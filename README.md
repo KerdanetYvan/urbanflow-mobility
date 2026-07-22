@@ -1,8 +1,17 @@
 # UrbanFlow Mobility
 
+[![CI](https://github.com/KerdanetYvan/urbanflow-mobility/actions/workflows/ci.yml/badge.svg)](https://github.com/KerdanetYvan/urbanflow-mobility/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Plateforme de mobilité urbaine intelligente — planification d'itinéraires multimodaux, profils de mobilité personnalisés, et classement des trajets en temps réel selon la météo, les perturbations et les préférences de l'usager.
 
 Projet réalisé dans le cadre du Titre 6 Concepteur Développeur de Solutions Digitales (RNCP 36146). Le dossier de certification complet, avec l'ensemble des choix argumentés, se trouve dans le dossier parent (`UrbanFlow_Mobility_Dossier.md`).
+
+## Suivi du projet
+
+- [GitHub Project (Kanban, sprints, milestones)](https://github.com/users/KerdanetYvan/projects/1)
+- [Issues](https://github.com/KerdanetYvan/urbanflow-mobility/issues)
+- [CONTRIBUTING.md](CONTRIBUTING.md) — workflow Git, convention de commits, checklist de PR
 
 ## Stack
 
