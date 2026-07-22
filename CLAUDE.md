@@ -63,6 +63,29 @@ Sprints de 2 semaines (approche Agile inspirée de Scrum), chacun terminé par u
 
 Git/GitHub, GitHub Projects (Kanban), GitHub Actions (CI : tests + lint à chaque push), Jest (tests unitaires), Postman (tests API), Figma (maquettes).
 
+## Suivi du GitHub Project (Kanban)
+
+Repo : `KerdanetYvan/urbanflow-mobility`. Project : [UrbanFlow Mobility](https://github.com/users/KerdanetYvan/projects/1) (project number 1, owner `KerdanetYvan`).
+
+Deux champs distincts sur le board, à ne pas confondre :
+
+- **Milestone** = à quel sprint la tâche est planifiée (Sprint 1/2/3, ou Stretch (post-MVP)).
+- **Status** = où elle en est dans le flux (Backlog → Sprint courant → In Progress → Review/QA → Done).
+
+Quand on travaille sur une issue en session, Claude Code doit tenir le Status à jour sans attendre qu'on le demande :
+
+- Passer l'issue en **In Progress** dès qu'on commence à coder dessus.
+- Passer l'issue en **Review/QA** dès qu'une PR liée est ouverte.
+- Le passage en **Done** est géré par les workflows natifs du Project une fois activés côté UI (`Project → ⋯ → Workflows` : "Item closed" et "Pull request merged" → Status = Done) — l'API GitHub ne permet pas de configurer ces workflows par commande, seulement de les activer manuellement dans l'interface.
+
+Commande utilisée pour modifier le Status d'un item (`gh` CLI, PowerShell) :
+
+```bash
+gh project item-edit --project-id "PVT_kwHOCjZVkc4BeKov" --id "<ITEM_ID>" --field-id "PVTSSF_lAHOCjZVkc4BeKovzhYm3is" --single-select-option-id "<OPTION_ID>"
+```
+
+Options du champ Status : Backlog `6a1fdd2b`, Sprint courant `a800da72`, In Progress `f47b8a18`, Review/QA `e4233821`, Done `46c90389`. L'ID d'item d'une issue s'obtient via `gh project item-list 1 --owner KerdanetYvan --format json`.
+
 ## Ce que ce dossier ne couvre pas encore
 
 - Docker n'était pas un choix acté dans le dossier de certification — c'est un ajout pour l'environnement de dev local, pas une exigence du cahier des charges.
