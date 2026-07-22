@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # Nécessite un export GTFS de la métropole et un extrait OpenStreetMap (.osm.pbf)
+  # déposés dans routing-engine/data/ avant le premier lancement (voir routing-engine/README.md)
+  otp:
+    image: opentripplanner/opentripplanner:2.5.0
+    restart: unless-stopped
+    volumes:
+      - ./routing-engine/data:/var/opentripplanner
+    command: ["--build", "--serve"]
+    ports:
+      - "8080:8080"
+
+  # Le build échouera tant que backend/ ne contient pas de projet NestJS initialisé
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - postgres
+      - otp
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Le build échouera tant que frontend/ ne contient pas de projet Vite initialisé
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
