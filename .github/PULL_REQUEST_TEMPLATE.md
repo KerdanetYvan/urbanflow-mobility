@@ -16,6 +16,8 @@ Closes #
 
 ## Checklist
 
+Voir [DEFINITION_OF_DONE.md](../DEFINITION_OF_DONE.md) pour le détail de chaque point.
+
 - [ ] Le code respecte les conventions de nommage du projet (voir `CLAUDE.md`)
 - [ ] Les tests unitaires passent (`npm test`)
 - [ ] Le lint passe (`npm run lint`)

@@ -42,6 +42,8 @@ docs(claude): met à jour les conventions de nommage
 3. Vérifier que la CI GitHub Actions est verte
 4. Renseigner le template de PR (ticket lié, checklist)
 
+Une issue n'est réellement terminée que si elle satisfait la [Definition of Done](DEFINITION_OF_DONE.md).
+
 ## Conventions de code
 
 Voir `CLAUDE.md` pour la stack technique, les conventions de nommage (endpoints, tables, composants) et les contraintes transverses (accessibilité, RGPD, sécurité OWASP, éco-conception) à respecter dans tout code ajouté.
