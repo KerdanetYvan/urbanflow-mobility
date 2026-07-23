@@ -12,6 +12,7 @@ Projet réalisé dans le cadre du Titre 6 Concepteur Développeur de Solutions D
 - [GitHub Project (Kanban, sprints, milestones)](https://github.com/users/KerdanetYvan/projects/1)
 - [Issues](https://github.com/KerdanetYvan/urbanflow-mobility/issues)
 - [CONTRIBUTING.md](CONTRIBUTING.md) — workflow Git, convention de commits, checklist de PR
+- [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — critères communs à toute issue considérée comme terminée
 
 ## Stack
 
@@ -23,7 +24,7 @@ Projet réalisé dans le cadre du Titre 6 Concepteur Développeur de Solutions D
 
 ## Structure du projet
 
-```
+```text
 UrbanFlow_Mobility/
 ├── frontend/          # PWA React (Vite)
 ├── backend/           # API REST NestJS
@@ -40,7 +41,7 @@ UrbanFlow_Mobility/
 2. Déposer les données de transport dans `routing-engine/data/` (export GTFS de la métropole + extrait OpenStreetMap au format `.osm.pbf`).
 3. Lancer l'environnement :
 
-```
+```bash
 docker compose up --build
 ```
 
