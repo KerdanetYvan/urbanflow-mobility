@@ -15,8 +15,19 @@ npm run dev
 - `npm run build` — build de production (`tsc -b && vite build`)
 - `npm run lint` — ESLint
 - `npm run preview` — prévisualisation du build de production
+- `npm test` — tests unitaires (Vitest, mode exécution unique)
+- `npm run test:watch` — Vitest en mode watch
+- `npm run test:cov` — tests avec rapport de couverture (`coverage/`, non versionné)
 
-Les tests (Vitest + React Testing Library) seront ajoutés par une issue QA dédiée.
+## Tests
+
+Framework : **Vitest** + **React Testing Library** (`@testing-library/react`, `@testing-library/user-event`, matchers `@testing-library/jest-dom`).
+
+- Environnement simulé : `jsdom` (voir `vite.config.ts`, clé `test`).
+- `globals: true` : `describe`/`it`/`expect` disponibles sans import (cohérent avec Jest côté backend).
+- `src/test/setup.ts` : chargé avant chaque fichier de test, ajoute les matchers `jest-dom`.
+
+Convention de nommage : `<composant>.spec.tsx` (ou `.spec.ts` pour un fichier non-JSX), **colocalisé** à côté du fichier testé — même convention que le backend (`src/App.tsx` → `src/App.spec.tsx`).
 
 ## Conventions à respecter
 
