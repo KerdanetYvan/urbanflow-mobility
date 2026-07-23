@@ -46,6 +46,16 @@ docker compose up --build
 
 Le frontend, le backend, OpenTripPlanner et la base de données démarrent ensemble. Voir `CLAUDE.md` pour le détail des choix d'architecture et des conventions de code à respecter.
 
+### Démarrage partiel en développement
+
+Tant que le frontend et/ou les données GTFS/OSM ne sont pas encore en place, on peut démarrer uniquement les services déjà prêts, par exemple :
+
+```bash
+docker compose up --build postgres backend
+```
+
+Le service `otp` redémarrera en boucle tant que `routing-engine/data/` ne contient pas d'export GTFS et d'extrait `.osm.pbf` valides — c'est attendu, ça ne bloque pas le backend ni la base de données.
+
 ## État actuel
 
-Cette arborescence est un point de départ : structure, configuration Docker et contexte de projet sont en place, mais le code applicatif (frontend et backend) reste à écrire.
+Backend NestJS initialisé et connecté à PostgreSQL/PostGIS (validé via `docker compose up postgres backend`). Frontend encore à initialiser. Voir le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) pour l'avancement détaillé.
