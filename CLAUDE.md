@@ -42,6 +42,15 @@ Un abonnement aux mises à jour GTFS-Realtime permet de détecter une perturbati
 | Composants React | PascalCase | `TripPlanner`, `MobilityDashboard` |
 | Services NestJS | Suffixe explicite du rôle | `TripService`, `ReservationService` |
 
+## Documentation du code
+
+Contrairement à la pratique par défaut de Claude Code (commenter seulement le non-évident), ce projet demande de **commenter un maximum** — c'est un projet pédagogique de certification, relu et noté, où la lisibilité et la pédagogie du code priment sur la concision :
+
+- Commentaires de ligne sur les portions de logique non triviales, même quand le code est déjà lisible par lui-même.
+- Commentaire au-dessus de chaque fonction/méthode expliquant ce qu'elle fait, ses paramètres et ce qu'elle retourne.
+- Docstrings/JSDoc sur les fonctions et classes exportées (services, contrôleurs, composants).
+- Cette règle s'applique à tout code écrit dans ce projet (backend, frontend, scripts), et prévaut sur l'instruction par défaut de sobriété en commentaires.
+
 ## Contraintes transverses à respecter dans le code
 
 - **PWA** : manifest, service worker, installable sans store.
