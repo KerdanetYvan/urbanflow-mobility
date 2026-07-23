@@ -46,16 +46,16 @@ docker compose up --build
 
 Le frontend, le backend, OpenTripPlanner et la base de données démarrent ensemble. Voir `CLAUDE.md` pour le détail des choix d'architecture et des conventions de code à respecter.
 
+`docker compose up --build` a été validé avec les 4 services (postgres, otp, backend, frontend). Le service `otp` redémarrera en boucle tant que `routing-engine/data/` ne contient pas d'export GTFS et d'extrait `.osm.pbf` valides — c'est attendu et sans impact sur le reste de la stack ; ça sera résolu par le ticket d'ingestion GTFS (F3).
+
 ### Démarrage partiel en développement
 
-Tant que le frontend et/ou les données GTFS/OSM ne sont pas encore en place, on peut démarrer uniquement les services déjà prêts, par exemple :
+Pour ne pas voir `otp` redémarrer en boucle tant que ses données ne sont pas prêtes, on peut démarrer uniquement les autres services :
 
 ```bash
-docker compose up --build postgres backend
+docker compose up --build postgres backend frontend
 ```
-
-Le service `otp` redémarrera en boucle tant que `routing-engine/data/` ne contient pas d'export GTFS et d'extrait `.osm.pbf` valides — c'est attendu, ça ne bloque pas le backend ni la base de données.
 
 ## État actuel
 
-Backend NestJS initialisé et connecté à PostgreSQL/PostGIS (validé via `docker compose up postgres backend`). Frontend encore à initialiser. Voir le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) pour l'avancement détaillé.
+Backend NestJS et frontend Vite/React initialisés, orchestration Docker Compose validée de bout en bout (backend connecté à PostgreSQL/PostGIS, frontend accessible). Voir le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) pour l'avancement détaillé.
