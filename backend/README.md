@@ -20,6 +20,12 @@ Nécessite une variable d'environnement `DATABASE_URL` (voir `../.env.example`),
 - `npm run lint` — ESLint
 - `npm test` — tests unitaires Jest
 
+## Gestion des erreurs et logs
+
+- `AllExceptionsFilter` (`src/common/filters/`) : filtre d'exceptions global, formate toute erreur en `{ statusCode, timestamp, path, message }`. Les erreurs non contrôlées (non-`HttpException`) sont masquées derrière un message générique côté client, mais loggées avec leur stack trace côté serveur — jamais l'inverse.
+- `LoggingInterceptor` (`src/common/interceptors/`) : logge chaque requête HTTP (méthode, URL, statut, durée) via le logger `HTTP`.
+- Niveaux de log : `error` pour les statuts ≥ 500, `warn` pour le reste des erreurs (4xx), `log` pour les requêtes normales.
+
 ## Conventions à respecter
 
 - Endpoints REST en **pluriel, kebab-case** (`GET /trips`, `POST /reservations`).
