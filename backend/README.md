@@ -20,6 +20,20 @@ Nécessite une variable d'environnement `DATABASE_URL` (voir `../.env.example`),
 - `npm run lint` — ESLint
 - `npm test` — tests unitaires Jest
 
+## Tests
+
+Framework : **Jest** (déjà configuré par le scaffold NestJS, voir le bloc `"jest"` dans `package.json`).
+
+- `npm test` — lance tous les tests unitaires
+- `npm run test:watch` — mode watch (relance à chaque sauvegarde)
+- `npm run test:cov` — génère un rapport de couverture dans `coverage/` (non versionné)
+- `npm run test:e2e` — tests end-to-end (config séparée dans `test/jest-e2e.json`)
+
+Convention de nommage :
+
+- Test unitaire : `<fichier>.spec.ts`, **colocalisé** à côté du fichier qu'il teste (ex. `src/common/filters/all-exceptions.filter.ts` → `src/common/filters/all-exceptions.filter.spec.ts`). Pas de dossier `__tests__` séparé, pour garder le test visible dès qu'on ouvre le fichier source.
+- Test end-to-end : `test/<nom>.e2e-spec.ts`.
+
 ## Gestion des erreurs et logs
 
 - `AllExceptionsFilter` (`src/common/filters/`) : filtre d'exceptions global, formate toute erreur en `{ statusCode, timestamp, path, message }`. Les erreurs non contrôlées (non-`HttpException`) sont masquées derrière un message générique côté client, mais loggées avec leur stack trace côté serveur — jamais l'inverse.
