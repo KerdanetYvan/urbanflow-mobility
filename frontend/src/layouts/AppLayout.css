@@ -1,0 +1,119 @@
+/*
+ * Styles du layout global, ecrits "mobile-first" : les regles de base
+ * s'appliquent aux petits ecrans, et les media queries (min-width) ajoutent
+ * ou modifient le comportement pour les ecrans plus larges. C'est l'inverse
+ * d'une approche "desktop-first" (qui partirait du grand ecran pour
+ * restreindre ensuite) : coherent avec la contrainte d'usage prioritaire
+ * en mobilite (voir CLAUDE.md).
+ */
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  /* Espace reserve en bas pour la nav fixe mobile (voir .app-nav ci-dessous),
+     sinon le dernier contenu de page serait cache derriere elle. */
+  padding-bottom: 4rem;
+}
+
+/*
+ * Lien d'evitement (skip link) : invisible tant qu'il n'a pas le focus
+ * clavier (Tab), visible des qu'un utilisateur clavier l'atteint. Pattern
+ * WCAG standard pour eviter de forcer a tabuler sur toute la navigation
+ * a chaque page.
+ */
+.skip-link {
+  position: absolute;
+  top: -3rem;
+  left: 0.5rem;
+  background: #1d3557;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0 0 0.25rem 0.25rem;
+  z-index: 100;
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+.app-header {
+  padding: 1rem;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Mobile (par defaut) : barre de navigation fixee en bas de l'ecran, comme
+   une app mobile classique (facile a atteindre au pouce). */
+.app-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  z-index: 10;
+}
+
+.app-nav-link {
+  flex: 1;
+  text-align: center;
+  padding: 0.75rem 0.25rem;
+  /* Cible tactile d'au moins 44px de haut (recommandation d'accessibilite
+     mobile), pour rester facilement cliquable/tapable. */
+  min-height: 44px;
+  font-size: 0.85rem;
+  color: #333;
+  text-decoration: none;
+}
+
+/* NavLink ajoute aria-current="page" sur le lien actif : on s'en sert
+   directement comme selecteur CSS plutot que de dupliquer la logique
+   en JS avec une classe "active" custom. */
+.app-nav-link[aria-current='page'] {
+  color: #1d3557;
+  font-weight: 700;
+  border-top: 2px solid #1d3557;
+}
+
+/* Ne jamais supprimer l'indicateur de focus clavier sans le remplacer :
+   ici on le rend simplement plus visible. */
+.app-nav-link:focus-visible {
+  outline: 2px solid #1d3557;
+  outline-offset: -2px;
+}
+
+.app-content {
+  flex: 1;
+  padding: 1rem;
+}
+
+/* A partir d'un ecran tablette/desktop : la navigation redevient une barre
+   classique en haut, sous l'entete, plutot qu'une barre fixe en bas. */
+@media (min-width: 768px) {
+  .app-layout {
+    padding-bottom: 0;
+  }
+
+  .app-nav {
+    position: static;
+    justify-content: center;
+    gap: 1.5rem;
+    border-top: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .app-nav-link {
+    flex: none;
+    padding: 1rem 0.5rem;
+  }
+}
