@@ -29,6 +29,18 @@ Framework : **Vitest** + **React Testing Library** (`@testing-library/react`, `@
 
 Convention de nommage : `<composant>.spec.tsx` (ou `.spec.ts` pour un fichier non-JSX), **colocalisé** à côté du fichier testé — même convention que le backend (`src/App.tsx` → `src/App.spec.tsx`).
 
+## Charte graphique (design tokens)
+
+`src/styles/tokens.css` est la **seule source de vérité** pour les couleurs, la typographie, l'espacement et les rayons de bordure (issue #52). Aucune valeur de couleur ou de taille ne doit être écrite en dur ailleurs — toujours passer par une variable définie ici, pour changer la charte en un seul endroit et garantir le support automatique du thème sombre (`@media (prefers-color-scheme: dark)`) partout dans l'app.
+
+Point important sur le primaire (ambre) : il existe **trois variantes**, non interchangeables :
+
+- `--color-primary` : fond d'une surface pleine (ex. bouton primaire). Vif, mais échoue le contraste WCAG utilisé comme texte sur fond de page (~2:1).
+- `--color-on-primary` : texte/icône par-dessus un fond `--color-primary`.
+- `--color-primary-emphasis` : le primaire utilisé comme texte, bordure ou anneau de focus **directement sur le fond de page** (ex. lien de nav actif) — conçu spécifiquement pour ce contraste-là (foncé en thème clair, clair en thème sombre), à l'inverse de `--color-primary`.
+
+Avant d'ajouter une couleur en dur dans un nouveau composant, vérifier si un token existant convient déjà.
+
 ## Navigation et layout
 
 - `react-router-dom` pour le routing (voir `src/App.tsx` pour l'arbre de routes). Le `BrowserRouter` est posé dans `src/main.tsx`, pas dans `App.tsx`, pour pouvoir tester la navigation avec un `MemoryRouter` à la place (voir `App.spec.tsx`).
