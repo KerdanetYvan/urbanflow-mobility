@@ -1,0 +1,132 @@
+/**
+ * Design tokens d'UrbanFlow Mobility (issue #52 — charte graphique).
+ *
+ * Ce fichier est la SEULE source de verite pour les couleurs, la
+ * typographie, l'espacement et les rayons de bordure. Aucun autre fichier
+ * CSS du projet ne doit contenir de couleur ou de taille en dur : toujours
+ * passer par une variable definie ici, pour pouvoir changer la charte en un
+ * seul endroit et garantir le support automatique du theme sombre partout.
+ */
+
+:root {
+  /* ============================================================
+     Couleurs de marque
+     ============================================================
+     Le primaire est volontairement CLAIR et vif dans les deux themes (un
+     ambre "pop" en clair, une nuance a peine plus foncee en sombre pour
+     eviter l'eblouissement sur fond noir), plutot que fonce en clair / clair
+     en sombre. Consequence directe : trois variantes du primaire, chacune
+     avec un usage precis et NON interchangeable :
+
+     --color-primary          : fond d'une surface pleine (ex. bouton primaire).
+     --color-on-primary       : texte/icone AU-DESSUS d'un fond --color-primary.
+     --color-primary-emphasis : le primaire utilise comme TEXTE, bordure ou
+                                anneau de focus, directement sur le fond de
+                                PAGE (pas sur un fond --color-primary). La
+                                version vive de --color-primary echoue le
+                                contraste WCAG utilisee ainsi (~2:1 sur blanc) ;
+                                --color-primary-emphasis est concue pour ca
+                                (fonce en theme clair, clair en theme sombre).
+     ------------------------------------------------------------ */
+  --color-primary: #f5a623;
+  --color-primary-dark: #d98a1e; /* hover/active du fond --color-primary */
+  --color-on-primary: #241a00;
+  --color-primary-emphasis: #8a5209;
+
+  --color-secondary: #2f6fed;
+  --color-secondary-dark: #1d4fbd;
+
+  --color-success: #2fa84f;
+  --color-warning: #d9600f;
+  --color-error: #e23d3d;
+  --color-info: var(--color-secondary);
+
+  /* Versions plus sombres, reservees au texte de corps dans les encadres
+     teintes (jamais la couleur saturee pleine pour du texte long, voir les
+     classes .alert-* dans les composants). */
+  --color-success-text: #1c5c2e;
+  --color-warning-text: #7a3308;
+  --color-error-text: #7a1414;
+  --color-info-text: #1a3f8f;
+
+  /* ============================================================
+     Neutres / theme clair (voir @media prefers-color-scheme plus bas
+     pour les surcharges du theme sombre)
+     ============================================================ */
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f7f7f8;
+  --color-text: #2b2b2f;
+  --color-text-muted: #6b6375;
+  --color-border: #e0e0e0;
+
+  /* ============================================================
+     Typographie
+     ============================================================
+     Police systeme (aucune requete reseau, coherent avec la contrainte
+     d'eco-conception C5 du sujet) plutot qu'une police web chargee. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+
+  --text-xs: 0.75rem; /* 12px - legendes, labels secondaires */
+  --text-sm: 0.875rem; /* 14px - texte secondaire */
+  --text-base: 1rem; /* 16px - corps de texte, jamais en dessous (zoom auto iOS) */
+  --text-lg: 1.125rem; /* 18px - texte mis en avant / h3 */
+  --text-xl: 1.5rem; /* 24px - h2 */
+  --text-2xl: 2rem; /* 32px - h1 mobile */
+  --text-3xl: 2.5rem; /* 40px - h1 desktop (>=768px) */
+
+  --weight-normal: 400;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --line-height-base: 1.5; /* WCAG 1.4.12 : au moins 1.5x pour le corps de texte */
+
+  /* ============================================================
+     Espacement (base 4px, en rem pour suivre le zoom navigateur)
+     ============================================================ */
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.5rem; /* 24px */
+  --space-6: 2rem; /* 32px */
+  --space-8: 3rem; /* 48px */
+
+  /* ============================================================
+     Rayons de bordure
+     ============================================================ */
+  --radius-sm: 0.25rem; /* champs de formulaire */
+  --radius-md: 0.5rem; /* boutons, cartes */
+  --radius-full: 9999px; /* badges, pastilles */
+
+  /* ============================================================
+     Accessibilite
+     ============================================================ */
+  --touch-target-min: 2.75rem; /* 44px, cible tactile minimale */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #16171d;
+    --color-bg-subtle: #1f2028;
+    --color-text: #e5e4e7;
+    --color-text-muted: #9ca3af;
+    --color-border: #2e303a;
+
+    --color-success-text: #7fd89a;
+    --color-warning-text: #f0a06a;
+    --color-error-text: #f2a0a0;
+    --color-info-text: #9dbcf5;
+
+    /* Nuance a peine plus foncee qu'en clair : un ambre trop lumineux
+       "eblouirait" sur fond quasi noir. --color-on-primary ne change pas
+       (il reste fonce dans les deux themes, voir le commentaire plus haut). */
+    --color-primary: #e0993d;
+    --color-primary-dark: #c97f22;
+    /* Clair plutot que fonce ici : doit contraster avec le fond de PAGE
+       quasi-noir, pas avec le bouton (voir le commentaire sur
+       --color-primary-emphasis plus haut). */
+    --color-primary-emphasis: #f4c177;
+  }
+}

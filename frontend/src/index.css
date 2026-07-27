@@ -1,37 +1,21 @@
 /*
- * Styles globaux et variables de theme. Conserve les tokens de couleur du
- * scaffold Vite (utiles, notamment le support clair/sombre via
- * prefers-color-scheme), mais retire les regles specifiques a la page de
- * demo Vite/React (largeur fixe centree, classes .counter/.button-icon...)
- * qui ne conviennent pas a un layout d'application mobile-first pleine largeur.
+ * Styles globaux de base. Les variables de theme (couleurs, typographie,
+ * espacement) vivent dans styles/tokens.css, seule source de verite pour
+ * la charte graphique (voir issue #52) - ce fichier ne fait que les
+ * consommer pour les styles element-par-element les plus generaux.
  */
 
+@import './styles/tokens.css';
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-
-  font: 16px/145% var(--sans);
+  font: var(--text-base) / var(--line-height-base) var(--font-sans);
   color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--color-text);
+  background: var(--color-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-  }
 }
 
 * {
@@ -49,12 +33,32 @@ body {
 }
 
 h1,
+h2,
+h3 {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+}
+
+h1 {
+  font-size: var(--text-2xl);
+}
+
 h2 {
-  font-family: var(--heading);
-  font-weight: 600;
-  color: var(--text-h);
+  font-size: var(--text-xl);
+}
+
+h3 {
+  font-size: var(--text-lg);
+}
+
+@media (min-width: 768px) {
+  h1 {
+    font-size: var(--text-3xl);
+  }
 }
 
 p {
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-3);
 }
