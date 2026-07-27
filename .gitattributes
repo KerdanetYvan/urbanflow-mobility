@@ -1,0 +1,14 @@
+# Normalise les fins de ligne en LF pour tous les fichiers texte, quel que
+# soit le reglage local core.autocrlf de chaque contributeur. Le projet
+# tourne aussi sous Linux (Docker, CI GitHub Actions sur runners Ubuntu),
+# qui attendent du LF nativement.
+* text=auto eol=lf
+
+# Fichiers binaires : jamais de normalisation de fins de ligne
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
