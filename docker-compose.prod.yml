@@ -1,0 +1,39 @@
+# Stack de production (issue #24). Different du docker-compose.yml de dev :
+# - backend construit avec un Dockerfile de production (build compile,
+#   pas de bind mount, pas de mode watch)
+# - pas de service frontend : le build (frontend/dist) est servi en fichiers
+#   statiques directement par Caddy (reverse proxy installe sur l'hote,
+#   voir /etc/caddy/Caddyfile), pas besoin d'un conteneur pour ca
+# - pas de service otp pour l'instant : necessite les vraies donnees GTFS/OSM
+#   de la metropole (issue F3), sera reintroduit a ce moment-la
+# - postgres n'expose aucun port : seul le reseau docker interne y accede
+# - le port du backend est lie a 127.0.0.1 uniquement (pas 0.0.0.0) : Docker
+#   manipule iptables directement et contourne ufw pour les ports publies,
+#   donc "127.0.0.1:3000:3000" est necessaire pour que le port ne soit
+#   PAS expose publiquement - seul Caddy (sur l'hote) doit pouvoir l'atteindre.
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: always
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.prod.Dockerfile
+    restart: always
+    env_file: .env
+    depends_on:
+      - postgres
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  postgres_data:

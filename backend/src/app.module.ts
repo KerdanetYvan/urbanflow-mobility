@@ -19,8 +19,14 @@ import { UsersModule } from './users/users.module';
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
-        synchronize:
-          config.get<string>('NODE_ENV', 'development') !== 'production',
+        // Controle par sa propre variable plutot que deduit de NODE_ENV :
+        // synchronize (creation automatique du schema) et "on tourne en
+        // production" sont deux questions independantes. Tant qu'aucune
+        // migration TypeORM n'existe (voir issue de durcissement a venir),
+        // TYPEORM_SYNC=true reste necessaire meme en production pour que
+        // les tables se creent. A repasser a false une fois les migrations
+        // en place.
+        synchronize: config.get<string>('TYPEORM_SYNC', 'false') === 'true',
       }),
     }),
     UsersModule,

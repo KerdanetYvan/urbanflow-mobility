@@ -56,4 +56,4 @@ Convention de nommage :
 - Le service de scoring (partie 7.3 du dossier) est un module dédié, interrogé après chaque appel à OpenTripPlanner — poids clairs et modifiables, pas de modèle opaque.
 - Authentification JWT + refresh tokens, mots de passe hachés avec bcrypt (voir annexes C et D du dossier de certification).
 - Respect OWASP Top 10 sur l'ensemble des endpoints exposés.
-- `synchronize` TypeORM n'est actif qu'en dehors de `NODE_ENV=production` (voir `src/app.module.ts`) — les migrations seront introduites avant tout déploiement en production.
+- `synchronize` TypeORM (création automatique du schéma) est piloté par sa propre variable `TYPEORM_SYNC` (voir `src/app.module.ts`), indépendamment de `NODE_ENV` : les deux questions ("crée le schéma automatiquement ?" et "tourne-t-on en production ?") sont indépendantes. `TYPEORM_SYNC=true` reste nécessaire même en production tant qu'aucune migration TypeORM n'existe — à repasser à `false` une fois les migrations en place.

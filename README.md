@@ -65,6 +65,17 @@ Sur Windows, les événements de changement de fichier ne remontent pas toujours
 docker compose restart backend
 ```
 
+## Déploiement (production)
+
+La solution est en ligne : **[urbanflow-mobility.kerdanetyvan.dev](https://urbanflow-mobility.kerdanetyvan.dev)**
+
+- Hébergement : VPS OVHcloud (VPS-2, 4 vCPU / 8 Go, Ubuntu 26.04 LTS) — choix argumenté dans le dossier de certification (hébergement UE, RGPD).
+- Accès SSH par clé uniquement (mot de passe désactivé), `ufw` (22/80/443 seulement) + `fail2ban` actifs.
+- **Caddy** en reverse proxy sur l'hôte : HTTPS automatique (Let's Encrypt), sert le build statique du frontend (`/var/www/urbanflow-frontend`) et route `/api/*` vers le conteneur backend.
+- `docker-compose.prod.yml` : uniquement `postgres` + `backend` (le frontend est servi en statique par Caddy, pas besoin de conteneur ; `otp` sera réintroduit avec les vraies données GTFS, F3). Le port du backend est lié à `127.0.0.1` uniquement — Docker contourne `ufw` pour les ports publiés, donc seul Caddy (sur l'hôte) peut atteindre le conteneur.
+- Backend construit via `docker/backend.prod.Dockerfile` (multi-étapes : build TypeScript puis image finale sans devDependencies).
+- `TYPEORM_SYNC=true` en production pour l'instant (pas encore de migrations TypeORM) — à repasser à `false` une fois les migrations en place (voir `backend/README.md`).
+
 ## État actuel
 
-Backend NestJS et frontend Vite/React initialisés, orchestration Docker Compose validée de bout en bout (backend connecté à PostgreSQL/PostGIS, frontend accessible). Voir le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) pour l'avancement détaillé.
+Backend NestJS et frontend Vite/React initialisés, orchestration Docker Compose validée de bout en bout (backend connecté à PostgreSQL/PostGIS, frontend accessible). Solution déployée en continu. Voir le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) pour l'avancement détaillé.

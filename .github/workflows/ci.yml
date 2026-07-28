@@ -78,3 +78,51 @@ jobs:
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists != 'true'
         run: echo "backend/package.json absent — étape ignorée en attendant l'initialisation du projet."
+
+  deploy:
+    name: Déploiement production
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    # Seulement sur un push reel sur main (pas sur les PR) : merger sur main
+    # redeploie automatiquement, ouvrir/mettre a jour une PR ne deploie rien.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build du frontend
+        working-directory: frontend
+        env:
+          # Chemin relatif : fonctionne quel que soit le domaine, Caddy route
+          # /api/* vers le backend (voir /etc/caddy/Caddyfile sur le serveur).
+          VITE_API_URL: /api
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configurer l'accès SSH au serveur
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Déployer les fichiers statiques du frontend
+        run: |
+          rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key" \
+            frontend/dist/ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/urbanflow-frontend/"
+
+      - name: Déployer le backend (git reset --hard + rebuild du conteneur)
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" '
+            set -e
+            cd /home/ubuntu/app
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose -f docker-compose.prod.yml up --build -d
+          '
