@@ -1,3 +1,11 @@
+import {
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  saveTokens,
+  type TokenPair,
+} from './authStorage';
+
 /**
  * URL de base de l'API, fournie par Vite via une variable d'environnement
  * prefixee VITE_ (seules celles-ci sont exposees au code cote client, par
@@ -58,4 +66,69 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export function apiPost<T>(path: string, data: unknown): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(data) });
+}
+
+/**
+ * Echange le refresh token stocke contre une nouvelle paire de jetons et
+ * les sauvegarde. Levee interne uniquement (voir authRequest) : jamais
+ * appelee directement par les pages.
+ */
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    throw new ApiError('Session expirée', 401);
+  }
+  const tokens = await request<TokenPair>('/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
+  });
+  saveTokens(tokens);
+  return tokens.accessToken;
+}
+
+/**
+ * Comme `request`, mais attache l'access token stocke en en-tete
+ * Authorization. Si l'API repond 401 (access token expire - duree de vie
+ * courte, voir backend/README.md), tente UNE fois un rafraichissement via
+ * le refresh token avant de rejouer l'appel original. Si le rafraichissement
+ * echoue aussi (refresh token expire/invalide), nettoie les jetons stockes :
+ * a l'appelant de rediriger vers /connexion en voyant l'erreur remonter.
+ */
+async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const callWithToken = (token: string | null) =>
+    request<T>(path, {
+      ...options,
+      headers: { ...options?.headers, Authorization: `Bearer ${token ?? ''}` },
+    });
+
+  try {
+    return await callWithToken(getAccessToken());
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.statusCode !== 401) {
+      throw error;
+    }
+    try {
+      const newAccessToken = await refreshAccessToken();
+      return await callWithToken(newAccessToken);
+    } catch {
+      clearTokens();
+      throw new ApiError('Session expirée, veuillez vous reconnecter', 401);
+    }
+  }
+}
+
+export function authGet<T>(path: string): Promise<T> {
+  return authRequest<T>(path);
+}
+
+export function authPost<T>(path: string, data: unknown): Promise<T> {
+  return authRequest<T>(path, { method: 'POST', body: JSON.stringify(data) });
+}
+
+export function authPatch<T>(path: string, data: unknown): Promise<T> {
+  return authRequest<T>(path, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export function authDelete<T>(path: string): Promise<T> {
+  return authRequest<T>(path, { method: 'DELETE' });
 }
