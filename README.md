@@ -57,6 +57,14 @@ Pour ne pas voir `otp` redémarrer en boucle tant que ses données ne sont pas p
 docker compose up --build postgres backend frontend
 ```
 
+### Le rechargement à chaud ne se déclenche pas après une modification
+
+Sur Windows, les événements de changement de fichier ne remontent pas toujours de manière fiable à travers un bind mount Docker jusqu'au mode `--watch` de NestJS/Vite. Si le comportement observé ne correspond pas au code modifié, redémarrer le service concerné avant de chercher plus loin :
+
+```bash
+docker compose restart backend
+```
+
 ## État actuel
 
 Backend NestJS et frontend Vite/React initialisés, orchestration Docker Compose validée de bout en bout (backend connecté à PostgreSQL/PostGIS, frontend accessible). Voir le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) pour l'avancement détaillé.

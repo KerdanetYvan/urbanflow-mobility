@@ -1,0 +1,51 @@
+/* Voir styles/tokens.css pour le detail des variables utilisees, et le
+   commentaire sur --color-primary vs --color-primary-emphasis. */
+
+.btn {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* outline: currentColor par defaut : chaque variante recupere la couleur
+   de SON texte pour son anneau de focus (pas de bleu impose a tous). */
+.btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+/* --color-on-primary ne convient pas pour l'anneau de focus : il est choisi
+   pour contraster avec LE BOUTON, pas avec le fond de page sur lequel
+   l'anneau se dessine (voir --color-primary-emphasis dans tokens.css). */
+.btn-primary:focus-visible {
+  outline-color: var(--color-primary-emphasis);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
