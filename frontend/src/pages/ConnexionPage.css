@@ -1,0 +1,54 @@
+.connexion-page {
+  max-width: 24rem;
+  margin: var(--space-6) auto 0;
+}
+
+/* Carte sobre : bordure + ombre tres legere pour detacher le formulaire du
+   fond de page, sans degrade ni illustration (voir issue #33 - direction
+   "minimal mais soigne"). La bordure a elle seule assure la delimitation
+   dans les deux themes ; l'ombre n'apporte qu'un plus en theme clair. */
+.connexion-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-5);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.connexion-submit {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.connexion-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.connexion-tab {
+  flex: 1;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.connexion-tab[aria-selected='true'] {
+  color: var(--color-primary-emphasis);
+  border-bottom-color: var(--color-primary-emphasis);
+}
+
+.connexion-tab:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: -2px;
+}

@@ -45,10 +45,18 @@ Avant d'ajouter une couleur en dur dans un nouveau composant, vérifier si un to
 
 - `react-router-dom` pour le routing (voir `src/App.tsx` pour l'arbre de routes). Le `BrowserRouter` est posé dans `src/main.tsx`, pas dans `App.tsx`, pour pouvoir tester la navigation avec un `MemoryRouter` à la place (voir `App.spec.tsx`).
 - `src/layouts/AppLayout.tsx` : entête + navigation principale (`NavLink`, avec `aria-current="page"` automatique sur le lien actif) + zone de contenu (`<Outlet />`). Inclut un lien d'évitement (skip link) pour la navigation clavier.
-- `src/pages/` : un composant par écran principal (`ConnexionPage`, `ProfilPage`, `RecherchePage`, `ResultatsPage`, `HistoriquePage`) — pour l'instant des placeholders, à remplir par leurs issues dédiées respectives.
+- `src/pages/` : un composant par écran principal (`ConnexionPage`, `ProfilPage`, `RecherchePage`, `ResultatsPage`, `HistoriquePage`). `ConnexionPage` est implémenté (F1, issue #33) ; les autres restent des placeholders, à remplir par leurs issues dédiées.
 - Layout mobile-first (`AppLayout.css`) : navigation fixée en bas de l'écran sur mobile (à portée du pouce), qui redevient une barre classique en haut à partir de 768px.
 
 **Sécurité** : `react-router-dom` reste sur sa dernière version malgré une alerte `npm audit` (CVE sur le "RSC Mode", un mode framework avec actions serveur qu'on n'utilise pas ici — SPA client pur avec `BrowserRouter`). Revenir à une version antérieure réintroduirait une dizaine d'autres failles déjà corrigées entretemps.
+
+## Authentification (F1)
+
+- `src/lib/api.ts` — petit client fetch : lit l'URL de base dans `VITE_API_URL`, lève une `ApiError` avec le message déjà prêt à afficher (gère aussi bien un message simple qu'un tableau de messages de validation renvoyé par le backend).
+- `src/lib/auth.ts` — `register()` (POST /users) et `login()` (POST /auth/login, enregistre les jetons). `register()` ne connecte pas automatiquement (le backend ne renvoie pas de jetons à l'inscription) : `ConnexionPage` enchaîne elle-même un `login()` juste après un `register()` réussi.
+- `src/lib/authStorage.ts` — jetons stockés en `localStorage`. Compromis assumé pour le MVP (voir le commentaire dans le fichier) : plus simple qu'un cookie httpOnly, mais accessible en JS donc sensible en cas de faille XSS ailleurs — à réévaluer lors de l'audit sécurité OWASP dédié (issue #21, Sprint 3).
+- `src/components/` — `Button`, `FormField`, `Alert` : composants communs réutilisables, implémentent la charte graphique (issue #52). `ConnexionPage` est le premier écran à les utiliser ; les futurs écrans (recherche, résultats...) doivent les réutiliser plutôt que redéfinir leurs propres styles de bouton/champ.
+- Validation double : côté client (retour immédiat, `ConnexionPage.tsx`) **et** côté serveur (jamais faire confiance uniquement au client) — les deux appliquent la même règle de mot de passe (8 caractères minimum, une majuscule, une minuscule, un chiffre, un caractère spécial) et le même message d'erreur.
 
 ## Conventions à respecter
 

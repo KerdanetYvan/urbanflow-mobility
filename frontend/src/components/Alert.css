@@ -1,0 +1,79 @@
+.alert {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  border: 1px solid;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.alert strong {
+  display: block;
+  font-size: var(--text-base);
+  margin-bottom: var(--space-1);
+}
+
+/* Pastille ronde derriere l'icone plutot que l'icone "a vif" sur le fond
+   teinte : lisibilite, coherence avec les badges (meme --radius-full). */
+.alert-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  line-height: 1;
+  color: #fff;
+}
+
+.alert-success {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-bg));
+  color: var(--color-success-text);
+}
+.alert-success strong {
+  color: var(--color-success);
+}
+.alert-success .alert-icon {
+  background: var(--color-success);
+}
+
+.alert-warning {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-bg));
+  color: var(--color-warning-text);
+}
+.alert-warning strong {
+  color: var(--color-warning);
+}
+.alert-warning .alert-icon {
+  background: var(--color-warning);
+}
+
+.alert-error {
+  border-color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 12%, var(--color-bg));
+  color: var(--color-error-text);
+}
+.alert-error strong {
+  color: var(--color-error);
+}
+.alert-error .alert-icon {
+  background: var(--color-error);
+}
+
+.alert-info {
+  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, var(--color-bg));
+  color: var(--color-info-text);
+}
+.alert-info strong {
+  color: var(--color-info);
+}
+.alert-info .alert-icon {
+  background: var(--color-info);
+}

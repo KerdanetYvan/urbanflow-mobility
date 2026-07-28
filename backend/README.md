@@ -40,6 +40,15 @@ Convention de nommage :
 - `LoggingInterceptor` (`src/common/interceptors/`) : logge chaque requête HTTP (méthode, URL, statut, durée) via le logger `HTTP`.
 - Niveaux de log : `error` pour les statuts ≥ 500, `warn` pour le reste des erreurs (4xx), `log` pour les requêtes normales.
 
+## Authentification (F1)
+
+- `POST /users` — inscription (`src/users/`). Cree le compte, mot de passe hache **bcryptjs** (10 rounds), ne renvoie jamais le hash au client. Ne connecte pas automatiquement l'utilisateur (le frontend enchaine lui-meme un login juste apres, voir `frontend/README.md`).
+- `POST /auth/login` — connexion (`src/auth/`). Verifie l'email/mot de passe, renvoie une paire `{ accessToken, refreshToken }`. Message d'erreur volontairement identique que ce soit l'email inconnu ou le mot de passe incorrect (pas d'enumeration d'utilisateurs, OWASP).
+- `POST /auth/refresh` — echange un refresh token valide contre une nouvelle paire de jetons.
+- Access token : courte duree (`JWT_EXPIRATION`, 15 min par defaut), signe avec `JWT_SECRET`. Refresh token : longue duree (`JWT_REFRESH_EXPIRATION`, 7 j), signe avec un secret **different** (`JWT_REFRESH_SECRET`) — si l'un des deux secrets fuite, l'autre type de jeton ne peut pas etre forge.
+- `JwtStrategy` + `JwtAuthGuard` (`src/auth/`) : infrastructure prete pour proteger de futurs endpoints (`@UseGuards(JwtAuthGuard)`), pas encore utilisee par un endpoint metier (viendra avec le profil de mobilite).
+- CORS activé (`CORS_ORIGIN` dans `.env`, `http://localhost:5173` par defaut) : necessaire des qu'un frontend sur un port different appelle l'API depuis un navigateur.
+
 ## Conventions à respecter
 
 - Endpoints REST en **pluriel, kebab-case** (`GET /trips`, `POST /reservations`).

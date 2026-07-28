@@ -1,0 +1,70 @@
+.field {
+  margin-bottom: var(--space-5);
+}
+
+.field label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-1);
+}
+
+.field-input-wrapper {
+  position: relative;
+}
+
+.field-icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--color-text-muted);
+  /* Purement decoratif : ne doit jamais intercepter le clic destine au champ. */
+  pointer-events: none;
+}
+
+.field input {
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-3);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.field input.has-icon {
+  padding-left: 2.75rem;
+}
+
+.field input:focus-visible {
+  outline: none;
+  border-color: var(--color-secondary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 25%, transparent);
+}
+
+.field.has-error input {
+  border-color: var(--color-error);
+}
+
+.field.has-error input:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 25%, transparent);
+}
+
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-error-text);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+}
+
+.field-help {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+}
