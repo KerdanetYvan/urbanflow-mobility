@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './layouts/AppLayout';
+import RequireAuth from './components/RequireAuth';
 import ConnexionPage from './pages/ConnexionPage';
 import ProfilPage from './pages/ProfilPage';
 import RecherchePage from './pages/RecherchePage';
@@ -25,7 +26,14 @@ function App() {
             d'entree naturel de l'application pour un utilisateur non identifie. */}
         <Route index element={<Navigate to="/connexion" replace />} />
         <Route path="connexion" element={<ConnexionPage />} />
-        <Route path="profil" element={<ProfilPage />} />
+        <Route
+          path="profil"
+          element={
+            <RequireAuth>
+              <ProfilPage />
+            </RequireAuth>
+          }
+        />
         <Route path="recherche" element={<RecherchePage />} />
         <Route path="resultats" element={<ResultatsPage />} />
         <Route path="historique" element={<HistoriquePage />} />
