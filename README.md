@@ -38,7 +38,7 @@ UrbanFlow_Mobility/
 ## Démarrage
 
 1. Copier `.env.example` vers `.env` et compléter les valeurs (secrets, clés API).
-2. Déposer les données de transport dans `routing-engine/data/` (export GTFS de la métropole + extrait OpenStreetMap au format `.osm.pbf`).
+2. Déposer les données de transport dans `routing-engine/data/` (export GTFS de la métropole + extrait OpenStreetMap au format `.osm.pbf`) — **ou**, pour un développement local sans dépendre des vraies données, copier le petit jeu de test versionné (`routing-engine/test-fixtures/`, voir `routing-engine/README.md`).
 3. Lancer l'environnement :
 
 ```bash
@@ -46,6 +46,12 @@ docker compose up --build
 ```
 
 Le frontend, le backend, OpenTripPlanner et la base de données démarrent ensemble. Voir `CLAUDE.md` pour le détail des choix d'architecture et des conventions de code à respecter.
+
+Optionnel : peupler la base avec un jeu de comptes de test (issue #40, voir `backend/README.md` pour le détail des comptes créés) :
+
+```bash
+docker compose exec backend npm run seed
+```
 
 `docker compose up --build` a été validé avec les 4 services (postgres, otp, backend, frontend). Le service `otp` redémarrera en boucle tant que `routing-engine/data/` ne contient pas d'export GTFS et d'extrait `.osm.pbf` valides — c'est attendu et sans impact sur le reste de la stack ; ça sera résolu par le ticket d'ingestion GTFS (F3).
 
