@@ -76,6 +76,8 @@ Git/GitHub, GitHub Projects (Kanban), GitHub Actions (CI : tests + lint à chaqu
 
 Repo : `KerdanetYvan/urbanflow-mobility`. Project : [UrbanFlow Mobility](https://github.com/users/KerdanetYvan/projects/1) (project number 1, owner `KerdanetYvan`).
 
+**Reprendre après une coupure de session** : `docs/sprints/sprint-<N>-plan.md` (s'il existe pour le sprint en cours) fixe l'ordre de traitement décidé en session — le consulter en priorité, puis vérifier le Status réel des issues sur le board (une issue déjà avancée ne se redémarre pas depuis le haut de la liste). Le fichier explique lui-même comment s'en servir.
+
 Deux champs distincts sur le board, à ne pas confondre :
 
 - **Milestone** = à quel sprint la tâche est planifiée (Sprint 1/2/3, ou Stretch (post-MVP)).
