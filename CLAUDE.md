@@ -53,7 +53,7 @@ Contrairement à la pratique par défaut de Claude Code (commenter seulement le 
 
 ## Contraintes transverses à respecter dans le code
 
-- **PWA** : manifest, service worker, installable sans store.
+- **PWA** : manifest, service worker, installable sans store. Le manifest utilise `display: 'standalone'` (voir `frontend/vite.config.ts`, issue #19) : une fois installée, l'app s'ouvre sans barre d'adresse ni bouton "retour" du navigateur — impact direct sur le design mobile-first, la navigation en propre (`AppLayout`) doit donc rester utilisable de façon autonome, sans compter sur les affordances du navigateur.
 - **Responsive / UX** : utilisable sur mobile en priorité (usage en mobilité).
 - **Sécurité — OWASP** : suivre les recommandations OWASP Top 10 sur l'API.
 - **Éco-conception** : limiter les appels réseau superflus, chargement progressif des données.

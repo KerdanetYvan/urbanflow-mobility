@@ -1,6 +1,6 @@
 # Frontend — PWA UrbanFlow Mobility
 
-Stack retenue (voir `../CLAUDE.md`) : **React + Vite (TypeScript)**, PWA via **Workbox** pour le service worker (à mettre en place, voir issue dédiée).
+Stack retenue (voir `../CLAUDE.md`) : **React + Vite (TypeScript)**, PWA via **Workbox** pour le service worker (voir [section PWA](#pwa-installabilité) ci-dessous, issue #19).
 
 ## Démarrage local
 
@@ -64,6 +64,20 @@ Avant d'ajouter une couleur en dur dans un nouveau composant, vérifier si un to
 - `src/lib/profile.ts` — `getMyProfile()`, `createProfile()`, `updateProfile()`, `deleteProfile()`, toutes via les helpers authentifiés de `api.ts` (en-tête `Authorization` automatique). `TRANSPORT_MODES` liste les modes de transport affichables dans le formulaire (mêmes valeurs que l'enum `TransportMode` du backend, dupliquées volontairement — pas de code partagé entre les deux projets).
 - `src/lib/api.ts` — `authGet`/`authPost`/`authPatch`/`authDelete` : variantes authentifiées de la requête de base. En cas de 401 (access token expiré), tentent **une fois** un rafraîchissement via le refresh token stocké avant de rejouer l'appel ; si le rafraîchissement échoue aussi, nettoient les jetons et laissent l'erreur remonter (la page appelante redirige alors vers `/connexion`).
 - `ProfilPage` : charge le profil au montage (`GET /profiles/me`) ; un 404 signifie "pas encore de profil" (formulaire vide, la sauvegarde fera un `POST` plutôt qu'un `PATCH`) — pas une erreur à afficher à l'utilisateur.
+
+## PWA (installabilité)
+
+Fondations PWA (issue #19) : manifest + service worker via **`vite-plugin-pwa`** (génère un service worker Workbox au build, stratégie `generateSW` — pas de fichier de service worker écrit à la main).
+
+- `vite.config.ts` — configuration du plugin : manifest (nom, couleurs, icônes), `registerType: 'autoUpdate'` (le service worker se met à jour automatiquement, cohérent avec le déploiement continu du projet), et une règle de cache runtime `NetworkFirst` sur `/api/*` (réseau en priorité, repli sur le cache si hors-ligne — générique, couvrira aussi les futurs endpoints de recherche d'itinéraires sans modification).
+- `public/favicon.svg` — monogramme "U" en ruban à largeur variable (fin aux extrémités, plein au centre du trait), branche gauche droite et volontairement plus longue que la branche droite qui se courbe vers l'extérieur. Couleurs `--color-primary`/`--color-on-primary` de `tokens.css`. **Généré, ne pas éditer à la main** — voir ci-dessous.
+- `npm run favicon` (`scripts/generate-favicon.mjs`) — régénère `public/favicon.svg` à partir d'une ligne centrale paramétrique (le contour à largeur variable est calculé, pas dessiné à la main : SVG ne sait pas faire varier `stroke-width` le long d'un tracé). Pour ajuster le dessin (épaisseur, longueur des branches, couleurs), modifier les constantes en tête du script puis relancer — ne jamais éditer `favicon.svg` directement, il serait écrasé.
+- `npm run icons` (`scripts/generate-pwa-icons.mjs`, dépendance `sharp`) — relance d'abord `npm run favicon`, puis régénère `public/pwa-192x192.png`, `public/pwa-512x512.png` et `public/apple-touch-icon.png` à partir du SVG. Commande à utiliser pour tout régénérer en une fois.
+- `index.html` — balises Apple (`apple-touch-icon`, `apple-mobile-web-app-*`) ajoutées à la main : iOS ignore le manifest web pour l'icône et le mode plein écran. Le lien `<link rel="manifest">` et l'enregistrement du service worker sont eux injectés automatiquement au build par `vite-plugin-pwa`.
+
+**Vérification** : `npm run build && npm run preview`, puis auditer `http://localhost:4173` avec Lighthouse. Catégorie PWA notée (manifest, service worker, icône maskable, splash screen) : 100/100 sur Lighthouse 10.4 — dernière version où cette catégorie est encore un score chiffré, Lighthouse 11+ l'a retirée de la config par défaut (les audits d'installabilité existent toujours individuellement mais ne sont plus groupés/notés). Utiliser `npx lighthouse@10.4.0 <url> --only-categories=pwa` pour reproduire un score comparable.
+
+**Sécurité (audit npm)** : `vite-plugin-pwa` tire `workbox-build` qui dépend d'un ancien `rollup-plugin-off-main-thread` (via `ejs`/`jake`/`filelist`, vulnérabilités "high" côté `npm audit`). Ces paquets ne s'exécutent qu'au build (génération du service worker), jamais expédiés dans le bundle livré au navigateur — risque limité à la chaîne de build, pas à l'application en production. Pas de correctif amont disponible à ce jour sans rétrograder `vite-plugin-pwa` en semver majeur (voir aussi la note équivalente sur `react-router-dom` plus haut).
 
 ## Conventions à respecter
 

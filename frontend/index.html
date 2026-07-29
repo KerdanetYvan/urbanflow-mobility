@@ -5,6 +5,32 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>UrbanFlow Mobility</title>
+
+    <!--
+      Le lien <link rel="manifest"> et l'enregistrement du service worker
+      sont injectes automatiquement au build par vite-plugin-pwa
+      (voir vite.config.ts, injectRegister: 'auto' par defaut) : pas besoin
+      de les ajouter ici a la main.
+    -->
+
+    <!--
+      theme-color : teinte la barre d'adresse/barre de statut du navigateur
+      (Chrome Android notamment) - meme valeur que theme_color du manifest
+      (vite.config.ts) pour rester coherent entre l'app installee et l'app
+      ouverte dans un onglet classique.
+    -->
+    <meta name="theme-color" content="#f5a623" />
+
+    <!--
+      iOS ignore le manifest web pour l'icone/le mode plein ecran : ces
+      balises Apple-specifiques sont necessaires en plus pour un "Ajout a
+      l'ecran d'accueil" correct sur Safari iOS (icone dediee generee par
+      npm run icons, voir scripts/generate-pwa-icons.mjs).
+    -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="UrbanFlow" />
   </head>
   <body>
     <div id="root"></div>
