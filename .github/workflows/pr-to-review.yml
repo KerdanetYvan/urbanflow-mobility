@@ -1,0 +1,66 @@
+name: PR → Review/QA
+
+# Bascule automatiquement en Review/QA les issues du GitHub Project que
+# cette PR fermera au merge (mot-cle "Closes #N"/"Fixes #N" deja
+# interprete par GitHub via closingIssuesReferences, pas de re-parsing
+# manuel du corps de la PR).
+#
+# ready_for_review en plus de opened : une PR ouverte en brouillon puis
+# marquee prete declenche aussi le basculement, sans quoi une PR qui
+# reste longtemps en brouillon ne bougerait jamais l'issue.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  move-to-review:
+    name: Basculer les issues liées en Review/QA
+    runs-on: ubuntu-latest
+    # Une PR encore en brouillon n'est pas prete pour la revue.
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Basculer le Status des issues liées
+        env:
+          # PAT dedie avec le scope "project" : le GITHUB_TOKEN par defaut
+          # des Actions n'a pas acces aux GitHub Projects (v2) d'un compte
+          # utilisateur (voir CLAUDE.md, section "Suivi du GitHub Project").
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+
+          # Identifiants stables du board (voir CLAUDE.md) : project number 1
+          # chez KerdanetYvan, champ Status, option "Review/QA".
+          PROJECT_ID="PVT_kwHOCjZVkc4BeKov"
+          STATUS_FIELD_ID="PVTSSF_lAHOCjZVkc4BeKovzhYm3is"
+          REVIEW_OPTION_ID="e4233821"
+
+          # Issues que cette PR fermera au merge (deduites par GitHub a
+          # partir des mots-cles "Closes #N" / "Fixes #N" / "Resolves #N"
+          # dans le corps de la PR).
+          ISSUE_NUMBERS=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+            --json closingIssuesReferences \
+            --jq '.closingIssuesReferences[].number')
+
+          if [ -z "$ISSUE_NUMBERS" ]; then
+            echo "Aucune issue liee via 'Closes #N' sur cette PR, rien a faire."
+            exit 0
+          fi
+
+          for ISSUE_NUMBER in $ISSUE_NUMBERS; do
+            ITEM_ID=$(gh project item-list 1 --owner KerdanetYvan --format json --limit 200 \
+              --jq ".items[] | select(.content.number == $ISSUE_NUMBER) | .id")
+
+            if [ -z "$ITEM_ID" ]; then
+              echo "Issue #$ISSUE_NUMBER absente du board, ignoree."
+              continue
+            fi
+
+            echo "Issue #$ISSUE_NUMBER -> Review/QA"
+            gh project item-edit \
+              --project-id "$PROJECT_ID" \
+              --id "$ITEM_ID" \
+              --field-id "$STATUS_FIELD_ID" \
+              --single-select-option-id "$REVIEW_OPTION_ID"
+          done

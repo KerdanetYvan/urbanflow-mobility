@@ -84,16 +84,22 @@ Deux champs distincts sur le board, à ne pas confondre :
 Quand on travaille sur une issue en session, Claude Code doit tenir le Status à jour sans attendre qu'on le demande :
 
 - Passer l'issue en **In Progress** dès qu'on commence à coder dessus.
-- Passer l'issue en **Review/QA** dès qu'une PR liée est ouverte.
+- Le passage en **Review/QA** est automatisé (voir ci-dessous) dès qu'une PR contenant `Closes #N` est ouverte — plus besoin de le faire à la main dans ce cas. Le faire manuellement seulement si l'automatisation est indisponible (secret absent, workflow en échec) ou si la PR ne référence pas l'issue via `Closes #N`.
 - Le passage en **Done** est géré par les workflows natifs du Project une fois activés côté UI (`Project → ⋯ → Workflows` : "Item closed" et "Pull request merged" → Status = Done) — l'API GitHub ne permet pas de configurer ces workflows par commande, seulement de les activer manuellement dans l'interface.
 
-Commande utilisée pour modifier le Status d'un item (`gh` CLI, PowerShell) :
+Commande utilisée pour modifier le Status d'un item à la main (`gh` CLI, PowerShell) :
 
 ```bash
 gh project item-edit --project-id "PVT_kwHOCjZVkc4BeKov" --id "<ITEM_ID>" --field-id "PVTSSF_lAHOCjZVkc4BeKovzhYm3is" --single-select-option-id "<OPTION_ID>"
 ```
 
 Options du champ Status : Backlog `6a1fdd2b`, Sprint courant `a800da72`, In Progress `f47b8a18`, Review/QA `e4233821`, Done `46c90389`. L'ID d'item d'une issue s'obtient via `gh project item-list 1 --owner KerdanetYvan --format json`.
+
+### Automatisation PR → Review/QA
+
+Le workflow `.github/workflows/pr-to-review.yml` bascule automatiquement en Review/QA les issues qu'une PR fermera au merge (`closingIssuesReferences`, déduit par GitHub des mots-clés `Closes #N`/`Fixes #N`/`Resolves #N` dans le corps de la PR), à l'ouverture de la PR ou à sa sortie de brouillon.
+
+Il a besoin d'un secret de dépôt **`PROJECT_TOKEN`** : un PAT classique avec le scope `project`, différent du `GITHUB_TOKEN` par défaut des Actions qui n'a pas accès aux GitHub Projects (v2) d'un compte utilisateur. À créer sur `github.com/settings/tokens` et ajouter via `gh secret set PROJECT_TOKEN` ou l'interface du dépôt (`Settings → Secrets and variables → Actions`).
 
 ## Ce que ce dossier ne couvre pas encore
 
