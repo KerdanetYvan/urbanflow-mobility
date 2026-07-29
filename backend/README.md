@@ -19,6 +19,33 @@ Nécessite une variable d'environnement `DATABASE_URL` (voir `../.env.example`),
 - `npm run build` — compilation TypeScript
 - `npm run lint` — ESLint
 - `npm test` — tests unitaires Jest
+- `npm run seed` — jeu de données de test (voir ci-dessous)
+
+## Jeu de données de test (seed)
+
+Issue #40 : permet de développer/démontrer en local sans dépendre des vraies données de la métropole. `src/seed/seed.ts` crée 3 comptes en passant par `UsersService`/`ProfilesService` (mêmes validations et même hachage bcrypt que l'inscription réelle via l'API, pas d'insertion SQL directe) :
+
+| Compte | Mot de passe | Profil |
+| --- | --- | --- |
+| `antoine@urbanflow.test` | `Antoine123!` | Calqué sur le persona Antoine (dossier, partie 2.3) : préférences larges (marche, TC, trottinette), pas de contrainte d'accessibilité |
+| `muriel@urbanflow.test` | `Muriel123!` | Calqué sur le persona Muriel : mobilité réduite, évite les correspondances (`maxTransfers: 0`) |
+| `sans-profil@urbanflow.test` | `SansProfil123!` | Aucun profil créé — utile pour tester/démontrer l'état "profil pas encore créé" (`ProfilPage.tsx`, 404 sur `GET /profiles/me`) |
+
+**Lancer le seed** (base déjà démarrée, `docker compose up` en cours) :
+
+```bash
+docker compose exec backend npm run seed
+```
+
+À l'intérieur du conteneur, `DATABASE_URL` pointe déjà vers `postgres` (le nom du service Docker) — pas de configuration supplémentaire. Pour lancer le script depuis l'hôte sans passer par le conteneur (ex. `postgres` démarré seul via `docker compose up -d postgres`), surcharger `DATABASE_URL` avec `localhost` à la place :
+
+```bash
+DATABASE_URL=postgresql://urbanflow:changeme@localhost:5432/urbanflow npm run seed
+```
+
+**Idempotent** : relancer le script ne duplique rien et n'écrase rien — un email déjà présent (`ConflictException` sur `UsersService.create`) est simplement signalé et ignoré, y compris pour le profil associé.
+
+Mots de passe en clair volontairement dans `seed.ts` et ci-dessus : ce sont des identifiants de développement local documentés, pas des secrets applicatifs.
 
 ## Tests
 

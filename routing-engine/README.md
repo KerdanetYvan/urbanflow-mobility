@@ -8,3 +8,32 @@ OpenTripPlanner calcule les itinéraires multimodaux à partir de deux types de 
 Les flux **GBFS** (vélos et trottinettes en libre-service) et **GTFS-Realtime** (perturbations) sont consommés dynamiquement par le service de scoring côté backend, pas par OTP directement au build — voir `../CLAUDE.md` et la partie 7.3 du dossier de certification.
 
 Le dossier `data/` n'est volontairement pas versionné (voir `.gitignore`) : ces fichiers sont volumineux et propres à l'environnement de chaque développeur.
+
+## Jeu de données de test (développement local)
+
+Issue #40 : en attendant le vrai export GTFS de la métropole (ticket d'ingestion F3), `test-fixtures/` fournit un **petit réseau synthétique versionné** pour développer/démontrer sans dépendre de données réelles :
+
+- `test-fixtures/gtfs-test.zip` — 4 arrêts (`A` Place Centrale, `B` Gare Test, `C` Université, `D` Hôpital, ~1,3 km entre arrêts adjacents), une ligne de bus fictive (`T1`) qui boucle entre eux, 3 départs par jour (8h, 12h, 18h). Généré à la main (pas un export réel) — voir `backend/src/seed/seed.ts` pour le jeu de comptes utilisateur correspondant.
+- `test-fixtures/osm-extract.osm.pbf` — une seule rue en boucle qui passe par les 4 arrêts, suffisante pour qu'OTP construise un graphe piéton/vélo/voiture et calcule de vrais itinéraires porte-à-porte entre eux. Coordonnées purement fictives (aucune rue réelle). Généré depuis `test-fixtures/osm-extract-source.osm` (XML lisible, à éditer en cas de besoin), au format binaire `.osm.pbf` attendu par OTP :
+
+  ```bash
+  # Necessite osmium-tool - via un conteneur jetable si non installe localement :
+  docker run --rm -v "$(pwd)/routing-engine/test-fixtures:/data" ubuntu:24.04 \
+    bash -c "apt-get update -qq && apt-get install -y -qq osmium-tool && \
+    osmium cat /data/osm-extract-source.osm -o /data/osm-extract.osm.pbf --overwrite"
+  ```
+
+  (Un fichier `.osm`/`.osm.xml` en clair ne suffit pas : OTP 2.5 attend le format binaire PBF quel que soit le nom de fichier fourni, y compris pour de tout petits extraits comme celui-ci.)
+
+Contrairement à `data/`, `test-fixtures/` **est versionné** : les fichiers sont volontairement minuscules (quelques Ko), donc sans le problème de poids qui justifie de ne pas versionner `data/`.
+
+**Utilisation** : copier les deux fichiers utilisés par OTP dans `data/` avant `docker compose up` :
+
+```bash
+cp routing-engine/test-fixtures/gtfs-test.zip routing-engine/data/
+cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
+```
+
+**Vérifié manuellement** (build du graphe + requête réelle) : avec ces deux fichiers, OTP construit le graphe sans erreur (`Graph built. |V|=11 |E|=22`, `Transit built. |Stops|=4 |Patterns|=1`) et répond correctement à une planification d'itinéraire — ex. `Place Centrale → Université` à 8h retourne un trajet en bus de 10 minutes sur la ligne `T1`, en plus de l'option à pied.
+
+Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en dessous d'un certain seuil, OTP juge la marche "triviale" et ne propose jamais le bus dans les résultats — inutile pour tester un vrai scénario multimodal.
