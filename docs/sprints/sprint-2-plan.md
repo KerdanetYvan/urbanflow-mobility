@@ -23,7 +23,7 @@ Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajo
 - [x] [#65](https://github.com/KerdanetYvan/urbanflow-mobility/issues/65) (Dev FE) — Déconnexion + garde d'authentification sur le profil
 - [x] [#6](https://github.com/KerdanetYvan/urbanflow-mobility/issues/6) (Dev BE) — Intégrer OpenTripPlanner au backend *(traité avec #7 dans une seule PR)*
 - [x] [#7](https://github.com/KerdanetYvan/urbanflow-mobility/issues/7) (Dev BE) — Endpoint de recherche d'itinéraires multimodaux — `GET /trips` prend origine/destination en **lat/lon uniquement** (pas de texte libre), voir #81
-- [ ] [#81](https://github.com/KerdanetYvan/urbanflow-mobility/issues/81) (Dev BE) — Endpoint de géocodage (texte → coordonnées) pour l'autocomplétion — *ajoutée en session le 2026-07-31, comble un trou identifié en cadrant #7 : rien ne couvrait la résolution texte→coordonnées pourtant nécessaire à l'autocomplétion prévue par #35*
+- [*] [#81](https://github.com/KerdanetYvan/urbanflow-mobility/issues/81) (Dev BE) — Endpoint de géocodage (texte → coordonnées) pour l'autocomplétion — *ajoutée en session le 2026-07-31, comble un trou identifié en cadrant #7 : rien ne couvrait la résolution texte→coordonnées pourtant nécessaire à l'autocomplétion prévue par #35*
 - [ ] [#31](https://github.com/KerdanetYvan/urbanflow-mobility/issues/31) (QA) — Collection Postman de tests API
 - [ ] [#38](https://github.com/KerdanetYvan/urbanflow-mobility/issues/38) (Dev BE) — Documentation API (OpenAPI/Swagger)
 - [ ] [#26](https://github.com/KerdanetYvan/urbanflow-mobility/issues/26) (PO) — Specs détaillées des écrans F3 et scoring
