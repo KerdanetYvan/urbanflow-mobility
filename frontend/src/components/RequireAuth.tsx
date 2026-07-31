@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { getAccessToken } from '../lib/authStorage';
+import { useAuth } from '../lib/useAuth';
 
 interface RequireAuthProps {
   children: ReactNode;
@@ -19,8 +19,9 @@ interface RequireAuthProps {
  */
 function RequireAuth({ children }: RequireAuthProps) {
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
 
-  if (!getAccessToken()) {
+  if (!isAuthenticated) {
     return <Navigate to="/connexion" state={{ from: location }} replace />;
   }
 

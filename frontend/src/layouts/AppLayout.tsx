@@ -1,23 +1,29 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../lib/useAuth';
 import './AppLayout.css';
 
 /**
- * Description d'un lien de navigation : le libelle affiche et la route cible.
+ * Description d'un lien de navigation : le libelle affiche, la route cible,
+ * et a quel etat de connexion ce lien est reserve ('always' par defaut).
+ *
+ * "Resultats" ne fait volontairement pas partie de cette liste (issue #64) :
+ * ce n'est pas un ecran permanent, on n'y arrive que depuis une recherche
+ * lancee sur /recherche (voir issue #35), jamais via un clic direct en nav.
  */
 interface NavItem {
   label: string;
   to: string;
+  visibility: 'always' | 'authenticated-only' | 'guest-only';
 }
 
 // Liste unique des ecrans principaux de l'application. Modifier cette liste
 // suffit a mettre a jour a la fois la navigation et les routes (voir
 // src/App.tsx qui reutilise ces memes chemins).
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Connexion', to: '/connexion' },
-  { label: 'Profil', to: '/profil' },
-  { label: 'Recherche', to: '/recherche' },
-  { label: 'Résultats', to: '/resultats' },
-  { label: 'Historique', to: '/historique' },
+  { label: 'Recherche', to: '/recherche', visibility: 'always' },
+  { label: 'Connexion', to: '/connexion', visibility: 'guest-only' },
+  { label: 'Profil', to: '/profil', visibility: 'authenticated-only' },
+  { label: 'Historique', to: '/historique', visibility: 'authenticated-only' },
 ];
 
 /**
@@ -31,8 +37,24 @@ const NAV_ITEMS: NavItem[] = [
  * - NavLink (plutot que Link) ajoute automatiquement `aria-current="page"`
  *   sur le lien actif, ce qui permet aux lecteurs d'ecran d'annoncer la
  *   page courante, et sert de crochet CSS pour la mettre en valeur.
+ *
+ * Navigation conditionnelle selon l'authentification (issue #64) : passe par
+ * useAuth() (voir lib/AuthProvider.tsx et lib/useAuth.ts) plutot que par une lecture directe de
+ * localStorage. AppLayout reste monte en continu pendant toute la session
+ * (seul son <Outlet /> change d'ecran en ecran) et react-router reutilise la
+ * meme reference d'element a chaque navigation - lire localStorage
+ * directement dans le rendu ne se serait donc jamais mis a jour apres un
+ * login/logout. Le contexte force un re-rendu cible des que l'etat change.
  */
 function AppLayout() {
+  const { isAuthenticated } = useAuth();
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.visibility === 'authenticated-only') return isAuthenticated;
+    if (item.visibility === 'guest-only') return !isAuthenticated;
+    return true;
+  });
+
   return (
     <div className="app-layout">
       <a href="#main-content" className="skip-link">
@@ -44,7 +66,7 @@ function AppLayout() {
       </header>
 
       <nav className="app-nav" aria-label="Navigation principale">
-        {NAV_ITEMS.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink key={item.to} to={item.to} className="app-nav-link">
             {item.label}
           </NavLink>

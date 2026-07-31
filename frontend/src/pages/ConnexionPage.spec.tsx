@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../lib/api';
 import * as authLib from '../lib/auth';
+import { AuthProvider } from '../lib/AuthProvider';
 import ConnexionPage from './ConnexionPage';
 
 // react-router-dom reel (MemoryRouter fonctionne normalement), seul
@@ -22,7 +23,9 @@ vi.mock('../lib/auth');
 function renderPage() {
   return render(
     <MemoryRouter>
-      <ConnexionPage />
+      <AuthProvider>
+        <ConnexionPage />
+      </AuthProvider>
     </MemoryRouter>,
   );
 }
