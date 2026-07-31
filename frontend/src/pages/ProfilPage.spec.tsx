@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../lib/api';
+import { AuthProvider } from '../lib/AuthProvider';
 import * as profileLib from '../lib/profile';
 import ProfilPage from './ProfilPage';
 
@@ -29,7 +30,9 @@ vi.mock('../lib/profile', async () => {
 function renderPage() {
   return render(
     <MemoryRouter>
-      <ProfilPage />
+      <AuthProvider>
+        <ProfilPage />
+      </AuthProvider>
     </MemoryRouter>,
   );
 }

@@ -1,0 +1,14 @@
+/*
+ * Invitation discrete a se connecter (issue #64) : texte secondaire simple,
+ * pas un encadre plein type Alert (reserve aux vrais messages
+ * succes/warning/erreur/info) - volontairement peu appuyee, "pas un mur".
+ */
+.recherche-guest-hint {
+  margin-top: var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.recherche-guest-hint a {
+  color: var(--color-primary-emphasis);
+}

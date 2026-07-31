@@ -4,6 +4,7 @@ import Alert from '../components/Alert';
 import Button from '../components/Button';
 import FormField from '../components/FormField';
 import { ApiError } from '../lib/api';
+import { useAuth } from '../lib/useAuth';
 import {
   TRANSPORT_MODES,
   createProfile,
@@ -30,6 +31,7 @@ type Feedback = { variant: 'success' | 'error'; message: string };
  */
 function ProfilPage() {
   const navigate = useNavigate();
+  const { setAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [profileExists, setProfileExists] = useState(false);
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
@@ -63,7 +65,10 @@ function ProfilPage() {
           // Pas encore de profil : formulaire vide, la sauvegarde le creera.
           setProfileExists(false);
         } else if (error instanceof ApiError && error.statusCode === 401) {
-          // authGet a deja nettoye les jetons invalides (voir lib/api.ts).
+          // authGet a deja nettoye les jetons invalides (voir lib/api.ts) :
+          // on resynchronise le contexte pour que la nav (voir AppLayout)
+          // arrete immediatement de proposer Profil/Historique.
+          setAuthenticated(false);
           navigate('/connexion');
         } else {
           setFeedback({
@@ -80,7 +85,7 @@ function ProfilPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, setAuthenticated]);
 
   function toggleMode(mode: string) {
     setSelectedModes((current) =>

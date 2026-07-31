@@ -6,6 +6,7 @@ import FormField from '../components/FormField';
 import { EnvelopeIcon, LockIcon } from '../components/icons';
 import { login, register } from '../lib/auth';
 import { ApiError } from '../lib/api';
+import { useAuth } from '../lib/useAuth';
 import './ConnexionPage.css';
 
 type Mode = 'login' | 'register';
@@ -41,6 +42,7 @@ const PASSWORD_MESSAGE =
  */
 function ConnexionPage() {
   const navigate = useNavigate();
+  const { setAuthenticated } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -95,6 +97,7 @@ function ConnexionPage() {
         await register(email, password);
       }
       await login(email, password);
+      setAuthenticated(true);
       navigate('/profil');
     } catch (error) {
       // Message renvoye tel quel par l'API (voir ApiError) : deja pense
