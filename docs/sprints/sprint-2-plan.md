@@ -21,8 +21,9 @@ Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajo
 
 - [x] [#64](https://github.com/KerdanetYvan/urbanflow-mobility/issues/64) (Dev FE) — Navigation conditionnelle selon l'authentification ([PR #76](https://github.com/KerdanetYvan/urbanflow-mobility/pull/76) + [PR #77](https://github.com/KerdanetYvan/urbanflow-mobility/pull/77), Done)
 - [x] [#65](https://github.com/KerdanetYvan/urbanflow-mobility/issues/65) (Dev FE) — Déconnexion + garde d'authentification sur le profil
-- [ ] [#6](https://github.com/KerdanetYvan/urbanflow-mobility/issues/6) (Dev BE) — Intégrer OpenTripPlanner au backend
-- [ ] [#7](https://github.com/KerdanetYvan/urbanflow-mobility/issues/7) (Dev BE) — Endpoint de recherche d'itinéraires multimodaux
+- [*] [#6](https://github.com/KerdanetYvan/urbanflow-mobility/issues/6) (Dev BE) — Intégrer OpenTripPlanner au backend *(traité avec #7 dans une seule PR, décision de session le 2026-07-31)*
+- [*] [#7](https://github.com/KerdanetYvan/urbanflow-mobility/issues/7) (Dev BE) — Endpoint de recherche d'itinéraires multimodaux — `GET /trips` prend origine/destination en **lat/lon uniquement** (pas de texte libre), voir #81
+- [ ] [#81](https://github.com/KerdanetYvan/urbanflow-mobility/issues/81) (Dev BE) — Endpoint de géocodage (texte → coordonnées) pour l'autocomplétion — *ajoutée en session le 2026-07-31, comble un trou identifié en cadrant #7 : rien ne couvrait la résolution texte→coordonnées pourtant nécessaire à l'autocomplétion prévue par #35*
 - [ ] [#31](https://github.com/KerdanetYvan/urbanflow-mobility/issues/31) (QA) — Collection Postman de tests API
 - [ ] [#38](https://github.com/KerdanetYvan/urbanflow-mobility/issues/38) (Dev BE) — Documentation API (OpenAPI/Swagger)
 - [ ] [#26](https://github.com/KerdanetYvan/urbanflow-mobility/issues/26) (PO) — Specs détaillées des écrans F3 et scoring
@@ -42,7 +43,7 @@ Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajo
 ## Pourquoi cet ordre (raisonnement complet en cas de doute)
 
 - **#64/#65 en tête** : correctifs de navigation quasi gratuits, très visibles (un utilisateur connecté qui voit encore "Connexion" saute aux yeux dans n'importe quelle démo) — aucune raison de ne pas les caser immédiatement avant le reste.
-- **#6 → #7 → #31 → #38 → #26 → #35 → #8 → #36 → #9** : le cœur F2, dans l'ordre de ses dépendances techniques (l'endpoint avant les écrans qui le consomment, la carte avant l'écran de résultats qui l'intègre d'après les specs [#25](https://github.com/KerdanetYvan/urbanflow-mobility/issues/25)). Priorité haute car F2 est la fonctionnalité **obligatoire** du dossier de certification.
+- **#6 → #7 → #81 → #31 → #38 → #26 → #35 → #8 → #36 → #9** : le cœur F2, dans l'ordre de ses dépendances techniques (l'endpoint avant les écrans qui le consomment, la carte avant l'écran de résultats qui l'intègre d'après les specs [#25](https://github.com/KerdanetYvan/urbanflow-mobility/issues/25)). #81 (géocodage) juste après #7 : #35 (écran de recherche) en a besoin pour l'autocomplétion, identifié comme un trou du backlog en cadrant #7. Priorité haute car F2 est la fonctionnalité **obligatoire** du dossier de certification.
 - **#68/#69 avant #66/#67** : la correction sur l'accessibilité était la plus explicitement prioritaire lors de la revue ("exactement ce que je ne voulais surtout pas faire").
 - **#70/#71 (mot de passe oublié) et #72/#73 (refonte visuelle) en dernier** : les deux chantiers les plus lourds et les moins critiques pour la certification (nouvelle dépendance email pour l'un, refonte complète du layout pour l'autre) — peuvent glisser sur Sprint 3 sans mettre F2 en danger si le temps manque. #73 dépend en plus structurellement de #64.
 
