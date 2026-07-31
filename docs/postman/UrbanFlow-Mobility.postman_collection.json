@@ -1,0 +1,526 @@
+{
+  "info": {
+    "_postman_id": "6f2c9a3e-6b6a-4c1a-9f0e-1a2b3c4d5e6f",
+    "name": "UrbanFlow Mobility - API",
+    "description": "Collection QA (issue #31) pour valider manuellement et de facon reproductible les endpoints de l'API backend. Organisee par fonctionnalite (F1, F2, ...), etendue au fil des sprints.\n\n**Utilisation** :\n1. Lancer le backend (`docker compose up` ou `npm run start:dev`).\n2. Importer cette collection dans Postman.\n3. Verifier/ajuster la variable de collection `baseUrl` (par defaut `http://localhost:3000`).\n4. Lancer le dossier \"Auth (F1)\" en premier (via Postman Runner ou requete par requete, dans l'ordre) : \"Inscription\" genere un email unique et le stocke dans `testEmail`, \"Connexion\" recupere les jetons et les stocke dans `accessToken`/`refreshToken`, reutilises automatiquement par les requetes protegees suivantes.\n5. Les requetes F2 (itineraires/lieux) sont independantes de l'auth (endpoints publics) et peuvent etre lancees seules.\n\nLes requetes du dossier \"Erreurs\" de chaque section verifient les cas limites (deja couverts cote automatise par les tests Jest, utiles ici pour une verification manuelle rapide).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "testEmail", "value": "", "type": "string" },
+    { "key": "testPassword", "value": "TestApi123!", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth (F1)",
+      "item": [
+        {
+          "name": "Inscription",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Email unique a chaque execution : permet de relancer la collection",
+                  "// (via Runner) sans collision \"email deja utilise\" (409) sur un rerun.",
+                  "pm.collectionVariables.set('testEmail', `qa.${Date.now()}@urbanflow.test`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test(\"renvoie l'email inscrit, jamais le mot de passe\", () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.email).to.eql(pm.collectionVariables.get('testEmail'));",
+                  "  pm.expect(body).to.not.have.property('password');",
+                  "  pm.expect(body).to.not.have.property('passwordHash');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "F1 - inscription (issue #3). Ne connecte pas automatiquement : voir \"Connexion\" juste apres."
+          },
+          "response": []
+        },
+        {
+          "name": "Connexion",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('renvoie une paire de jetons', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "F1 - connexion (issue #3). A lancer juste apres \"Inscription\" (reutilise testEmail). Stocke accessToken/refreshToken pour les requetes suivantes."
+          },
+          "response": []
+        },
+        {
+          "name": "Rafraichir les jetons",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('renvoie une NOUVELLE paire de jetons', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Echange le refresh token stocke contre une nouvelle paire de jetons."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Inscription - email deja utilise",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "A lancer APRES \"Inscription\" : reutilise le meme testEmail, deja pris."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Connexion - mot de passe incorrect",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test(\"message generique (pas d'enumeration d'utilisateurs)\", () => {",
+                  "  pm.expect(pm.response.json().message).to.eql('Email ou mot de passe incorrect');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"MauvaisMotDePasse123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profil de mobilite (F1)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Creer mon profil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('profil rattache au bon utilisateur', () => {",
+                  "  pm.expect(pm.response.json().preferredTransportModes).to.include('walking');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferredTransportModes\": [\"walking\", \"public_transport\"],\n  \"reducedMobility\": false,\n  \"maxWalkingDistanceMeters\": 1000,\n  \"maxTransfers\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profiles",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles"]
+            },
+            "description": "F1 - profil de mobilite (issue #4). Valeurs valides pour preferredTransportModes : walking, cycling, scooter, public_transport, carpooling."
+          },
+          "response": []
+        },
+        {
+          "name": "Recuperer mon profil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mettre a jour mon profil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('mise a jour partielle appliquee', () => {",
+                  "  pm.expect(pm.response.json().reducedMobility).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reducedMobility\": true,\n  \"maxTransfers\": 0\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me"]
+            },
+            "description": "Mise a jour partielle : seuls les champs fournis changent (voir UpdateProfileDto)."
+          },
+          "response": []
+        },
+        {
+          "name": "Supprimer mon profil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Recuperer mon profil - sans jeton",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me"]
+            },
+            "description": "Verifie que JwtAuthGuard protege bien la route (pas d'Authorization envoye). L'override auth doit etre sur request.auth (pas item.auth) pour que Newman/Postman le prenne reellement en compte face a l'auth heritee du dossier parent."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Recuperer mon profil - pas encore cree (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/profiles/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["profiles", "me"]
+            },
+            "description": "A lancer APRES \"Supprimer mon profil\" (ou sur un compte n'ayant jamais cree de profil, ex. sans-profil@urbanflow.test du jeu de seed) pour verifier le 404."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Itineraires (F2)",
+      "item": [
+        {
+          "name": "Rechercher un itineraire (donnees de test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('renvoie un tableau', () => {",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/trips?originLat=45.7540&originLon=4.8400&destinationLat=45.7700&destinationLon=4.8400&departureTime=2026-08-01T06:00:00.000Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips"],
+              "query": [
+                { "key": "originLat", "value": "45.7540" },
+                { "key": "originLon", "value": "4.8400" },
+                { "key": "destinationLat", "value": "45.7700" },
+                { "key": "destinationLon", "value": "4.8400" },
+                { "key": "departureTime", "value": "2026-08-01T06:00:00.000Z" }
+              ]
+            },
+            "description": "F2 - recherche multimodale (issues #6, #7). Coordonnees = Place Centrale -> Universite (jeu de donnees de test, voir routing-engine/README.md) ; a 8h heure locale (06:00 UTC en ete), retourne un trajet a pied et un trajet en bus T1 - ajuster departureTime si l'heure locale change (fuseau OTP_TIMEZONE, Europe/Paris par defaut). Endpoint public, pas de jeton requis."
+          },
+          "response": []
+        },
+        {
+          "name": "Rechercher un lieu (autocompletion)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('trouve au moins une suggestion avec label + coordonnees', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('array').with.length.greaterThan(0);",
+                  "  pm.expect(body[0]).to.have.all.keys('label', 'lat', 'lon');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/places?query=Gare",
+              "host": ["{{baseUrl}}"],
+              "path": ["places"],
+              "query": [{ "key": "query", "value": "Gare" }]
+            },
+            "description": "F2 - autocompletion origine/destination (issue #81). \"Gare\" doit trouver \"Gare Test\" sur le jeu de donnees de test. Endpoint public."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Itineraire - hors zone couverte",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/trips?originLat=0&originLon=0&destinationLat=45.7700&destinationLon=4.8400",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips"],
+              "query": [
+                { "key": "originLat", "value": "0" },
+                { "key": "originLon", "value": "0" },
+                { "key": "destinationLat", "value": "45.7700" },
+                { "key": "destinationLon", "value": "4.8400" }
+              ]
+            },
+            "description": "Coordonnees (0,0) hors de la zone couverte par le graphe OTP charge."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Itineraire - parametres manquants",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/trips?originLon=4.84&destinationLat=45.77&destinationLon=4.84",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips"],
+              "query": [
+                { "key": "originLon", "value": "4.84" },
+                { "key": "destinationLat", "value": "45.77" },
+                { "key": "destinationLon", "value": "4.84" }
+              ]
+            },
+            "description": "originLat manquant : erreur de validation (class-validator)."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Lieu - query manquant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": ["{{baseUrl}}"],
+              "path": ["places"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
