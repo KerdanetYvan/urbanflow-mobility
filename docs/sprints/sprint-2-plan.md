@@ -4,11 +4,16 @@
 
 ## Comment reprendre après une coupure de session
 
-Les cases ci-dessous font foi pour savoir où on en est : `[ ]` pas commencé, `[*]` en cours, `[x]` terminé. Reprendre au premier item non `[x]`.
+Les cases ci-dessous font foi pour savoir où on en est : `[ ]` pas commencé, `[*]` en cours (travail démarré, PR pas encore ouverte), `[x]` travail terminé et validé, PR ouverte. Reprendre au premier item non `[x]`. Si le dernier item `[x]` a encore sa PR ouverte (pas mergée), vérifier d'abord si elle est prête à merger avant de démarrer autre chose.
 
 En cas de doute (case pas à jour, session interrompue en plein travail), vérifier le **Status** réel des issues sur le [GitHub Project](https://github.com/users/KerdanetYvan/projects/1) (`gh project item-list 1 --owner KerdanetYvan --format json`) et resynchroniser les cases ci-dessous en conséquence. Si l'ordre lui-même ne correspond plus à la réalité (nouvelle issue ajoutée, priorité changée en cours de route), le mettre à jour ici plutôt que de laisser ce fichier se périmer silencieusement.
 
-**Convention** : cocher `[*]` dès qu'une issue passe en In Progress sur le board, `[x]` dès qu'elle passe en Done (pas avant — Review/QA reste `[*]`).
+**Convention** (revue le 2026-07-31, voir la rétro ci-dessous) :
+
+- Cocher `[*]` dès qu'on commence à travailler sur une issue, avant le premier commit.
+- Cocher `[x]` juste avant d'ouvrir la PR, une fois le travail terminé et validé (tests/lint/vérification manuelle passés) — **toute la tâche part dans une seule PR**, ouverte une fois le travail fini, pas au milieu.
+- Ne pas ouvrir la PR puis continuer à pousser des ajouts/correctifs dessus au fil de l'eau après coup, surtout si elle a déjà pu être mergée entre-temps (ça force à ouvrir une PR de rattrapage hors contexte, comme pour #64). Si un besoin de retouche apparaît après avoir coché `[x]` mais avant d'ouvrir la PR, terminer la retouche d'abord, PUIS ouvrir la PR.
+- Le Status réel sur le board (In Progress / Review-QA / Done) continue d'évoluer séparément via l'automatisation PR (`Closes #N`) et les workflows natifs du Project — la case `[x]` ici n'attend pas que la PR soit mergée, seulement que le travail soit fini et prêt à être proposé en revue.
 
 ## Ordre retenu
 
