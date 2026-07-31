@@ -4,10 +4,7 @@ import type {
   OtpItinerary,
   OtpLeg,
 } from '../otp/interfaces/otp-plan-response.interface';
-import type {
-  TripItinerary,
-  TripSegment,
-} from './interfaces/trip-itinerary.interface';
+import type { TripItinerary, TripSegment } from './dto/trip-itinerary.dto';
 import { OtpClientService } from '../otp/otp-client.service';
 
 @Injectable()

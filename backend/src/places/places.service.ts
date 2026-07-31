@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OtpClientService } from '../otp/otp-client.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
-import type { PlaceSuggestion } from './interfaces/place-suggestion.interface';
+import type { PlaceSuggestion } from './dto/place-suggestion.dto';
 
 @Injectable()
 export class PlacesService {

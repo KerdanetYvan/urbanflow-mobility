@@ -21,6 +21,16 @@ Nécessite une variable d'environnement `DATABASE_URL` (voir `../.env.example`),
 - `npm test` — tests unitaires Jest
 - `npm run seed` — jeu de données de test (voir ci-dessous)
 
+## Documentation API (OpenAPI/Swagger)
+
+Issue #38. Accessible sur `GET /api/docs` (interface Swagger UI) et `GET /api/docs-json` (schéma OpenAPI brut) **uniquement en développement** — désactivée si `NODE_ENV=production` (voir `docker/backend.prod.Dockerfile`, qui fixe cette variable ; vérifié manuellement : `404` sur `/api/docs` avec `NODE_ENV=production`, `200` sans). Exposer le schéma complet de l'API (routes, DTO, exemples) publiquement n'a pas de raison d'être une fois déployée.
+
+- Chaque contrôleur porte `@ApiTags(...)` et documente ses réponses (`@ApiOperation`, `@ApiResponse`) ; chaque DTO documente ses champs (`@ApiProperty`/`@ApiPropertyOptional`, avec exemples). Les entités retournées directement (`MobilityProfile`) sont aussi annotées, sauf leurs relations internes (`user`) qui ne sont jamais sérialisées.
+- `UpdateProfileDto` utilise le `PartialType` de `@nestjs/swagger` (pas `@nestjs/mapped-types`, retiré du projet) : seule la version swagger propage à la fois les décorateurs `class-validator` et `@ApiProperty` de `CreateProfileDto` vers le DTO partiel.
+- Authentification Bearer déclarée une fois (`DocumentBuilder.addBearerAuth(..., 'access-token')` dans `main.ts`), référencée par `@ApiBearerAuth('access-token')` sur `ProfilesController` — cohérent avec `JwtAuthGuard`.
+- Complète la collection Postman (`docs/postman/`, issue #31) plutôt que la remplacer : Swagger sert à l'exploration interactive au fil du développement, Postman reste la référence versionnée pour la validation reproductible.
+- **Audit npm** : `@nestjs/swagger` tire une version vulnérable de `js-yaml` (DoS par parsing exponentiel, `npm audit`). Risque accepté : ce module ne traite jamais de YAML fourni par un utilisateur externe (uniquement l'introspection interne des routes/DTO), et n'est de toute façon jamais chargé en production (voir plus haut).
+
 ## Jeu de données de test (seed)
 
 Issue #40 : permet de développer/démontrer en local sans dépendre des vraies données de la métropole. `src/seed/seed.ts` crée 3 comptes en passant par `UsersService`/`ProfilesService` (mêmes validations et même hachage bcrypt que l'inscription réelle via l'API, pas d'insertion SQL directe) :
