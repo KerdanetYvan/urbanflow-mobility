@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { startTransition, useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
 import { ApiError } from '../../lib/api';
+import { logout } from '../../lib/auth';
 import { useAuth } from '../../lib/useAuth';
 import {
   TRANSPORT_MODES,
@@ -86,6 +87,37 @@ function ProfilPage() {
       cancelled = true;
     };
   }, [navigate, setAuthenticated]);
+
+  /**
+   * Deconnexion (issue #65) : renvoie vers la recherche plutot que vers
+   * l'ecran de connexion - se deconnecter, c'est parfois vouloir faire une
+   * recherche rapide sans que le compte connecte l'influence (preferences,
+   * historique...), pas forcement vouloir se reconnecter dans la foulee.
+   * /recherche reste utilisable sans compte (voir issue #64).
+   *
+   * startTransition() est indispensable ici, pas une precaution superflue :
+   * react-router-dom v7 marque ses propres mises a jour de navigation via
+   * React.startTransition (verifie dans ses sources), donc navigate() est
+   * une mise a jour BASSE priorite. Sans l'envelopper ici, setAuthenticated
+   * (mise a jour normale, haute priorite) s'applique et se rend AVANT que la
+   * transition vers /recherche ne soit commise : RequireAuth (voir
+   * components/RequireAuth.tsx), encore monte sur /profil a cet instant,
+   * detecte alors la session invalidee (son garde durci, issue #65) et
+   * declenche SA PROPRE navigation vers /connexion, qui ecrase celle
+   * demandee ici (constate en session, reproduit par un test de regression
+   * dans App.spec.tsx). Englober logout()/setAuthenticated() dans la MEME
+   * transition que navigate() garantit qu'ils se commitent ensemble, une
+   * fois la navigation vers /recherche deja effective - RequireAuth n'a
+   * alors plus jamais l'occasion de se re-rendre sur /profil avec une
+   * session invalide.
+   */
+  function handleLogout() {
+    startTransition(() => {
+      navigate('/recherche');
+      logout();
+      setAuthenticated(false);
+    });
+  }
 
   function toggleMode(mode: string) {
     setSelectedModes((current) =>
@@ -205,6 +237,20 @@ function ProfilPage() {
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}
         </Button>
       </form>
+
+      {/* Hors du <form> : ne doit pas pouvoir etre declenche par un Entree
+          dans un champ du formulaire de profil (comportement par defaut
+          d'un bouton submit a l'interieur d'un <form>). */}
+      <div className="profil-account-actions">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleLogout}
+          className="profil-logout"
+        >
+          Se déconnecter
+        </Button>
+      </div>
     </section>
   );
 }

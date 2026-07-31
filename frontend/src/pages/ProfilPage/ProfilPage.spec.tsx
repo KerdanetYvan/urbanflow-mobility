@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { AuthProvider } from '../../lib/AuthProvider';
+import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from '../../lib/authStorage';
 import * as profileLib from '../../lib/profile';
 import ProfilPage from './ProfilPage';
 
@@ -40,6 +41,10 @@ function renderPage() {
 describe('ProfilPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    clearTokens();
   });
 
   it("propose un formulaire vide et cree le profil quand l'utilisateur n'en a pas encore", async () => {
@@ -129,6 +134,33 @@ describe('ProfilPage', () => {
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith('/connexion');
     });
+  });
+
+  it("nettoie les jetons et redirige vers la recherche au clic sur 'Se deconnecter' (issue #65)", async () => {
+    saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+    vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+      id: 'profile-1',
+      userId: 'user-1',
+      preferredTransportModes: [],
+      reducedMobility: false,
+      maxWalkingDistanceMeters: null,
+      maxTransfers: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }));
+
+    // Pas vers /connexion : se deconnecter peut juste vouloir dire "faire
+    // une recherche sans que le compte connecte l'influence", pas
+    // forcement se reconnecter dans la foulee (retour utilisateur, voir
+    // le commentaire de handleLogout dans ProfilPage.tsx).
+    expect(navigateMock).toHaveBeenCalledWith('/recherche');
+    expect(getAccessToken()).toBeNull();
+    expect(getRefreshToken()).toBeNull();
   });
 
   it('affiche une erreur si la sauvegarde echoue', async () => {

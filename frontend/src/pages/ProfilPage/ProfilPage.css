@@ -34,3 +34,15 @@
   width: 100%;
   margin-top: var(--space-2);
 }
+
+/* Separee visuellement du formulaire de preferences (bordure au-dessus) :
+   la deconnexion n'est pas une action "profil", c'est une action "compte". */
+.profil-account-actions {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.profil-logout {
+  width: 100%;
+}

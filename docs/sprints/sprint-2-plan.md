@@ -20,7 +20,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajoutées suite à la revue de fin de Sprint 1) sont volontairement **entrelacées** plutôt que traitées par lot : F2 est la fonctionnalité obligatoire du dossier de certification, elle ne doit pas prendre de retard à cause de corrections F1, mais les deux correctifs de navigation les plus rapides valent la peine d'être faits immédiatement.
 
 - [x] [#64](https://github.com/KerdanetYvan/urbanflow-mobility/issues/64) (Dev FE) — Navigation conditionnelle selon l'authentification ([PR #76](https://github.com/KerdanetYvan/urbanflow-mobility/pull/76) + [PR #77](https://github.com/KerdanetYvan/urbanflow-mobility/pull/77), Done)
-- [*] [#65](https://github.com/KerdanetYvan/urbanflow-mobility/issues/65) (Dev FE) — Déconnexion + garde d'authentification sur le profil
+- [x] [#65](https://github.com/KerdanetYvan/urbanflow-mobility/issues/65) (Dev FE) — Déconnexion + garde d'authentification sur le profil
 - [ ] [#6](https://github.com/KerdanetYvan/urbanflow-mobility/issues/6) (Dev BE) — Intégrer OpenTripPlanner au backend
 - [ ] [#7](https://github.com/KerdanetYvan/urbanflow-mobility/issues/7) (Dev BE) — Endpoint de recherche d'itinéraires multimodaux
 - [ ] [#31](https://github.com/KerdanetYvan/urbanflow-mobility/issues/31) (QA) — Collection Postman de tests API

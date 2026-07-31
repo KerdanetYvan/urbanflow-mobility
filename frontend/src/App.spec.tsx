@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import * as profileLib from './lib/profile';
 import * as authLib from './lib/auth';
 import { saveTokens, clearTokens } from './lib/authStorage';
+import { fakeJwt } from './test/fakeJwt';
 import App from './App';
 
 // ProfilPage (derriere RequireAuth) appelle getMyProfile() au montage : on
@@ -29,6 +30,10 @@ function renderApp(initialPath = '/') {
 }
 
 describe('App (navigation)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => {
     clearTokens();
   });
@@ -130,6 +135,29 @@ describe('App (navigation)', () => {
     ).toBeInTheDocument();
   });
 
+  it('redirige vers la connexion si on visite /profil avec des jetons JWT prouves expires (issue #65, durcissement RequireAuth)', () => {
+    saveTokens({ accessToken: fakeJwt(-60), refreshToken: fakeJwt(-1) });
+
+    renderApp('/profil');
+
+    expect(
+      screen.getByRole('heading', { name: 'Connexion' }),
+    ).toBeInTheDocument();
+    // getMyProfile n'a meme pas besoin d'etre appele : le rejet est purement
+    // local, avant tout aller-retour reseau.
+    expect(profileLib.getMyProfile).not.toHaveBeenCalled();
+  });
+
+  it("ne redirige pas /connexion vers /profil si les jetons JWT sont prouves expires, meme si un jeton existe (issue #65)", () => {
+    saveTokens({ accessToken: fakeJwt(-60), refreshToken: fakeJwt(-1) });
+
+    renderApp('/connexion');
+
+    expect(
+      screen.getByRole('heading', { name: 'Connexion' }),
+    ).toBeInTheDocument();
+  });
+
   it('met a jour la nav juste apres une connexion reussie, sans reload (regression AppLayout reste monte)', async () => {
     vi.mocked(profileLib.getMyProfile).mockResolvedValue({
       id: 'profile-1',
@@ -164,6 +192,29 @@ describe('App (navigation)', () => {
     expect(
       within(nav).queryByRole('link', { name: 'Connexion' }),
     ).not.toBeInTheDocument();
+  });
+
+  it("deconnecte vers /recherche au clic sur 'Se deconnecter', sans etre reprisi par le garde RequireAuth (issue #65)", async () => {
+    saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+    vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+      id: 'profile-1',
+      userId: 'user-1',
+      preferredTransportModes: [],
+      reducedMobility: false,
+      maxWalkingDistanceMeters: null,
+      maxTransfers: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const user = userEvent.setup();
+    renderApp('/profil');
+
+    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }));
+
+    expect(
+      await screen.findByRole('heading', { name: "Recherche d'itinéraire" }),
+    ).toBeInTheDocument();
   });
 
   it('navigue vers la page Profil au clic sur le lien correspondant, une fois connecte', async () => {
