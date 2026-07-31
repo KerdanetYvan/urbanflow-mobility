@@ -26,7 +26,7 @@ Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajo
 - [x] [#81](https://github.com/KerdanetYvan/urbanflow-mobility/issues/81) (Dev BE) — Endpoint de géocodage (texte → coordonnées) pour l'autocomplétion — `GET /places`, délègue au géocodeur OTP (`otp-config.json`, `SandboxAPIGeocoder`)
 - [x] [#31](https://github.com/KerdanetYvan/urbanflow-mobility/issues/31) (QA) — Collection Postman de tests API — `docs/postman/`, vérifiée via Newman (16 requêtes, 24 assertions)
 - [x] [#38](https://github.com/KerdanetYvan/urbanflow-mobility/issues/38) (Dev BE) — Documentation API (OpenAPI/Swagger) — `GET /api/docs`, desactive en production
-- [ ] [#26](https://github.com/KerdanetYvan/urbanflow-mobility/issues/26) (PO) — Specs détaillées des écrans F3 et scoring
+- [*] [#26](https://github.com/KerdanetYvan/urbanflow-mobility/issues/26) (PO) — Specs détaillées des écrans F3 et scoring
 - [ ] [#35](https://github.com/KerdanetYvan/urbanflow-mobility/issues/35) (Dev FE) — Écran de recherche d'itinéraire
 - [ ] [#8](https://github.com/KerdanetYvan/urbanflow-mobility/issues/8) (Dev FE) — Affichage cartographique du trajet
 - [ ] [#36](https://github.com/KerdanetYvan/urbanflow-mobility/issues/36) (Dev FE) — Écran de résultats d'itinéraires
