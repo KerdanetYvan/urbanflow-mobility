@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { getAccessToken } from './authStorage';
+import { hasValidSession } from './authStorage';
 import { AuthContext } from './authContext';
 
 /**
@@ -19,13 +19,13 @@ import { AuthContext } from './authContext';
  * setAuthenticated est appele, independamment de ce mecanisme de reutilisation
  * d'element.
  *
- * L'etat initial est lu une fois depuis authStorage au montage : coherent
- * avec un rechargement de page ou l'utilisateur est deja connecte.
+ * L'etat initial est lu une fois depuis authStorage au montage (via
+ * hasValidSession(), pas juste "un jeton existe" - voir authStorage.ts,
+ * durcissement issue #65) : coherent avec un rechargement de page ou
+ * l'utilisateur est deja connecte.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() =>
-    Boolean(getAccessToken()),
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState(hasValidSession);
 
   const value = useMemo(
     () => ({ isAuthenticated, setAuthenticated: setIsAuthenticated }),
