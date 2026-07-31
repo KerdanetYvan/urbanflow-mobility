@@ -82,6 +82,15 @@ Convention de nommage :
 - Toutes les routes (`POST /profiles`, `GET /profiles/me`, `PATCH /profiles/me`, `DELETE /profiles/me`) sont protégées par `JwtAuthGuard` et n'agissent **que** sur le profil de l'utilisateur authentifié (`user.sub` extrait du JWT via `@CurrentUser()`) — jamais d'id de profil fourni par le client dans l'URL, pour éliminer par construction tout risque d'IDOR.
 - Pas de `GET /profiles/:id` générique : volontairement absent, un utilisateur ne peut jamais consulter le profil de quelqu'un d'autre.
 
+## Recherche d'itinéraires (F2)
+
+- `GET /trips` (`src/trips/`, issues #6 + #7) — recherche multimodale. Paramètres : `originLat`/`originLon`/`destinationLat`/`destinationLon` (coordonnées uniquement, pas d'adresse en texte libre — voir issue #81 pour le géocodage) et `departureTime` optionnel (ISO 8601, absent = maintenant). Pas de garde d'authentification : utilisable sans compte (voir issue #64).
+- `OtpClientService` — client REST d'OpenTripPlanner (`GET {OTP_URL}/plan`), modes `TRANSIT,WALK` (vélo/trottinette en libre-service et covoiturage pas encore intégrés à OTP, voir F3). Formate date/heure dans le fuseau `OTP_TIMEZONE` (`Europe/Paris` par défaut, celui de l'`agency_timezone` du GTFS chargé) via `Intl.DateTimeFormat`, indépendamment du fuseau du conteneur (UTC par défaut).
+- Gestion des erreurs OTP : jetons/coordonnées hors de la zone couverte par le graphe (erreur OTP `id: 400`) → `BadRequestException` ; OTP injoignable ou en erreur (réseau, HTTP non-2xx) → `ServiceUnavailableException` ; toute autre réponse d'erreur OTP (ex. aucun trajet possible) → tableau vide, **pas** une erreur (voir `docs/specs/f2-ecrans-planification.md` section 4 : "0 résultat" est un état vide, pas une erreur).
+- `TripsService` reformate la réponse OTP en itinéraires/segments (`TripItinerary`/`TripSegment`, `src/trips/interfaces/`) et affiche le nom **court** de la ligne (`routeShortName`, ex. `T1`) — le champ `route` d'OTP est le nom long, pas ce qu'un usager reconnaît (piège découvert en testant contre un vrai OTP).
+- Tri des itinéraires : ordre natif OpenTripPlanner (durée croissante) pour l'instant — le classement pondéré (temps de trajet, correspondances, météo...) arrivera avec le service de scoring (issue #16, Sprint 3), sans changement attendu côté frontend.
+- **Vérifié manuellement** contre une instance OTP réelle (voir `routing-engine/README.md` pour le jeu de données de test) : `GET /trips` entre `Place Centrale` et `Université` à 8h renvoie bien un trajet à pied et un trajet en bus `T1` de 10 minutes ; coordonnées hors zone → 400 ; OTP arrêté → 503 ; paramètres manquants → 400 avec message de validation.
+
 ## Conventions à respecter
 
 - Endpoints REST en **pluriel, kebab-case** (`GET /trips`, `POST /reservations`).

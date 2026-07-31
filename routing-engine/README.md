@@ -18,21 +18,21 @@ Issue #40 : en attendant le vrai export GTFS de la métropole (ticket d'ingestio
 
   ```bash
   # Necessite osmium-tool - via un conteneur jetable si non installe localement :
-  docker run --rm -v "$(pwd)/routing-engine/test-fixtures:/data" ubuntu:24.04 \
-    bash -c "apt-get update -qq && apt-get install -y -qq osmium-tool && \
-    osmium cat /data/osm-extract-source.osm -o /data/osm-extract.osm.pbf --overwrite"
+  docker run --rm -v "$(pwd)/routing-engine/test-fixtures:/data" ubuntu:24.04 bash -c "apt-get update -qq && apt-get install -y -qq osmium-tool && osmium cat /data/osm-extract-source.osm -o /data/osm-extract.osm.pbf --overwrite"
   ```
 
   (Un fichier `.osm`/`.osm.xml` en clair ne suffit pas : OTP 2.5 attend le format binaire PBF quel que soit le nom de fichier fourni, y compris pour de tout petits extraits comme celui-ci.)
 
 Contrairement à `data/`, `test-fixtures/` **est versionné** : les fichiers sont volontairement minuscules (quelques Ko), donc sans le problème de poids qui justifie de ne pas versionner `data/`.
 
-**Utilisation** : copier les deux fichiers utilisés par OTP dans `data/` avant `docker compose up` :
+**Utilisation** : copier **seulement ces deux fichiers** (jamais `osm-extract-source.osm`) dans `data/` avant `docker compose up` :
 
 ```bash
 cp routing-engine/test-fixtures/gtfs-test.zip routing-engine/data/
 cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
 ```
+
+⚠️ **Piège vécu** : si `osm-extract-source.osm` (le XML source, pas destiné à `data/`) se retrouve copié dans `data/` à côté du `.pbf`, OTP scanne le dossier, détecte les deux comme des sources OSM valides d'après leur extension, et peut choisir de charger le mauvais fichier (le XML brut) en tentant de le parser comme un binaire PBF — il plante alors en boucle de redémarrage avec `FileFormatException: Unexpectedly long header ... Possibly corrupt file` dans ses logs (`docker logs <container_otp>`). Si ça arrive, supprimer `osm-extract-source.osm` de `data/` (il n'a rien à y faire) et relancer OTP.
 
 **Vérifié manuellement** (build du graphe + requête réelle) : avec ces deux fichiers, OTP construit le graphe sans erreur (`Graph built. |V|=11 |E|=22`, `Transit built. |Stops|=4 |Patterns|=1`) et répond correctement à une planification d'itinéraire — ex. `Place Centrale → Université` à 8h retourne un trajet en bus de 10 minutes sur la ligne `T1`, en plus de l'option à pied.
 
