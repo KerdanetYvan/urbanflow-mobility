@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { ApiError } from '../lib/api';
-import * as authLib from '../lib/auth';
-import { AuthProvider } from '../lib/AuthProvider';
+import { ApiError } from '../../lib/api';
+import * as authLib from '../../lib/auth';
+import { AuthProvider } from '../../lib/AuthProvider';
 import ConnexionPage from './ConnexionPage';
 
 // react-router-dom reel (MemoryRouter fonctionne normalement), seul
@@ -18,7 +18,7 @@ vi.mock('react-router-dom', async () => {
 // login()/register() sont mockes : ce test verifie le COMPORTEMENT de
 // l'ecran (validation, appels, affichage d'erreur, navigation), pas le
 // reseau reel (deja verifie manuellement contre le backend, voir la PR).
-vi.mock('../lib/auth');
+vi.mock('../../lib/auth');
 
 function renderPage() {
   return render(

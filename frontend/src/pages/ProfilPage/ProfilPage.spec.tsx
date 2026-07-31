@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { ApiError } from '../lib/api';
-import { AuthProvider } from '../lib/AuthProvider';
-import * as profileLib from '../lib/profile';
+import { ApiError } from '../../lib/api';
+import { AuthProvider } from '../../lib/AuthProvider';
+import * as profileLib from '../../lib/profile';
 import ProfilPage from './ProfilPage';
 
 const navigateMock = vi.fn();
@@ -15,9 +15,9 @@ vi.mock('react-router-dom', async () => {
 // Auto-mock complet remplacerait aussi TRANSPORT_MODES (un tableau, pas une
 // fonction) par une valeur vide : on garde l'export reel de tout sauf les
 // fonctions d'appel API, qu'on mocke explicitement.
-vi.mock('../lib/profile', async () => {
+vi.mock('../../lib/profile', async () => {
   const actual =
-    await vi.importActual<typeof import('../lib/profile')>('../lib/profile');
+    await vi.importActual<typeof import('../../lib/profile')>('../../lib/profile');
   return {
     ...actual,
     getMyProfile: vi.fn(),

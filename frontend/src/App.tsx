@@ -1,11 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import AppLayout from './layouts/AppLayout';
+import AppLayout from './layouts/AppLayout/AppLayout';
 import RequireAuth from './components/RequireAuth';
 import RedirectIfAuthenticated from './components/RedirectIfAuthenticated';
 import { AuthProvider } from './lib/AuthProvider';
-import ConnexionPage from './pages/ConnexionPage';
-import ProfilPage from './pages/ProfilPage';
-import RecherchePage from './pages/RecherchePage';
+import ConnexionPage from './pages/ConnexionPage/ConnexionPage';
+import ProfilPage from './pages/ProfilPage/ProfilPage';
+import RecherchePage from './pages/RecherchePage/RecherchePage';
 import ResultatsPage from './pages/ResultatsPage';
 import HistoriquePage from './pages/HistoriquePage';
 
