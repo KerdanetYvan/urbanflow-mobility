@@ -61,6 +61,8 @@ Convention de nommage :
 - Test unitaire : `<fichier>.spec.ts`, **colocalisé** à côté du fichier qu'il teste (ex. `src/common/filters/all-exceptions.filter.ts` → `src/common/filters/all-exceptions.filter.spec.ts`). Pas de dossier `__tests__` séparé, pour garder le test visible dès qu'on ouvre le fichier source.
 - Test end-to-end : `test/<nom>.e2e-spec.ts`.
 
+**Collection Postman** (`docs/postman/`, issue #31) : validation manuelle et reproductible des endpoints, en complément des tests Jest — voir `docs/postman/README.md` pour l'utilisation. Vérifiable en CLI via `npx newman run docs/postman/UrbanFlow-Mobility.postman_collection.json`.
+
 ## Gestion des erreurs et logs
 
 - `AllExceptionsFilter` (`src/common/filters/`) : filtre d'exceptions global, formate toute erreur en `{ statusCode, timestamp, path, message }`. Les erreurs non contrôlées (non-`HttpException`) sont masquées derrière un message générique côté client, mais loggées avec leur stack trace côté serveur — jamais l'inverse.
