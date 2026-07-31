@@ -7,7 +7,7 @@
 
 Ce document cadre **l'expérience utilisateur et les règles métier** autour de deux sujets liés :
 
-1. Comment le classement des itinéraires (le score) est rendu transparent à l'utilisateur, sans jamais l'exposer comme une valeur brute.
+1. Quel rôle joue le score dans ce que voit l'utilisateur (uniquement le tri de la liste, jamais une valeur affichée) et les quelques badges qui viennent en renfort minimal.
 2. Comment une perturbation détectée en cours de trajet est communiquée, et ce qui se passe quand l'utilisateur réagit à cette communication.
 
 **Hors périmètre**, volontairement :
@@ -19,38 +19,28 @@ Ce document cadre **l'expérience utilisateur et les règles métier** autour de
 
 Ce document ne fixe pas non plus l'architecture technique du service de scoring : voir CLAUDE.md ("Fonctionnalité complémentaire retenue : scoring d'itinéraires") pour le flux déjà décidé (`OpenTripPlanner → Service de scoring (+ météo, + GTFS-Realtime, + profil) → Itinéraires classés → PWA`).
 
-## 2. Transparence du score, sans jamais l'afficher
+## 2. Rôle du score : trier la liste, jamais l'afficher
 
 ### 2.1 Principe
 
-Le score numérique brut reste **strictement interne** : jamais de badge, de note sur 10, de pourcentage ou de couleur codant une valeur (cohérent avec la règle déjà actée en [#25](https://github.com/KerdanetYvan/urbanflow-mobility/issues/25) et avec WCAG 1.4.1 — ne jamais coder une information uniquement par la couleur).
+Le score n'a **aucune représentation visible**, ni directe ni indirecte (pas de badge de valeur, de note sur 10, de pourcentage, de couleur codant un niveau — cohérent avec la règle déjà actée en [#25](https://github.com/KerdanetYvan/urbanflow-mobility/issues/25) et avec WCAG 1.4.1, ne jamais coder une information uniquement par la couleur). Son seul effet observable par l'utilisateur est **l'ordre d'affichage de la liste** ([#36](https://github.com/KerdanetYvan/urbanflow-mobility/issues/36)).
 
-Ce que l'utilisateur peut voir, c'est **pourquoi** un itinéraire est bien classé, formulé en langage naturel plutôt qu'en chiffres — l'équivalent d'un "pourquoi ce résultat" plutôt que d'un détail de calcul.
+Concrètement : si le profil de l'utilisateur préfère le vélo et le bus (`preferredTransportModes`), un itinéraire vélo et/ou bus reçoit un meilleur score et remonte au-dessus d'un itinéraire équivalent en métro/train — sans qu'aucun chiffre ne soit jamais montré, uniquement la position dans la liste. Voir section 4 pour le détail des critères qui déterminent ce classement.
 
-### 2.2 Emplacement
+### 2.2 Badges : un renfort minimal, jamais une explication du calcul
 
-Sur l'écran de résultats ([#36](https://github.com/KerdanetYvan/urbanflow-mobility/issues/36)), dans le détail d'un itinéraire sélectionné (déjà prévu par la section 3.2 du spec F2) : un lien discret **"Pourquoi ce trajet ?"**, sous la décomposition des segments. Discret et optionnel — jamais un élément qui interrompt la lecture de l'itinéraire, cohérent avec le principe mobile-first du spec F2 (rien qui alourdisse l'écran pour un usager pressé comme Antoine).
+Au-delà du simple ordre, jusqu'à **2 badges maximum sur l'ensemble de la liste** (pas par itinéraire) mettent en avant un choix, toujours en langage qualitatif, jamais une valeur chiffrée :
 
-Au clic/activation, affiche une liste de 2 à 4 badges qualitatifs parmi (liste fermée, pas de texte libre généré) :
-
-| Badge | Condition d'affichage |
-| --- | --- |
-| "Trajet le plus rapide" | Durée totale dans le meilleur tiers des itinéraires proposés |
-| "Correspondance unique" / "Sans correspondance" | `transfers <= 1` |
-| "Correspond à vos préférences" | Utilise uniquement des modes cochés dans `preferredTransportModes` |
-| "Accessible" | Réponse à une contrainte `reducedMobility` active sur le profil |
-| "Météo favorable" | Trajet majoritairement à pied/vélo et absence de pénalité météo (voir [#17](https://github.com/KerdanetYvan/urbanflow-mobility/issues/17)) |
-| "Perturbation en cours" | Un segment de l'itinéraire est actuellement affecté par une perturbation GTFS-Realtime (voir section 3) |
+1. **Un badge "meilleur choix global"** (libellé exact à affiner en maquette, ex. "Le plus adapté à vos critères") sur l'itinéraire déjà en tête de liste — renforce visuellement pourquoi il est en premier, sans révéler de valeur de score.
+2. **Un badge optionnel ciblé sur un seul critère**, uniquement quand ce critère est explicitement prioritaire pour l'utilisateur d'après son profil (ex. `maxTransfers` renseigné) : affiché sur l'itinéraire de la liste qui satisfait le mieux CE critère précis, même si ce n'est pas celui en tête de liste — ex. "Le moins de correspondances" sur l'itinéraire ayant le moins de correspondances parmi les résultats affichés, si l'utilisateur cherche à les limiter. Donne une alternative visible à l'utilisateur qui voudrait arbitrer différemment du classement par défaut, sans jamais lui montrer pourquoi le classement par défaut a tranché autrement.
 
 Règles :
 
-- Un itinéraire peut cumuler plusieurs badges, jamais plus de 4 (au-delà, ne garder que les plus pertinents pour ne pas noyer l'information).
-- Le badge "Perturbation en cours" est **toujours** affiché s'il s'applique, quels que soient les autres badges retenus — c'est l'information la plus actionnable pour l'utilisateur.
-- Aucun badge ne mentionne de valeur chiffrée (pas de "+12% plus rapide", pas de minutage) : la formulation reste qualitative pour ne jamais glisser vers l'exposition indirecte du score.
+- 2 badges maximum affichés simultanément sur toute la liste, jamais plus, jamais par itinéraire individuel — reste minimal, cohérent avec le principe mobile-first du spec F2 (rien qui alourdisse l'écran pour un usager pressé comme Antoine).
+- Formulations qualitatives uniquement (jamais "+12% plus rapide", jamais de minutage comparatif) : le badge signale un choix, il ne justifie jamais un calcul.
+- Si aucun critère n'est explicitement prioritaire pour l'utilisateur (profil incomplet ou recherche sans compte, [#64](https://github.com/KerdanetYvan/urbanflow-mobility/issues/64)), seul le badge "meilleur choix global" s'affiche.
 
-### 2.3 Cas limite
-
-Si aucun badge ne s'applique franchement (itinéraire "moyen" sur tous les critères), n'afficher aucun badge plutôt que d'en forcer un artificiellement — un itinéraire sans badge reste un résultat valide, juste sans mise en avant particulière.
+Le marqueur "Perturbation en cours" (voir section 3.3) est un cas à part : ce n'est pas un badge de transparence du score, mais une alerte de sécurité/actualité de trajet, affichée indépendamment de ces règles quel que soit le nombre de badges déjà utilisés.
 
 ## 3. Comportement lors d'une perturbation détectée en cours de trajet
 
@@ -73,7 +63,7 @@ Notification système (Notification API via le service worker), volontairement m
 
 ### 3.3 Réaction au tap
 
-Taper la notification ouvre l'app **directement sur l'écran de résultats**, avec le classement déjà recalculé, itinéraire perturbé marqué par le badge "Perturbation en cours" (section 2.2) — jamais un retour à l'écran de recherche : l'utilisateur ne doit pas retaper son trajet en cours de route.
+Taper la notification ouvre l'app **directement sur l'écran de résultats**, avec le classement déjà recalculé et l'itinéraire perturbé marqué par une alerte "Perturbation en cours" (visuellement distincte des badges de la section 2.2, voir la note en fin de cette section) — jamais un retour à l'écran de recherche : l'utilisateur ne doit pas retaper son trajet en cours de route.
 
 ### 3.4 Permission refusée ou app fermée
 
