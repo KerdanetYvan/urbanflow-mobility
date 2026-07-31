@@ -37,3 +37,11 @@ cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
 **Vérifié manuellement** (build du graphe + requête réelle) : avec ces deux fichiers, OTP construit le graphe sans erreur (`Graph built. |V|=11 |E|=22`, `Transit built. |Stops|=4 |Patterns|=1`) et répond correctement à une planification d'itinéraire — ex. `Place Centrale → Université` à 8h retourne un trajet en bus de 10 minutes sur la ligne `T1`, en plus de l'option à pied.
 
 Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en dessous d'un certain seuil, OTP juge la marche "triviale" et ne propose jamais le bus dans les résultats — inutile pour tester un vrai scénario multimodal.
+
+## Géocodeur (autocomplétion, issue #81)
+
+`otp-config.json` (versionné, à la racine de `routing-engine/`, **pas** dans `data/`) active `SandboxAPIGeocoder`, une fonctionnalité d'OTP **désactivée par défaut** — sans lui, `GET {OTP_URL}/geocode` renvoie 404. `docker-compose.yml` le monte directement dans le conteneur (`/var/opentripplanner/otp-config.json`), donc rien à copier manuellement, contrairement aux fichiers de `data/`.
+
+Le géocodeur indexe les noms d'arrêts/rues déjà chargés dans le graphe et fait du filtrage par **préfixe** (ex. `query=Uni` trouve "Université", mais une lettre isolée qui n'est pas en début de nom ne matche rien). Suffisant pour retrouver les 4 arrêts fictifs du jeu de données de test.
+
+**Vérifié manuellement** : `GET {OTP_URL}/geocode?query=Gare` renvoie `[{"lat":45.762,"lng":4.848,"description":"Gare Test","id":"1:B"}]` ; une requête sans correspondance renvoie `[]`.

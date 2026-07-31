@@ -128,4 +128,44 @@ describe('OtpClientService', () => {
       }),
     ).rejects.toThrow(ServiceUnavailableException);
   });
+
+  describe('geocode', () => {
+    it('renvoie les resultats du geocodeur OTP', async () => {
+      const results = [
+        { lat: 45.762, lng: 4.848, description: 'Gare Test', id: '1:B' },
+      ];
+      fetchSpy.mockResolvedValue(jsonResponse(results));
+
+      const result = await service.geocode('Gare');
+
+      expect(result).toEqual(results);
+      const calledUrl = new URL(fetchSpy.mock.calls[0][0] as string);
+      expect(calledUrl.pathname).toContain('/geocode');
+      expect(calledUrl.searchParams.get('query')).toBe('Gare');
+    });
+
+    it('renvoie un tableau vide quand OTP ne trouve aucun lieu (pas une erreur)', async () => {
+      fetchSpy.mockResolvedValue(jsonResponse([]));
+
+      const result = await service.geocode('xyzzynotfound');
+
+      expect(result).toEqual([]);
+    });
+
+    it('leve ServiceUnavailableException quand OTP est injoignable', async () => {
+      fetchSpy.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(service.geocode('Gare')).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
+
+    it('leve ServiceUnavailableException quand OTP repond avec un statut HTTP en erreur', async () => {
+      fetchSpy.mockResolvedValue(jsonResponse({}, false, 404));
+
+      await expect(service.geocode('Gare')).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
+  });
 });

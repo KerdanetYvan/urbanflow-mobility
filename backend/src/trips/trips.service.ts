@@ -3,12 +3,12 @@ import { SearchTripsDto } from './dto/search-trips.dto';
 import type {
   OtpItinerary,
   OtpLeg,
-} from './interfaces/otp-plan-response.interface';
+} from '../otp/interfaces/otp-plan-response.interface';
 import type {
   TripItinerary,
   TripSegment,
 } from './interfaces/trip-itinerary.interface';
-import { OtpClientService } from './otp-client.service';
+import { OtpClientService } from '../otp/otp-client.service';
 
 @Injectable()
 export class TripsService {

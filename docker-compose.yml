@@ -19,6 +19,10 @@ services:
     restart: unless-stopped
     volumes:
       - ./routing-engine/data:/var/opentripplanner
+      # otp-config.json (versionné, contrairement à data/) active le
+      # géocodeur REST intégré à OTP (SandboxAPIGeocoder, désactivé par
+      # défaut) - utilisé par GET /geocode côté backend (issue #81).
+      - ./routing-engine/otp-config.json:/var/opentripplanner/otp-config.json:ro
     command: ["--build", "--serve"]
     ports:
       - "8080:8080"

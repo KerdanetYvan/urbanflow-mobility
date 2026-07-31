@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { OtpGeocodeResult } from './interfaces/otp-geocode-result.interface';
 import type {
   OtpItinerary,
   OtpPlanResponse,
@@ -81,6 +82,42 @@ export class OtpClientService {
     }
 
     return body.plan?.itineraries ?? [];
+  }
+
+  /**
+   * Recherche de lieux par texte (issue #81) - delegue au geocodeur REST
+   * integre a OTP (fonctionnalite sandbox, voir
+   * routing-engine/otp-config.json), qui indexe les noms d'arrets/rues deja
+   * charges dans le graphe. Aucun resultat n'est traite comme une liste
+   * vide, jamais une erreur (meme logique que planTrip pour "aucun
+   * itineraire trouve").
+   */
+  async geocode(query: string): Promise<OtpGeocodeResult[]> {
+    const otpUrl = this.configService.get<string>('OTP_URL');
+    const url = new URL(`${otpUrl}/geocode`);
+    url.searchParams.set('query', query);
+
+    let response: Response;
+    try {
+      response = await fetch(url);
+    } catch (error) {
+      this.logger.error(
+        `OTP injoignable (${url.toString()})`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        "Le moteur de calcul d'itinéraires est momentanément indisponible",
+      );
+    }
+
+    if (!response.ok) {
+      this.logger.error(`OTP a repondu ${response.status} (${url.toString()})`);
+      throw new ServiceUnavailableException(
+        "Le moteur de calcul d'itinéraires est momentanément indisponible",
+      );
+    }
+
+    return (await response.json()) as OtpGeocodeResult[];
   }
 
   private buildPlanUrl(params: PlanTripParams): string {
