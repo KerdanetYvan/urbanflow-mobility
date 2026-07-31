@@ -1,16 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Alert from '../components/Alert';
-import Button from '../components/Button';
-import FormField from '../components/FormField';
-import { ApiError } from '../lib/api';
-import { useAuth } from '../lib/useAuth';
+import Alert from '../../components/Alert/Alert';
+import Button from '../../components/Button/Button';
+import FormField from '../../components/FormField/FormField';
+import { ApiError } from '../../lib/api';
+import { useAuth } from '../../lib/useAuth';
 import {
   TRANSPORT_MODES,
   createProfile,
   getMyProfile,
   updateProfile,
-} from '../lib/profile';
+} from '../../lib/profile';
 import './ProfilPage.css';
 
 type Feedback = { variant: 'success' | 'error'; message: string };

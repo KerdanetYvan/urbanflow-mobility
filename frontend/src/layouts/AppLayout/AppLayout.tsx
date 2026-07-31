@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../lib/useAuth';
+import { useAuth } from '../../lib/useAuth';
 import './AppLayout.css';
 
 /**
