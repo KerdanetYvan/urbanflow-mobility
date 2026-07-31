@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -48,6 +49,32 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Documentation OpenAPI/Swagger (issue #38) : jamais en production
+  // (NODE_ENV=production, voir docker/backend.prod.Dockerfile) - exposer le
+  // schema complet de l'API (routes, DTO, exemples) publiquement n'a pas de
+  // raison d'etre une fois deployee, seulement utile en developpement pour
+  // le frontend et les tests QA (cf. la collection Postman, docs/postman/,
+  // qui reste la reference versionnee - Swagger sert surtout d'exploration
+  // interactive au fil du developpement).
+  if (process.env.NODE_ENV !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('UrbanFlow Mobility API')
+      .setDescription(
+        "API de planification d'itineraires multimodaux, comptes et profils de mobilite (voir CLAUDE.md pour le contexte du projet).",
+      )
+      .setVersion('1.0')
+      // Nomme "access-token" (pas juste un bearer generique) : correspond au
+      // nom du schema de securite reference par @ApiBearerAuth('access-token')
+      // sur les controleurs proteges par JwtAuthGuard.
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'access-token',
+      )
+      .build();
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, swaggerDocument);
+  }
 
   // PORT vient de l'environnement (utile pour un hebergement type Scaleway/OVHcloud
   // qui impose son propre port) ; 3000 par defaut en developpement local.

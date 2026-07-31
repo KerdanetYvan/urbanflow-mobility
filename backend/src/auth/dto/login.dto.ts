@@ -1,7 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty } from 'class-validator';
 
 /** Donnees attendues pour POST /auth/login. */
 export class LoginDto {
+  @ApiProperty({ example: 'alice@example.com' })
   @IsEmail({}, { message: 'Adresse email invalide' })
   email: string;
 
@@ -10,6 +12,7 @@ export class LoginDto {
    * sur la politique de mot de passe a quelqu'un qui essaie de se connecter
    * (contrairement a l'inscription, ou c'est utile a l'utilisateur legitime).
    */
+  @ApiProperty({ example: 'MotDePasse123!' })
   @IsNotEmpty({ message: 'Le mot de passe est requis' })
   password: string;
 }

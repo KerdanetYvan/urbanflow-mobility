@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, Matches } from 'class-validator';
 
 /**
@@ -23,9 +24,14 @@ const PASSWORD_MESSAGE =
  * deja gerer ce format de message en tableau).
  */
 export class CreateUserDto {
+  @ApiProperty({ example: 'alice@example.com' })
   @IsEmail({}, { message: 'Adresse email invalide' })
   email: string;
 
+  @ApiProperty({
+    example: 'MotDePasse123!',
+    description: PASSWORD_MESSAGE,
+  })
   @Matches(PASSWORD_PATTERN, { message: PASSWORD_MESSAGE })
   password: string;
 }

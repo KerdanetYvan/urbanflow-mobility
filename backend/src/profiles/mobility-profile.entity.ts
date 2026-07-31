@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
@@ -21,12 +22,17 @@ import { TransportMode } from './transport-mode.enum';
  */
 @Entity('mobility_profiles')
 export class MobilityProfile {
+  @ApiProperty({ format: 'uuid' })
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @ApiProperty({ format: 'uuid' })
   @Column({ name: 'user_id', unique: true })
   userId: string;
 
+  // Pas de @ApiProperty : relation interne, jamais serialisee dans une
+  // reponse (elle porterait passwordHash) - voir ProfilesService, qui ne
+  // charge jamais cette relation.
   @OneToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
@@ -37,6 +43,7 @@ export class MobilityProfile {
    * separee : simple, suffisant pour une liste de preferences courte et
    * sans metadonnee propre.
    */
+  @ApiProperty({ enum: TransportMode, isArray: true })
   @Column({
     name: 'preferred_transport_modes',
     type: 'text',
@@ -53,20 +60,25 @@ export class MobilityProfile {
    * evitement des escaliers au cas par cas (pas de donnee de ce niveau de
    * detail dans le GTFS/OSM utilises par le projet).
    */
+  @ApiProperty()
   @Column({ name: 'reduced_mobility', default: false })
   reducedMobility: boolean;
 
   /** Distance de marche maximale acceptee, en metres. Optionnel. */
+  @ApiProperty({ nullable: true, type: Number })
   @Column({ name: 'max_walking_distance_meters', type: 'int', nullable: true })
   maxWalkingDistanceMeters: number | null;
 
   /** Nombre de correspondances maximum accepte sur un trajet. Optionnel. */
+  @ApiProperty({ nullable: true, type: Number })
   @Column({ name: 'max_transfers', type: 'int', nullable: true })
   maxTransfers: number | null;
 
+  @ApiProperty()
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
+  @ApiProperty()
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
