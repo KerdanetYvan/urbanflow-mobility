@@ -69,6 +69,15 @@ export function apiPost<T>(path: string, data: unknown): Promise<T> {
 }
 
 /**
+ * GET non authentifie. Utilise par les endpoints publics /places et /trips
+ * (recherche d'itineraire utilisable sans compte, voir issue #64) : pas
+ * d'en-tete Authorization, contrairement a authGet.
+ */
+export function apiGet<T>(path: string): Promise<T> {
+  return request<T>(path);
+}
+
+/**
  * Echange le refresh token stocke contre une nouvelle paire de jetons et
  * les sauvegarde. Levee interne uniquement (voir authRequest) : jamais
  * appelee directement par les pages.

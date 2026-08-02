@@ -37,3 +37,28 @@ export function LockIcon() {
     </svg>
   );
 }
+
+/** Marqueur de lieu, utilise pour les champs origine et destination (issue #35). */
+export function MapPinIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M12 21s-7-6.2-7-11.5a7 7 0 1 1 14 0C19 14.8 12 21 12 21Z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </svg>
+  );
+}
+
+/**
+ * Fleches opposees verticales, pour le bouton d'inversion origine/destination
+ * (issue #35) - suggere un echange plutot qu'une simple direction unique.
+ */
+export function SwapIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M7 4v13" />
+      <path d="m3.5 14 3.5 3.5L10.5 14" />
+      <path d="M17 20V7" />
+      <path d="m13.5 10 3.5-3.5L20.5 10" />
+    </svg>
+  );
+}
