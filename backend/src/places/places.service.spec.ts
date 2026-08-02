@@ -19,15 +19,15 @@ describe('PlacesService', () => {
 
   it('reformate les resultats OTP (lng -> lon, description -> label)', async () => {
     otpClient.geocode.mockResolvedValue([
-      { lat: 45.762, lng: 4.848, description: 'Gare Test', id: '1:B' },
-      { lat: 45.754, lng: 4.84, description: 'Place Centrale', id: '1:A' },
+      { lat: 48.119, lng: -1.674, description: 'Gare Test', id: '1:B' },
+      { lat: 48.111, lng: -1.682, description: 'Place Centrale', id: '1:A' },
     ]);
 
     const result = await service.search({ query: 'a' });
 
     expect(result).toEqual([
-      { label: 'Gare Test', lat: 45.762, lon: 4.848 },
-      { label: 'Place Centrale', lat: 45.754, lon: 4.84 },
+      { label: 'Gare Test', lat: 48.119, lon: -1.674 },
+      { label: 'Place Centrale', lat: 48.111, lon: -1.682 },
     ]);
   });
 

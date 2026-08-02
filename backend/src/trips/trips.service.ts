@@ -4,8 +4,13 @@ import type {
   OtpItinerary,
   OtpLeg,
 } from '../otp/interfaces/otp-plan-response.interface';
-import type { TripItinerary, TripSegment } from './dto/trip-itinerary.dto';
+import type {
+  GeoPoint,
+  TripItinerary,
+  TripSegment,
+} from './dto/trip-itinerary.dto';
 import { OtpClientService } from '../otp/otp-client.service';
+import { decodePolyline } from '../otp/polyline';
 
 @Injectable()
 export class TripsService {
@@ -63,6 +68,23 @@ export class TripsService {
       distanceMeters: leg.distance,
       from: { name: leg.from.name, lat: leg.from.lat, lon: leg.from.lon },
       to: { name: leg.to.name, lat: leg.to.lat, lon: leg.to.lon },
+      geometry: this.mapGeometry(leg),
     };
+  }
+
+  /**
+   * Trace detaille du segment (issue #8), decode depuis legGeometry.points
+   * (verifie contre un vrai OTP - toujours present en pratique). Repli sur
+   * une simple ligne [from, to] si absent, pour ne jamais faire planter la
+   * recherche a cause d'un champ manquant sur un leg particulier.
+   */
+  private mapGeometry(leg: OtpLeg): GeoPoint[] {
+    if (!leg.legGeometry?.points) {
+      return [
+        { lat: leg.from.lat, lon: leg.from.lon },
+        { lat: leg.to.lat, lon: leg.to.lon },
+      ];
+    }
+    return decodePolyline(leg.legGeometry.points);
   }
 }

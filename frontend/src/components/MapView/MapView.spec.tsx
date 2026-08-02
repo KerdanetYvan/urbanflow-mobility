@@ -16,6 +16,10 @@ const ITINERARY: TripItinerary = {
       distanceMeters: 400,
       from: { name: 'Domicile', lat: 45.75, lon: 4.85 },
       to: { name: 'Arrêt Bellecour', lat: 45.751, lon: 4.851 },
+      geometry: [
+        { lat: 45.75, lon: 4.85 },
+        { lat: 45.751, lon: 4.851 },
+      ],
     },
     {
       mode: 'BUS',
@@ -26,6 +30,11 @@ const ITINERARY: TripItinerary = {
       distanceMeters: 3000,
       from: { name: 'Arrêt Bellecour', lat: 45.751, lon: 4.851 },
       to: { name: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 },
+      geometry: [
+        { lat: 45.751, lon: 4.851 },
+        { lat: 45.755, lon: 4.855 },
+        { lat: 45.76, lon: 4.86 },
+      ],
     },
   ],
 };

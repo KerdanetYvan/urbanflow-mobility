@@ -7,6 +7,12 @@ export interface TripPlace {
   lon: number;
 }
 
+/** Un point du trace detaille d'un segment (issue #8) - pas de nom, contrairement a TripPlace. */
+export interface TripGeoPoint {
+  lat: number;
+  lon: number;
+}
+
 /** Un segment d'itineraire (un mode de transport, ex. marche puis bus). */
 export interface TripSegment {
   mode: string;
@@ -17,6 +23,8 @@ export interface TripSegment {
   distanceMeters: number;
   from: TripPlace;
   to: TripPlace;
+  /** Trace detaille du segment (suit les rues/voies parcourues), voir MapView. Au moins 2 points. */
+  geometry: TripGeoPoint[];
 }
 
 /** Un itineraire multimodal complet, decoupe en segments. */

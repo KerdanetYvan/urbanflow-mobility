@@ -25,6 +25,15 @@ export interface OtpLeg {
   distance: number;
   from: OtpPlace;
   to: OtpPlace;
+  /**
+   * Trace detaille du segment (suit les rues/voies), encode au format
+   * "Encoded Polyline Algorithm" de Google (precision 5) - present par
+   * defaut sur chaque leg de la reponse REST `/plan` d'OTP, verifie contre
+   * un vrai OTP (issue #8). Optionnel dans ce typage par prudence (un champ
+   * absent/vide ne doit jamais faire planter TripsService#mapLeg, voir son
+   * repli sur [from, to]), mais toujours present en pratique.
+   */
+  legGeometry?: { points: string };
 }
 
 export interface OtpItinerary {

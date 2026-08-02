@@ -393,14 +393,14 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/trips?originLat=45.7540&originLon=4.8400&destinationLat=45.7700&destinationLon=4.8400&departureTime=2026-08-01T06:00:00.000Z",
+              "raw": "{{baseUrl}}/trips?originLat=48.1110&originLon=-1.6820&destinationLat=48.1270&destinationLon=-1.6820&departureTime=2026-08-01T06:00:00.000Z",
               "host": ["{{baseUrl}}"],
               "path": ["trips"],
               "query": [
-                { "key": "originLat", "value": "45.7540" },
-                { "key": "originLon", "value": "4.8400" },
-                { "key": "destinationLat", "value": "45.7700" },
-                { "key": "destinationLon", "value": "4.8400" },
+                { "key": "originLat", "value": "48.1110" },
+                { "key": "originLon", "value": "-1.6820" },
+                { "key": "destinationLat", "value": "48.1270" },
+                { "key": "destinationLon", "value": "-1.6820" },
                 { "key": "departureTime", "value": "2026-08-01T06:00:00.000Z" }
               ]
             },
@@ -454,14 +454,14 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/trips?originLat=0&originLon=0&destinationLat=45.7700&destinationLon=4.8400",
+              "raw": "{{baseUrl}}/trips?originLat=0&originLon=0&destinationLat=48.1270&destinationLon=-1.6820",
               "host": ["{{baseUrl}}"],
               "path": ["trips"],
               "query": [
                 { "key": "originLat", "value": "0" },
                 { "key": "originLon", "value": "0" },
-                { "key": "destinationLat", "value": "45.7700" },
-                { "key": "destinationLon", "value": "4.8400" }
+                { "key": "destinationLat", "value": "48.1270" },
+                { "key": "destinationLon", "value": "-1.6820" }
               ]
             },
             "description": "Coordonnees (0,0) hors de la zone couverte par le graphe OTP charge."
@@ -484,13 +484,13 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/trips?originLon=4.84&destinationLat=45.77&destinationLon=4.84",
+              "raw": "{{baseUrl}}/trips?originLon=-1.682&destinationLat=48.127&destinationLon=-1.682",
               "host": ["{{baseUrl}}"],
               "path": ["trips"],
               "query": [
-                { "key": "originLon", "value": "4.84" },
-                { "key": "destinationLat", "value": "45.77" },
-                { "key": "destinationLon", "value": "4.84" }
+                { "key": "originLon", "value": "-1.682" },
+                { "key": "destinationLat", "value": "48.127" },
+                { "key": "destinationLon", "value": "-1.682" }
               ]
             },
             "description": "originLat manquant : erreur de validation (class-validator)."

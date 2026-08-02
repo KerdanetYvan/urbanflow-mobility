@@ -42,9 +42,12 @@ interface MapViewProps {
 
 /**
  * Affichage cartographique d'un itineraire (F2, issue #8) : trace de chaque
- * segment colore selon son mode (voir modeStyles.ts), marqueurs origine/
- * destination/correspondances. Integree a l'ecran de resultats (#36), pas
- * une route separee (voir docs/specs/f2-ecrans-planification.md section 3.3).
+ * segment colore selon son mode (voir modeStyles.ts), suivant les rues/voies
+ * reellement parcourues (segment.geometry, decode depuis OpenTripPlanner
+ * cote backend - pas une simple ligne droite entre origine et destination),
+ * marqueurs origine/destination/correspondances. Integree a l'ecran de
+ * resultats (#36), pas une route separee (voir
+ * docs/specs/f2-ecrans-planification.md section 3.3).
  *
  * Accessibilite (WCAG 1.1.1) : la carte elle-meme est un complement visuel
  * (`aria-hidden`, comme documente dans la spec - la liste + le detail texte
@@ -65,10 +68,11 @@ function MapView({ itinerary, className }: MapViewProps) {
   const transferPoints = segments.slice(1).map((segment) => segment.from);
 
   const bounds = L.latLngBounds(
-    segments.flatMap((segment) => [
-      [segment.from.lat, segment.from.lon] as [number, number],
-      [segment.to.lat, segment.to.lon] as [number, number],
-    ]),
+    segments.flatMap((segment) =>
+      segment.geometry.map(
+        (point) => [point.lat, point.lon] as [number, number],
+      ),
+    ),
   );
 
   // Legende : un seul badge par mode present dans l'itineraire, dans
@@ -93,10 +97,13 @@ function MapView({ itinerary, className }: MapViewProps) {
           return (
             <Polyline
               key={index}
-              positions={[
-                [segment.from.lat, segment.from.lon],
-                [segment.to.lat, segment.to.lon],
-              ]}
+              // Suit les rues/voies reellement parcourues (issue #8), pas
+              // une simple ligne entre les deux extremites - voir
+              // TripSegment#geometry (backend/src/trips/trips.service.ts,
+              // decode le legGeometry renvoye par OpenTripPlanner).
+              positions={segment.geometry.map(
+                (point) => [point.lat, point.lon] as [number, number],
+              )}
               pathOptions={{
                 color: style.color,
                 weight: 4,
