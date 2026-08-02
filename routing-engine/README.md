@@ -38,6 +38,8 @@ cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
 
 Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en dessous d'un certain seuil, OTP juge la marche "triviale" et ne propose jamais le bus dans les résultats — inutile pour tester un vrai scénario multimodal.
 
+**Limitation connue : le tracé du bus `T1` s'affiche en ligne droite sur la carte (issue #8, `MapView` côté frontend).** OpenTripPlanner ne peut fournir un tracé détaillé (`legGeometry`) suivant la route réellement empruntée par une ligne de transport en commun que si le GTFS source contient un fichier `shapes.txt` (forme précise du tracé) - `gtfs-test.zip` n'en fournit volontairement pas, pour rester minimal. Un segment à pied, lui, suit bien le réseau OSM (l'unique rue en boucle de ce fixture) : la limitation ne touche que les segments de transport en commun de ce jeu de données de test. Voir l'issue [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) pour la vérification à faire lors de l'ingestion du vrai export GTFS de la métropole (#12).
+
 ## Géocodeur (autocomplétion, issue #81)
 
 `otp-config.json` (versionné, à la racine de `routing-engine/`, **pas** dans `data/`) active `SandboxAPIGeocoder`, une fonctionnalité d'OTP **désactivée par défaut** — sans lui, `GET {OTP_URL}/geocode` renvoie 404. `docker-compose.yml` le monte directement dans le conteneur (`/var/opentripplanner/otp-config.json`), donc rien à copier manuellement, contrairement aux fichiers de `data/`.
