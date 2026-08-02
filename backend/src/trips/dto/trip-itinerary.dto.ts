@@ -13,6 +13,15 @@ export class TripPlace {
   lon: number;
 }
 
+/** Un point du trace detaille d'un segment (voir TripSegment#geometry, issue #8) - pas de nom, contrairement a TripPlace. */
+export class GeoPoint {
+  @ApiProperty()
+  lat: number;
+
+  @ApiProperty()
+  lon: number;
+}
+
 export class TripSegment {
   @ApiProperty({
     description:
@@ -42,6 +51,14 @@ export class TripSegment {
 
   @ApiProperty({ type: TripPlace })
   to: TripPlace;
+
+  @ApiProperty({
+    type: GeoPoint,
+    isArray: true,
+    description:
+      'Trace detaille du segment (suit les rues/voies parcourues), decode depuis le legGeometry renvoye par OpenTripPlanner (issue #8). Au moins 2 points (identiques a from/to si OTP ne fournit pas de trace pour ce segment).',
+  })
+  geometry: GeoPoint[];
 }
 
 export class TripItinerary {

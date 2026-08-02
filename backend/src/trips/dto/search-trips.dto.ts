@@ -16,22 +16,22 @@ import {
  * entiere, non couvert par ce ticket (voir issue #81, geocodage).
  */
 export class SearchTripsDto {
-  @ApiProperty({ example: 45.754 })
+  @ApiProperty({ example: 48.111 })
   @Type(() => Number)
   @IsLatitude()
   originLat: number;
 
-  @ApiProperty({ example: 4.84 })
+  @ApiProperty({ example: -1.682 })
   @Type(() => Number)
   @IsLongitude()
   originLon: number;
 
-  @ApiProperty({ example: 45.77 })
+  @ApiProperty({ example: 48.127 })
   @Type(() => Number)
   @IsLatitude()
   destinationLat: number;
 
-  @ApiProperty({ example: 4.84 })
+  @ApiProperty({ example: -1.682 })
   @Type(() => Number)
   @IsLongitude()
   destinationLon: number;

@@ -15,24 +15,24 @@
   de la construction de ce fixture, cf. commit history).
 -->
 <osm version="0.6" generator="urbanflow-mobility-seed">
-  <bounds minlat="45.7300" minlon="4.8300" maxlat="45.7720" maxlon="4.8500"/>
+  <bounds minlat="48.0870" minlon="-1.6920" maxlat="48.1290" maxlon="-1.6720"/>
 
   <!-- Noeud proche de l'arret A (Place Centrale) -->
-  <node id="1001" lat="45.7540" lon="4.8400" version="1"/>
+  <node id="1001" lat="48.1110" lon="-1.6820" version="1"/>
   <!-- Point intermediaire A -> B -->
-  <node id="1002" lat="45.7580" lon="4.8440" version="1"/>
+  <node id="1002" lat="48.1150" lon="-1.6780" version="1"/>
   <!-- Noeud proche de l'arret B (Gare Test) -->
-  <node id="1003" lat="45.7620" lon="4.8480" version="1"/>
+  <node id="1003" lat="48.1190" lon="-1.6740" version="1"/>
   <!-- Point intermediaire B -> C -->
-  <node id="1004" lat="45.7660" lon="4.8440" version="1"/>
+  <node id="1004" lat="48.1230" lon="-1.6780" version="1"/>
   <!-- Noeud proche de l'arret C (Universite) -->
-  <node id="1005" lat="45.7700" lon="4.8400" version="1"/>
+  <node id="1005" lat="48.1270" lon="-1.6820" version="1"/>
   <!-- Point intermediaire C -> D -->
-  <node id="1006" lat="45.7660" lon="4.8360" version="1"/>
+  <node id="1006" lat="48.1230" lon="-1.6860" version="1"/>
   <!-- Noeud proche de l'arret D (Hopital) -->
-  <node id="1007" lat="45.7620" lon="4.8320" version="1"/>
+  <node id="1007" lat="48.1190" lon="-1.6900" version="1"/>
   <!-- Point intermediaire D -> A -->
-  <node id="1008" lat="45.7580" lon="4.8360" version="1"/>
+  <node id="1008" lat="48.1150" lon="-1.6860" version="1"/>
 
   <way id="2001" version="1">
     <nd ref="1001"/>

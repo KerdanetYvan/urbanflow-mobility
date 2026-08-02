@@ -44,7 +44,7 @@ describe('TripsService', () => {
     );
   });
 
-  it('reformate les itineraires OTP en segments avec dates ISO', async () => {
+  it('reformate les itineraires OTP en segments avec dates ISO et trace decode (issue #8)', async () => {
     otpClient.planTrip.mockResolvedValue([
       {
         startTime: 1000,
@@ -61,6 +61,9 @@ describe('TripsService', () => {
             distance: 150.5,
             from: { name: 'Place Centrale', lat: 48.85, lon: 2.35 },
             to: { name: 'Arret Bus A', lat: 48.851, lon: 2.351 },
+            // Encode exactement [{48.85,2.35}, {48.851,2.351}] (voir
+            // polyline.spec.ts pour des chaines capturees contre un vrai OTP).
+            legGeometry: { points: 'o_diHo~iMgEgE' },
           },
           {
             mode: 'BUS',
@@ -74,6 +77,7 @@ describe('TripsService', () => {
             distance: 1300,
             from: { name: 'Arret Bus A', lat: 48.851, lon: 2.351 },
             to: { name: 'Université', lat: 48.86, lon: 2.36 },
+            // Pas de legGeometry sur ce leg : verifie le repli sur [from, to].
           },
         ],
       },
@@ -102,6 +106,10 @@ describe('TripsService', () => {
             distanceMeters: 150.5,
             from: { name: 'Place Centrale', lat: 48.85, lon: 2.35 },
             to: { name: 'Arret Bus A', lat: 48.851, lon: 2.351 },
+            geometry: [
+              { lat: 48.85, lon: 2.35 },
+              { lat: 48.851, lon: 2.351 },
+            ],
           },
           {
             mode: 'BUS',
@@ -112,6 +120,12 @@ describe('TripsService', () => {
             distanceMeters: 1300,
             from: { name: 'Arret Bus A', lat: 48.851, lon: 2.351 },
             to: { name: 'Université', lat: 48.86, lon: 2.36 },
+            // Pas de legGeometry en entree (voir le leg WALK ci-dessus) :
+            // repli sur [from, to].
+            geometry: [
+              { lat: 48.851, lon: 2.351 },
+              { lat: 48.86, lon: 2.36 },
+            ],
           },
         ],
       },

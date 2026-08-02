@@ -44,4 +44,4 @@ Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en d
 
 Le géocodeur indexe les noms d'arrêts/rues déjà chargés dans le graphe et fait du filtrage par **préfixe** (ex. `query=Uni` trouve "Université", mais une lettre isolée qui n'est pas en début de nom ne matche rien). Suffisant pour retrouver les 4 arrêts fictifs du jeu de données de test.
 
-**Vérifié manuellement** : `GET {OTP_URL}/geocode?query=Gare` renvoie `[{"lat":45.762,"lng":4.848,"description":"Gare Test","id":"1:B"}]` ; une requête sans correspondance renvoie `[]`.
+**Vérifié manuellement** : `GET {OTP_URL}/geocode?query=Gare` renvoie `[{"lat":48.119,"lng":-1.674,"description":"Gare Test","id":"1:B"}]` ; une requête sans correspondance renvoie `[]`.
