@@ -28,7 +28,7 @@ Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajo
 - [x] [#38](https://github.com/KerdanetYvan/urbanflow-mobility/issues/38) (Dev BE) — Documentation API (OpenAPI/Swagger) — `GET /api/docs`, desactive en production
 - [x] [#26](https://github.com/KerdanetYvan/urbanflow-mobility/issues/26) (PO) — Specs détaillées des écrans F3 et scoring — `docs/specs/f3-scoring-perturbations.md`
 - [x] [#35](https://github.com/KerdanetYvan/urbanflow-mobility/issues/35) (Dev FE) — Écran de recherche d'itinéraire — transmission des modes de transport pas encore cablee a `GET /trips`, voir #87
-- [ ] [#8](https://github.com/KerdanetYvan/urbanflow-mobility/issues/8) (Dev FE) — Affichage cartographique du trajet
+- [*] [#8](https://github.com/KerdanetYvan/urbanflow-mobility/issues/8) (Dev FE) — Affichage cartographique du trajet
 - [ ] [#36](https://github.com/KerdanetYvan/urbanflow-mobility/issues/36) (Dev FE) — Écran de résultats d'itinéraires
 - [ ] [#9](https://github.com/KerdanetYvan/urbanflow-mobility/issues/9) (Dev FE) — Géolocalisation temps réel de l'utilisateur
 - [ ] [#68](https://github.com/KerdanetYvan/urbanflow-mobility/issues/68) (Dev BE) — Remplacer "mobilité réduite" par des préférences d'accessibilité détaillées
