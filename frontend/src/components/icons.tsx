@@ -62,3 +62,86 @@ export function SwapIcon() {
     </svg>
   );
 }
+
+/**
+ * Icones par mode de transport (issue #36, voir
+ * docs/specs/f2-ecrans-planification.md section 5) - une par mode affiche
+ * sur les cartes-itineraire de l'ecran de resultats. Meme convention que le
+ * reste de ce fichier (SVG monoline, currentColor, pas d'emoji).
+ */
+export function WalkIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="13" cy="4.5" r="1.8" />
+      <path d="M10.5 21 12 15l-2.5-2 .5-4.5 3 1 1.5 3 3 1.5" />
+      <path d="m12 15 3 1.5-1 4.5" />
+      <path d="m9.5 13-3 1.5-2 4" />
+    </svg>
+  );
+}
+
+export function BikeIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="6" cy="17" r="3.2" />
+      <circle cx="18" cy="17" r="3.2" />
+      <path d="M6 17 10 9h4l3 4.5h3" />
+      <path d="M10 9 8.5 6.5H6" />
+      <path d="m10 9 4.5 8" />
+    </svg>
+  );
+}
+
+export function ScooterIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="5.5" cy="17.5" r="2.3" />
+      <circle cx="17.5" cy="17.5" r="2.3" />
+      <path d="M5.5 15.2V9.5h9" />
+      <path d="M14.5 9.5h3l1 6" />
+      <path d="M17.5 6.5h2.5" />
+    </svg>
+  );
+}
+
+/** Transport en commun (bus/tram/metro/train) - un seul pictogramme generique pour les 4, distingues par leur libelle (voir modeStyles.ts). */
+export function BusIcon() {
+  return (
+    <svg {...iconProps()}>
+      <rect x="4" y="4" width="16" height="12" rx="2" />
+      <path d="M4 11h16" />
+      <circle cx="8" cy="18.5" r="1.3" />
+      <circle cx="16" cy="18.5" r="1.3" />
+    </svg>
+  );
+}
+
+export function CarIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M4 16v-3.5L6 8h12l2 4.5V16" />
+      <path d="M4 16h16" />
+      <circle cx="7.5" cy="16" r="1.6" />
+      <circle cx="16.5" cy="16" r="1.6" />
+    </svg>
+  );
+}
+
+/** Mode non repertorie - meme role que DEFAULT_MODE_STYLE dans modeStyles.ts. */
+export function OtherModeIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="12" cy="12" r="7" />
+    </svg>
+  );
+}
+
+/** Point de correspondance entre deux segments (issue #36). */
+export function TransferIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="8" strokeDasharray="2 4" />
+    </svg>
+  );
+}

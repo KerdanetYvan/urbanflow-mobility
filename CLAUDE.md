@@ -2,6 +2,8 @@
 
 Ce fichier condense les décisions déjà actées dans le dossier de certification (Titre 6 CDSD, RNCP 36146). Il sert de contexte de démarrage pour le développement — pas la peine de redemander l'architecture ou les conventions, elles sont figées ci-dessous sauf indication contraire de l'utilisateur.
 
+Toujours répondre en français dans ce repo. Ne jamais basculer en anglais dans les réponses, même pour des messages courts, des commentaires de code générés à la volée ou des résumés techniques.
+
 ## Le projet
 
 Plateforme de mobilité urbaine intelligente pour une métropole de 500 000 habitants : planification d'itinéraires multimodaux (transports en commun, vélos/trottinettes en libre-service, covoiturage), avec classement personnalisé des trajets et alertes en temps réel.
