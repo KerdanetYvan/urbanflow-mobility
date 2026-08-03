@@ -38,6 +38,18 @@ const TRANSFER_ICON = L.divIcon({
 interface MapViewProps {
   itinerary: TripItinerary;
   className?: string;
+  /**
+   * 'boxed' (par defaut) : carte encadree de hauteur fixe, avec son propre
+   * resume texte + legende affiches juste en dessous - comportement d'origine
+   * de l'issue #8, verifie par MapView.spec.tsx.
+   *
+   * 'fullBleed' : la carte remplit tout son conteneur (pas de bordure/rayon),
+   * sans resume ni legende sous elle - utilise par l'ecran de resultats
+   * (#36) une fois la carte devenue le fond plein ecran de la page. Dans ce
+   * mode, l'equivalent textuel WCAG 1.1.1 (resume + segments) est fourni
+   * par les cards flottantes de ResultatsPage plutot que par ce composant.
+   */
+  variant?: 'boxed' | 'fullBleed';
 }
 
 /**
@@ -50,14 +62,12 @@ interface MapViewProps {
  * docs/specs/f2-ecrans-planification.md section 3.3).
  *
  * Accessibilite (WCAG 1.1.1) : la carte elle-meme est un complement visuel
- * (`aria-hidden`, comme documente dans la spec - la liste + le detail texte
- * des segments, cote ecran de resultats, sont deja l'alternative complete).
- * Ce composant reste neanmoins accessible de facon autonome, sans dependre
- * de #36 : le resume textuel et la legende ci-dessous sont visibles (pas
- * seulement pour lecteur d'ecran), et la legende sert aussi de canal
- * secondaire pour l'identification des modes par couleur (voir modeStyles.ts).
+ * (`aria-hidden`, comme documente dans la spec). En mode 'boxed', le resume
+ * textuel et la legende ci-dessous sont l'alternative complete ; en mode
+ * 'fullBleed', c'est a l'appelant (ResultatsPage) de fournir cette
+ * alternative via ses propres cards, voir le commentaire sur `variant`.
  */
-function MapView({ itinerary, className }: MapViewProps) {
+function MapView({ itinerary, className, variant = 'boxed' }: MapViewProps) {
   const segments = itinerary.segments;
   if (segments.length === 0) return null;
 
@@ -79,12 +89,31 @@ function MapView({ itinerary, className }: MapViewProps) {
   // l'ordre de premiere apparition (pas d'ordre alphabetique arbitraire).
   const modesUsed = [...new Set(segments.map((segment) => segment.mode))];
 
+  const isFullBleed = variant === 'fullBleed';
+
   return (
-    <div className={['mapview', className].filter(Boolean).join(' ')}>
+    <div
+      className={[
+        'mapview',
+        isFullBleed && 'mapview-full-bleed',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <MapContainer
         bounds={bounds}
         boundsOptions={{ padding: [24, 24] }}
-        scrollWheelZoom={false}
+        // Molette : desactivee en mode 'boxed' (comportement d'origine de
+        // l'issue #8) pour ne pas capter le defilement de la page quand la
+        // carte est un simple encart dans un flux normal ; activee en
+        // 'fullBleed' (#36 v2) puisque la page elle-meme ne defile plus
+        // (voir ResultatsPage.css) - rien a proteger.
+        scrollWheelZoom={isFullBleed}
+        // Pincement a deux doigts : deja actif par defaut dans Leaflet,
+        // rendu explicite ici pour que l'intention soit claire (zoom
+        // tactile attendu sur mobile, #36 v2).
+        touchZoom
         className="mapview-container"
         aria-hidden="true"
       >
@@ -127,26 +156,31 @@ function MapView({ itinerary, className }: MapViewProps) {
         ))}
       </MapContainer>
 
-      <p className="mapview-summary">
-        De {origin.name} à {destination.name} : {formatDuration(itinerary.durationSeconds)},{' '}
-        {formatTransfers(itinerary.transfers).toLowerCase()}.
-      </p>
+      {!isFullBleed && (
+        <>
+          <p className="mapview-summary">
+            De {origin.name} à {destination.name} :{' '}
+            {formatDuration(itinerary.durationSeconds)},{' '}
+            {formatTransfers(itinerary.transfers).toLowerCase()}.
+          </p>
 
-      <ul className="mapview-legend">
-        {modesUsed.map((mode) => {
-          const style = getModeStyle(mode);
-          return (
-            <li key={mode} className="mapview-legend-item">
-              <span
-                className="mapview-legend-swatch"
-                style={{ background: style.color }}
-                aria-hidden="true"
-              />
-              {style.label}
-            </li>
-          );
-        })}
-      </ul>
+          <ul className="mapview-legend">
+            {modesUsed.map((mode) => {
+              const style = getModeStyle(mode);
+              return (
+                <li key={mode} className="mapview-legend-item">
+                  <span
+                    className="mapview-legend-swatch"
+                    style={{ background: style.color }}
+                    aria-hidden="true"
+                  />
+                  {style.label}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

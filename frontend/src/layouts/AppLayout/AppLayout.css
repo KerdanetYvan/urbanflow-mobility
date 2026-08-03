@@ -103,6 +103,12 @@
 .app-content {
   flex: 1;
   padding: var(--space-4);
+  /* Sert d'ancrage pour le fond carte plein ecran de l'ecran de resultats
+     (#36 v2, voir ResultatsPage.css .resultats-shell, position:absolute) -
+     ainsi la carte commence exactement sous l'entete/la nav (deja
+     correctement positionnes par le flux normal ci-dessus), sans jamais
+     passer derriere eux ni necessiter de bidouille de z-index sur eux. */
+  position: relative;
 }
 
 /* A partir d'un ecran tablette/desktop : la navigation redevient une barre

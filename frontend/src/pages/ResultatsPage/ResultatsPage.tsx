@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type TouchEvent } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
@@ -25,6 +25,23 @@ interface ResultatsLocationState {
   origin: PlaceSuggestion;
   destination: PlaceSuggestion;
 }
+
+/**
+ * Etats du bandeau mobile (v2 de #36, disposition "carte plein ecran +
+ * panneau flottant", decidee en session le 2026-08-03) :
+ * - collapsed : juste la poignee + un apercu du trajet selectionne, carte
+ *   entierement visible.
+ * - list : la liste complete des itineraires, carte partiellement visible.
+ * - detail : le detail segment par segment du trajet selectionne, carte
+ *   presque entierement masquee.
+ * Non pertinent en desktop (voir ResultatsPage.css) : liste et detail y
+ * sont deux panneaux flottants toujours visibles simultanement.
+ */
+type SheetState = 'collapsed' | 'list' | 'detail';
+
+/** Distance verticale minimale (px) pour qu'un geste tactile sur la
+ * poignee du bandeau soit traite comme un glissement plutot qu'un tap. */
+const SWIPE_THRESHOLD_PX = 40;
 
 /**
  * Modes de transport uniques utilises par un itineraire, dans l'ordre de
@@ -88,47 +105,109 @@ function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) 
   );
 }
 
-interface ItineraryDetailProps {
+interface ResultsListProps {
+  itineraries: TripItinerary[];
+  origin: PlaceSuggestion;
+  destination: PlaceSuggestion;
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+}
+
+/**
+ * Contenu partage entre le panneau flottant "liste" (desktop) et l'etat
+ * "list" du bandeau (mobile) - evite de dupliquer la logique de rendu de la
+ * liste, seul le conteneur autour differe selon la disposition.
+ */
+function ResultsList({
+  itineraries,
+  origin,
+  destination,
+  selectedIndex,
+  onSelect,
+}: ResultsListProps) {
+  return (
+    <>
+      <p className="resultats-context">
+        De {origin.label} à {destination.label}
+        {' — '}
+        <Link to="/recherche">Modifier la recherche</Link>
+      </p>
+      <ul className="resultats-list">
+        {itineraries.map((itinerary, index) => (
+          <li key={index}>
+            <ItineraryCard
+              itinerary={itinerary}
+              isSelected={index === selectedIndex}
+              onSelect={() => onSelect(index)}
+            />
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+interface ItinerarySegmentsProps {
   itinerary: TripItinerary;
 }
 
 /**
- * Detail de l'itineraire selectionne (section 3.2/3.3 de la spec) : tracé
- * carte (MapView, #8) + decomposition segment par segment en texte (mode,
- * duree, arret de correspondance). La carte reste un complement visuel
- * (`aria-hidden`, voir MapView) - cette liste de segments est deja
- * l'alternative textuelle complete, comme l'exige la section 3.3.
+ * Detail de l'itineraire selectionne, segment par segment (mode, duree,
+ * arret de correspondance) - section 3.2 de la spec. Ne contient plus sa
+ * propre carte (contrairement a la v1 de #36) : la carte de fond plein
+ * ecran (variant="fullBleed" de MapView, voir ResultatsPage ci-dessous)
+ * affiche deja le trace du trajet selectionne, une deuxieme carte ici serait
+ * redondante (decision prise en session le 2026-08-03).
  */
-function ItineraryDetail({ itinerary }: ItineraryDetailProps) {
+function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
   return (
-    <>
-      <MapView itinerary={itinerary} />
-      <ol
-        className="resultats-segments"
-        aria-label="Détail du trajet sélectionné, segment par segment"
-      >
-        {itinerary.segments.map((segment, index) => (
-          <li key={index} className="resultats-segment">
-            <span className="resultats-segment-icon" aria-hidden="true">
-              {getTripModeIcon(segment.mode)}
+    <ol
+      className="resultats-segments"
+      aria-label="Détail du trajet sélectionné, segment par segment"
+    >
+      {itinerary.segments.map((segment, index) => (
+        <li key={index} className="resultats-segment">
+          <span className="resultats-segment-icon" aria-hidden="true">
+            {getTripModeIcon(segment.mode)}
+          </span>
+          <span className="resultats-segment-body">
+            <span className="resultats-segment-label">
+              {getModeStyle(segment.mode).label}
+              {segment.routeName ? ` ${segment.routeName}` : ''}
             </span>
-            <span className="resultats-segment-body">
-              <span className="resultats-segment-label">
-                {getModeStyle(segment.mode).label}
-                {segment.routeName ? ` ${segment.routeName}` : ''}
-              </span>
-              <span className="resultats-segment-time">
-                {formatTime(segment.startTime)} – {formatTime(segment.endTime)}{' '}
-                ({formatDuration(segment.durationSeconds)})
-              </span>
-              <span className="resultats-segment-stop">
-                {segment.from.name} → {segment.to.name}
-              </span>
+            <span className="resultats-segment-time">
+              {formatTime(segment.startTime)} – {formatTime(segment.endTime)}{' '}
+              ({formatDuration(segment.durationSeconds)})
             </span>
-          </li>
+            <span className="resultats-segment-stop">
+              {segment.from.name} → {segment.to.name}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * Resume compact d'un itineraire, affiche dans la poignee du bandeau mobile
+ * quand il est replie ("collapsed") - pas un <button> (deja imbrique dans
+ * celui de la poignee), juste du texte + icones decoratives.
+ */
+function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
+  const modes = modesUsedBy(itinerary);
+  return (
+    <span className="resultats-sheet-preview">
+      <span className="resultats-sheet-preview-modes" aria-hidden="true">
+        {modes.map((mode) => (
+          <span key={mode}>{getTripModeIcon(mode)}</span>
         ))}
-      </ol>
-    </>
+      </span>
+      <span className="resultats-sheet-preview-time">
+        {formatTime(itinerary.startTime)} → {formatTime(itinerary.endTime)} ·{' '}
+        {formatDuration(itinerary.durationSeconds)}
+      </span>
+    </span>
   );
 }
 
@@ -140,54 +219,111 @@ function ItineraryDetail({ itinerary }: ItineraryDetailProps) {
  * renvoie alors vers /recherche plutot que d'afficher un ecran vide sans
  * contexte.
  *
- * Disposition mobile-first (section 3.3 de la spec) : sur mobile la liste
- * est visible en premier, la carte + le detail segment par segment sont
- * derriere une bascule "Voir sur la carte" ; a partir de 768px (voir
- * ResultatsPage.css), liste et carte sont affichees cote a cote en
- * permanence et la bascule disparait (elle n'a plus de role).
+ * Disposition "carte plein ecran" (v2, decidee en session le 2026-08-03,
+ * rapprochee des applications de cartographie grand public type Google
+ * Maps) : la carte du trajet selectionne (MapView, variant="fullBleed")
+ * occupe tout l'ecran en fond, les resultats sont affiches par-dessus dans
+ * des panneaux flottants - deux panneaux cote a cote en desktop (liste +
+ * detail), un bandeau ("bottom sheet") a 3 etats en mobile (voir
+ * SheetState). La navigation principale de l'application (AppLayout) reste
+ * visible au-dessus en desktop, mais est volontairement recouverte par le
+ * bandeau en mobile (ecran de tache immersif, coherent avec le fait que
+ * "Resultats" n'apparait deja pas dans la barre de nav principale, voir
+ * AppLayout.tsx) - voir les z-index dans AppLayout.css et ResultatsPage.css.
  *
- * Note de sequencement (section 3.4 de la spec) : cet ecran n'a aucune
+ * L'etat vide (aucun itineraire) n'utilise pas cette disposition immersive :
+ * pas de trajet a tracer sur une carte, l'ecran reste un simple contenu en
+ * flux normal (voir le retour anticipe ci-dessous).
+ *
+ * Note de sequencement (section 3.4 du spec #25) : cet ecran n'a aucune
  * dependance au service de scoring (#16, Sprint 3) - la liste est affichee
  * dans l'ordre renvoye par GET /trips, quel que soit le critere de tri
  * utilise cote backend a ce moment-la. Les badges qualitatifs decrits dans
- * docs/specs/f3-scoring-perturbations.md section 2.2 sont volontairement
- * reportes a l'implementation de #16, une fois un vrai scoring en place
- * (decision prise en session le 2026-08-03) : les afficher des maintenant,
- * sur un tri encore naïf (duree OTP native), serait trompeur.
+ * docs/specs/f3-scoring-perturbations.md section 2.2 restent reportes a
+ * l'implementation de #16 (decision du 2026-08-03) : les afficher des
+ * maintenant, sur un tri encore naïf (duree OTP native), serait trompeur.
  */
 function ResultatsPage() {
   const location = useLocation();
   const state = location.state as ResultatsLocationState | null;
 
   // Itineraire selectionne par defaut : le premier de la liste (deja en tete
-  // du tri backend). null tant qu'aucun resultat n'existe.
+  // du tri backend).
   const [selectedIndex, setSelectedIndex] = useState(0);
-  // Bascule liste/carte, pertinente seulement sur mobile (voir CSS) - la
-  // carte + le detail restent toujours visibles a partir de 768px.
-  const [isMapVisible, setIsMapVisible] = useState(false);
+  // Etat du bandeau mobile, ignore en desktop (voir ResultatsPage.css) -
+  // "list" par defaut : la liste des resultats est ce qu'on veut voir en
+  // premier apres une recherche, ni trop replie (invisible), ni trop
+  // deploye (masquerait la carte inutilement avant toute selection).
+  const [sheetState, setSheetState] = useState<SheetState>('list');
+  const touchStartY = useRef<number | null>(null);
 
   if (!state) {
     return <Navigate to="/recherche" replace />;
   }
 
   const { itineraries, origin, destination } = state;
-  const selectedItinerary = itineraries[selectedIndex] as
-    | TripItinerary
-    | undefined;
 
-  return (
-    <section className="resultats-page">
-      <h1>Résultats</h1>
-      <p className="resultats-context">
-        De {origin.label} à {destination.label}
-        {' — '}
-        <Link to="/recherche">Modifier la recherche</Link>
-      </p>
+  function selectItinerary(index: number) {
+    setSelectedIndex(index);
+    // Sur mobile, choisir un trajet ouvre directement son detail plutot que
+    // de laisser l'utilisateur remonter chercher une action separee.
+    setSheetState('detail');
+  }
 
-      {itineraries.length === 0 ? (
-        // Etat vide (section 4 de la spec) : aucun itineraire trouve n'est
-        // pas une erreur, pas d'Alert ici - un message clair et une action
-        // de recours suffisent.
+  /**
+   * Poignee tapee/cliquee : deploie la liste depuis "collapsed" (seule
+   * direction possible depuis le niveau le plus bas), sinon replie d'un
+   * niveau ("detail" -> "list" -> "collapsed").
+   */
+  function handleHandleClick() {
+    setSheetState((current) => {
+      if (current === 'collapsed') return 'list';
+      if (current === 'detail') return 'list';
+      return 'collapsed';
+    });
+  }
+
+  function handleHandleTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    touchStartY.current = event.touches[0].clientY;
+  }
+
+  /**
+   * Glissement simple sur la poignee (etats discrets, pas de suivi du doigt
+   * en temps reel - decision prise en session le 2026-08-03) : un seuil de
+   * distance suffit a distinguer un tap d'un glissement, pas besoin de
+   * suivre le geste image par image pour un projet a delai serre.
+   */
+  function handleHandleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
+    if (touchStartY.current === null) return;
+    const delta = event.changedTouches[0].clientY - touchStartY.current;
+    touchStartY.current = null;
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return; // tap, pas un glissement : laisse le clic naturel gerer le cycle
+
+    // Empeche le clic synthetique qui suivrait sur mobile (touchend puis
+    // click) de re-appliquer une transition contradictoire.
+    event.preventDefault();
+    if (delta > 0) {
+      // Glissement vers le bas : repli d'un niveau.
+      setSheetState((current) => (current === 'detail' ? 'list' : 'collapsed'));
+    } else {
+      // Glissement vers le haut : ouverture d'un niveau (seulement utile
+      // depuis "collapsed", sans effet sinon).
+      setSheetState((current) => (current === 'collapsed' ? 'list' : current));
+    }
+  }
+
+  if (itineraries.length === 0) {
+    // Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
+    // une erreur, pas d'Alert ici - un message clair et une action de
+    // recours suffisent. Pas de carte plein ecran : rien a y tracer.
+    return (
+      <section className="resultats-page">
+        <h1>Résultats</h1>
+        <p className="resultats-context">
+          De {origin.label} à {destination.label}
+          {' — '}
+          <Link to="/recherche">Modifier la recherche</Link>
+        </p>
         <div className="resultats-empty">
           <p>Aucun itinéraire trouvé pour ce trajet.</p>
           <p>
@@ -196,41 +332,82 @@ function ResultatsPage() {
           </p>
           <Link to="/recherche">Nouvelle recherche</Link>
         </div>
-      ) : (
-        <div className="resultats-content">
-          <div className="resultats-list-column">
-            <ul className="resultats-list">
-              {itineraries.map((itinerary, index) => (
-                <li key={index}>
-                  <ItineraryCard
-                    itinerary={itinerary}
-                    isSelected={index === selectedIndex}
-                    onSelect={() => setSelectedIndex(index)}
-                  />
-                </li>
-              ))}
-            </ul>
+      </section>
+    );
+  }
 
-            <button
-              type="button"
-              className="resultats-toggle-map"
-              onClick={() => setIsMapVisible((visible) => !visible)}
-              aria-expanded={isMapVisible}
-            >
-              {isMapVisible ? 'Voir la liste' : 'Voir sur la carte'}
-            </button>
-          </div>
+  const selectedItinerary = itineraries[selectedIndex] as TripItinerary;
 
-          <div
-            className={`resultats-map-wrapper${isMapVisible ? ' is-active' : ''}`}
-          >
-            {selectedItinerary && (
-              <ItineraryDetail itinerary={selectedItinerary} />
-            )}
-          </div>
+  return (
+    <div className="resultats-shell">
+      {/* Titre de page toujours present pour les lecteurs d'ecran (une
+          seule instance, contrairement au reste ci-dessous qui differe
+          entre desktop et mobile) - pas affiche visuellement, la
+          disposition "carte plein ecran" ne laisse pas de place a un grand
+          titre de page comme dans la v1 de cet ecran. */}
+      <h1 className="resultats-visually-hidden">Résultats</h1>
+
+      <div className="resultats-map-bg">
+        <MapView itinerary={selectedItinerary} variant="fullBleed" />
+      </div>
+
+      {/* Panneaux flottants (desktop uniquement, voir la media query dans
+          ResultatsPage.css - masques en dessous de 768px). */}
+      <div className="resultats-panels">
+        <div className="resultats-panel resultats-panel-list">
+          <ResultsList
+            itineraries={itineraries}
+            origin={origin}
+            destination={destination}
+            selectedIndex={selectedIndex}
+            onSelect={selectItinerary}
+          />
         </div>
-      )}
-    </section>
+        <div className="resultats-panel resultats-panel-detail">
+          <ItinerarySegments itinerary={selectedItinerary} />
+        </div>
+      </div>
+
+      {/* Bandeau mobile a 3 etats (masque a partir de 768px). */}
+      <div className="resultats-sheet" data-sheet-state={sheetState}>
+        <button
+          type="button"
+          className="resultats-sheet-handle"
+          onClick={handleHandleClick}
+          onTouchStart={handleHandleTouchStart}
+          onTouchEnd={handleHandleTouchEnd}
+          aria-expanded={sheetState !== 'collapsed'}
+        >
+          <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+          {sheetState === 'collapsed' && (
+            <CompactPreview itinerary={selectedItinerary} />
+          )}
+        </button>
+
+        <div className="resultats-sheet-body">
+          {sheetState === 'detail' ? (
+            <div className="resultats-sheet-detail">
+              <button
+                type="button"
+                className="resultats-sheet-back"
+                onClick={() => setSheetState('list')}
+              >
+                ← Tous les trajets
+              </button>
+              <ItinerarySegments itinerary={selectedItinerary} />
+            </div>
+          ) : (
+            <ResultsList
+              itineraries={itineraries}
+              origin={origin}
+              destination={destination}
+              selectedIndex={selectedIndex}
+              onSelect={selectItinerary}
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
