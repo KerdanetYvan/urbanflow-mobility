@@ -2,6 +2,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
+import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary } from '../../lib/trips';
 import { getModeStyle } from './modeStyles';
 import './MapView.css';
@@ -35,9 +36,25 @@ const TRANSFER_ICON = L.divIcon({
   iconAnchor: [6, 6],
 });
 
+/**
+ * Position de l'utilisateur en temps reel (issue #9) - un point pulsant
+ * pour se distinguer visuellement du marqueur "origine" (aussi un simple
+ * disque), l'animation etant definie en CSS (MapView.css,
+ * .mapview-user-marker-ring) plutot qu'en SVG pour rester une simple
+ * transition de taille/opacite peu couteuse.
+ */
+const USER_POSITION_ICON = L.divIcon({
+  className: 'mapview-marker mapview-user-marker',
+  html: '<span class="mapview-user-marker-ring"></span><span class="mapview-user-marker-dot"></span>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
 interface MapViewProps {
   itinerary: TripItinerary;
   className?: string;
+  /** Position de l'utilisateur en temps reel (issue #9), voir lib/useGeolocation.ts. Absente/null : aucun marqueur affiche, la carte reste utilisable sans geolocalisation. */
+  userPosition?: GeoPosition | null;
   /**
    * 'boxed' (par defaut) : carte encadree de hauteur fixe, avec son propre
    * resume texte + legende affiches juste en dessous - comportement d'origine
@@ -67,7 +84,12 @@ interface MapViewProps {
  * 'fullBleed', c'est a l'appelant (ResultatsPage) de fournir cette
  * alternative via ses propres cards, voir le commentaire sur `variant`.
  */
-function MapView({ itinerary, className, variant = 'boxed' }: MapViewProps) {
+function MapView({
+  itinerary,
+  className,
+  variant = 'boxed',
+  userPosition,
+}: MapViewProps) {
   const segments = itinerary.segments;
   if (segments.length === 0) return null;
 
@@ -154,6 +176,17 @@ function MapView({ itinerary, className, variant = 'boxed' }: MapViewProps) {
             icon={TRANSFER_ICON}
           />
         ))}
+        {userPosition && (
+          // Volontairement exclue du calcul de `bounds` ci-dessus : recadrer
+          // la carte a chaque mise a jour de position (issue #9) ferait
+          // sauter la vue en continu, genant pour lire le trace de
+          // l'itineraire - l'utilisateur reste libre de deplacer la carte
+          // pour se retrouver si besoin.
+          <Marker
+            position={[userPosition.lat, userPosition.lon]}
+            icon={USER_POSITION_ICON}
+          />
+        )}
       </MapContainer>
 
       {!isFullBleed && (

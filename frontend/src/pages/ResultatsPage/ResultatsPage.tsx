@@ -10,6 +10,7 @@ import {
 } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
 import type { TripItinerary } from '../../lib/trips';
+import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
 import './ResultatsPage.css';
 
 /**
@@ -49,6 +50,24 @@ const SWIPE_THRESHOLD_PX = 40;
  */
 function modesUsedBy(itinerary: TripItinerary): string[] {
   return [...new Set(itinerary.segments.map((segment) => segment.mode))];
+}
+
+/**
+ * Message affiche quand la position en temps reel (issue #9) n'est pas
+ * disponible - `undefined` pour 'idle'/'watching' (rien a signaler). Gere
+ * explicitement la permission refusee (critere d'acceptation dedie de #9),
+ * regroupee avec les cas plus rares ('unsupported'/'error') sous un message
+ * generique : le resultat cote utilisateur est le meme (pas de marqueur sur
+ * la carte), pas besoin de details techniques.
+ */
+function geolocationMessage(status: GeolocationStatus): string | undefined {
+  if (status === 'denied') {
+    return 'Géolocalisation refusée — activez-la dans les réglages de votre navigateur pour voir votre position sur la carte.';
+  }
+  if (status === 'unsupported' || status === 'error') {
+    return 'Votre position en temps réel est indisponible pour le moment.';
+  }
+  return undefined;
 }
 
 interface ItineraryCardProps {
@@ -111,6 +130,8 @@ interface ResultsListProps {
   destination: PlaceSuggestion;
   selectedIndex: number;
   onSelect: (index: number) => void;
+  /** Message a afficher si la position en temps reel (issue #9) n'est pas disponible - voir geolocationMessage(). */
+  geolocationMessage?: string;
 }
 
 /**
@@ -124,6 +145,7 @@ function ResultsList({
   destination,
   selectedIndex,
   onSelect,
+  geolocationMessage,
 }: ResultsListProps) {
   return (
     <>
@@ -132,6 +154,9 @@ function ResultsList({
         {' — '}
         <Link to="/recherche">Modifier la recherche</Link>
       </p>
+      {geolocationMessage && (
+        <p className="resultats-geolocation-hint">{geolocationMessage}</p>
+      )}
       <ul className="resultats-list">
         {itineraries.map((itinerary, index) => (
           <li key={index}>
@@ -256,6 +281,12 @@ function ResultatsPage() {
   // deploye (masquerait la carte inutilement avant toute selection).
   const [sheetState, setSheetState] = useState<SheetState>('list');
   const touchStartY = useRef<number | null>(null);
+  // Hook appele inconditionnellement (regle des Hooks React), avant les
+  // retours anticipes ci-dessous - `enabled` reflete simplement si une carte
+  // avec un itineraire est sur le point d'etre affichee : pas de sollicitation
+  // du capteur GPS pour l'etat vide ou l'absence de criteres de recherche.
+  const hasItineraries = state !== null && state.itineraries.length > 0;
+  const geolocation = useGeolocation(hasItineraries);
 
   if (!state) {
     return <Navigate to="/recherche" replace />;
@@ -348,7 +379,11 @@ function ResultatsPage() {
       <h1 className="resultats-visually-hidden">Résultats</h1>
 
       <div className="resultats-map-bg">
-        <MapView itinerary={selectedItinerary} variant="fullBleed" />
+        <MapView
+          itinerary={selectedItinerary}
+          variant="fullBleed"
+          userPosition={geolocation.position}
+        />
       </div>
 
       {/* Panneaux flottants (desktop uniquement, voir la media query dans
@@ -361,6 +396,7 @@ function ResultatsPage() {
             destination={destination}
             selectedIndex={selectedIndex}
             onSelect={selectItinerary}
+            geolocationMessage={geolocationMessage(geolocation.status)}
           />
         </div>
         <div className="resultats-panel resultats-panel-detail">
@@ -403,6 +439,7 @@ function ResultatsPage() {
               destination={destination}
               selectedIndex={selectedIndex}
               onSelect={selectItinerary}
+              geolocationMessage={geolocationMessage(geolocation.status)}
             />
           )}
         </div>

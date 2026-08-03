@@ -26,6 +26,16 @@
   color: var(--color-primary-emphasis);
 }
 
+/* Position en temps reel indisponible (issue #9, permission refusee ou
+   navigateur incompatible) - texte secondaire simple, meme registre que
+   .recherche-guest-hint (RecherchePage.css) : une information utile mais
+   non bloquante, la carte reste utilisable sans le marqueur de position. */
+.resultats-geolocation-hint {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
 .resultats-empty {
   color: var(--color-text);
 }
