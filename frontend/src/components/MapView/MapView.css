@@ -12,6 +12,20 @@
   }
 }
 
+/* Mode 'fullBleed' (issue #36 v2) : la carte remplit tout son conteneur
+   (le fond plein ecran de l'ecran de resultats), sans bordure/rayon ni
+   resume/legende en dessous (voir MapView.tsx, prop `variant`). */
+.mapview-full-bleed,
+.mapview-full-bleed .mapview-container {
+  width: 100%;
+  height: 100%;
+}
+
+.mapview-full-bleed .mapview-container {
+  border-radius: 0;
+  border: none;
+}
+
 .mapview-summary {
   margin: var(--space-3) 0 0;
   color: var(--color-text);

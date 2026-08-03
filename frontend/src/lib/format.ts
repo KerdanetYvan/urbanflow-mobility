@@ -14,3 +14,11 @@ export function formatTransfers(transfers: number): string {
     ? 'Aucune correspondance'
     : `${transfers} correspondance${transfers > 1 ? 's' : ''}`;
 }
+
+/** Formate une date ISO en heure courte ("08:05"), utilise par l'ecran de resultats (#36). */
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

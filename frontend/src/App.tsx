@@ -6,7 +6,7 @@ import { AuthProvider } from './lib/AuthProvider';
 import ConnexionPage from './pages/ConnexionPage/ConnexionPage';
 import ProfilPage from './pages/ProfilPage/ProfilPage';
 import RecherchePage from './pages/RecherchePage/RecherchePage';
-import ResultatsPage from './pages/ResultatsPage';
+import ResultatsPage from './pages/ResultatsPage/ResultatsPage';
 import HistoriquePage from './pages/HistoriquePage';
 
 /**

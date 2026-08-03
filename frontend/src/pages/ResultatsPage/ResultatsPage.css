@@ -1,0 +1,353 @@
+/*
+ * Disposition "carte plein ecran" (v2, decidee en session le 2026-08-03,
+ * rapprochee des applications de cartographie grand public type Google
+ * Maps) : la carte occupe tout l'ecran en fond (.resultats-shell,
+ * .resultats-map-bg), les resultats flottent par-dessus - deux panneaux
+ * cote a cote en desktop (.resultats-panels), un bandeau a 3 etats en
+ * mobile (.resultats-sheet). Ecrit mobile-first comme le reste du projet :
+ * .resultats-sheet est la regle de base, .resultats-panels prend le relais
+ * a partir de 768px (voir la media query en bas de fichier).
+ */
+
+/* --- Etat vide (aucun itineraire) : reste en flux normal, pas de carte
+   plein ecran (voir ResultatsPage.tsx, retour anticipe). --- */
+
+.resultats-page {
+  max-width: 32rem;
+}
+
+.resultats-context {
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.resultats-context a {
+  color: var(--color-primary-emphasis);
+}
+
+.resultats-empty {
+  color: var(--color-text);
+}
+
+.resultats-empty a {
+  color: var(--color-primary-emphasis);
+  font-weight: var(--weight-semibold);
+}
+
+.resultats-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Coquille plein ecran (itineraires trouves) ---
+ * position:absolute ancre a .app-content (voir AppLayout.css,
+ * position:relative dedie) plutot que fixed sur tout le viewport : la carte
+ * commence ainsi exactement sous l'entete et la nav (deja correctement
+ * positionnes par le flux normal), sans jamais passer derriere eux. */
+.resultats-shell {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Mobile : .app-layout reserve `--space-8` en bas pour sa nav fixe (voir
+     AppLayout.css), ce qui raccourcit .app-content d'autant. Un bord bas
+     negatif compense cette reserve pour que le bandeau puisse quand meme
+     recouvrir la nav (ecran de tache immersif, coherent avec le fait que
+     "Resultats" n'apparait deja pas dans la nav principale) - sans ce
+     correctif, le bandeau s'arreterait juste au-dessus d'elle. */
+  bottom: calc(var(--space-8) * -1);
+  /* Doit couvrir la nav mobile fixe (.app-nav, z-index 10, voir
+     AppLayout.css) - seul element positionne avec lequel cette coquille
+     partage encore un espace ecran (l'entete et la nav desktop sont hors de
+     sa zone grace a l'ancrage ci-dessus, aucun z-index ne leur est
+     necessaire). */
+  z-index: 15;
+  background: var(--color-bg-subtle);
+}
+
+@media (min-width: 768px) {
+  .resultats-shell {
+    /* .app-layout n'a plus de padding-bottom reserve a partir de ce
+       breakpoint (nav redevenue une barre statique en haut, voir
+       AppLayout.css) - rien a compenser. */
+    bottom: 0;
+  }
+}
+
+.resultats-map-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* La carte elle-meme doit remplir toute la coquille (voir MapView.css,
+   .mapview-full-bleed). */
+.resultats-map-bg .mapview {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Panneaux flottants (desktop uniquement, voir media query) --- */
+
+.resultats-panels {
+  display: none;
+}
+
+.resultats-panel {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+/* --- Cartes-itineraire (liste, partagee panneau desktop + bandeau mobile) --- */
+
+.resultats-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Carte-itineraire : un <button> pleine largeur, toute la surface est
+   l'unite tactile/clavier (section 3.1/3.2 de la spec) - pas seulement le
+   texte "Voir le detail" en pied de carte. */
+.resultats-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-4);
+  text-align: left;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.resultats-card:hover {
+  background: var(--color-bg-subtle);
+}
+
+.resultats-card:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
+/* Itineraire selectionne : bordure pleine couleur plutot qu'un simple fond
+   teinte, pour ne jamais coder l'etat par la couleur seule (WCAG 1.4.1) -
+   `aria-current` porte deja l'information pour les lecteurs d'ecran. */
+.resultats-card.is-selected {
+  border-color: var(--color-primary-emphasis);
+  border-width: 2px;
+  padding: calc(var(--space-4) - 1px);
+}
+
+.resultats-card-modes {
+  display: flex;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.resultats-card-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 8rem;
+}
+
+.resultats-card-time {
+  font-weight: var(--weight-semibold);
+}
+
+.resultats-card-duration {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.resultats-card-transfers {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.resultats-card-action {
+  width: 100%;
+  color: var(--color-primary-emphasis);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* --- Detail segment par segment (partage panneau desktop + bandeau mobile) --- */
+
+.resultats-segments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resultats-segment {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.resultats-segment-icon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.resultats-segment-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.resultats-segment-label {
+  font-weight: var(--weight-semibold);
+}
+
+.resultats-segment-time,
+.resultats-segment-stop {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* --- Bandeau mobile a 3 etats (collapsed/list/detail) --- */
+
+.resultats-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
+  /* La hauteur (donc l'etat visuel) change via l'attribut ci-dessous -
+     transitionnee plutot que basculee net, pour rester lisible comme un
+     "glissement" meme quand l'etat change par tap plutot que par geste. */
+  transition: height 0.22s ease-out;
+  overflow: hidden;
+}
+
+.resultats-sheet[data-sheet-state='collapsed'] {
+  height: 4.5rem;
+}
+
+.resultats-sheet[data-sheet-state='list'] {
+  height: 60vh;
+}
+
+.resultats-sheet[data-sheet-state='detail'] {
+  height: 88vh;
+}
+
+.resultats-sheet-handle {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  /* Empeche le geste de glissement (voir onTouchStart/onTouchEnd) de
+     declencher en plus un defilement/zoom du navigateur sur cette zone. */
+  touch-action: none;
+}
+
+.resultats-sheet-handle:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: -2px;
+}
+
+.resultats-sheet-handle-bar {
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+}
+
+.resultats-sheet-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.resultats-sheet-preview-modes {
+  display: flex;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.resultats-sheet-body {
+  flex: 1;
+  min-height: 0; /* necessaire pour qu'overflow-y fonctionne dans un flex item */
+  overflow-y: auto;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.resultats-sheet-back {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) 0;
+  background: none;
+  border: none;
+  color: var(--color-primary-emphasis);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .resultats-sheet {
+    display: none;
+  }
+
+  .resultats-panels {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-4);
+    position: absolute;
+    left: var(--space-5);
+    bottom: var(--space-5);
+    z-index: 1;
+    max-width: calc(100% - var(--space-8));
+    max-height: calc(100% - var(--space-8));
+  }
+
+  .resultats-panel-list {
+    width: 22rem;
+    max-height: 100%;
+  }
+
+  .resultats-panel-detail {
+    width: 20rem;
+    max-height: 100%;
+  }
+}
