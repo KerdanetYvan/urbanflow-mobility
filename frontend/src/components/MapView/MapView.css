@@ -55,3 +55,50 @@
   border-radius: var(--radius-full);
   flex-shrink: 0;
 }
+
+/* Marqueur "ma position" (issue #9) - point plein + anneau pulsant, pour se
+   distinguer du marqueur "origine" (un disque statique de meme taille).
+   Couleur dupliquee depuis tokens.css volontairement, meme raisonnement que
+   les autres icones de ce fichier (chaine HTML brute injectee par Leaflet,
+   hors de portee de la cascade CSS des variables du composant). */
+.mapview-user-marker {
+  position: relative;
+}
+
+.mapview-user-marker-dot,
+.mapview-user-marker-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #2f6fed;
+}
+
+.mapview-user-marker-dot {
+  border: 2px solid #fff;
+}
+
+.mapview-user-marker-ring {
+  opacity: 0.35;
+  animation: mapview-user-marker-pulse 2s ease-out infinite;
+}
+
+@keyframes mapview-user-marker-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapview-user-marker-ring {
+    animation: none;
+    opacity: 0.2;
+  }
+}
