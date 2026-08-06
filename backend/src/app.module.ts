@@ -22,13 +22,13 @@ import { UsersModule } from './users/users.module';
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
-        // Controle par sa propre variable plutot que deduit de NODE_ENV :
-        // synchronize (creation automatique du schema) et "on tourne en
-        // production" sont deux questions independantes. Tant qu'aucune
-        // migration TypeORM n'existe (voir issue de durcissement a venir),
-        // TYPEORM_SYNC=true reste necessaire meme en production pour que
-        // les tables se creent. A repasser a false une fois les migrations
-        // en place.
+        // Le schema est desormais gere par les migrations TypeORM (voir
+        // src/data-source.ts et src/migrations/, lancees via
+        // `npm run migration:run` avant le demarrage de l'app - Dockerfiles
+        // de dev et de prod). synchronize reste controle par sa propre
+        // variable (independante de NODE_ENV) comme garde-fou manuel, mais
+        // doit rester a false en usage normal pour ne pas diverger des
+        // migrations.
         synchronize: config.get<string>('TYPEORM_SYNC', 'false') === 'true',
       }),
     }),

@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../users/user.entity';
+import { AccessibilityPreference } from './accessibility-preference.enum';
 import { TransportMode } from './transport-mode.enum';
 
 /**
@@ -53,26 +54,25 @@ export class MobilityProfile {
   preferredTransportModes: TransportMode[];
 
   /**
-   * Accessibilite PMR (contrainte C10 du sujet) : correspond au parametre
-   * de routage "accessible en fauteuil roulant" d'OpenTripPlanner, base sur
-   * le champ GTFS wheelchair_boarding et les tags OSM - une contrainte
-   * reellement exploitable par le graphe de routage, contrairement a un
-   * evitement des escaliers au cas par cas (pas de donnee de ce niveau de
-   * detail dans le GTFS/OSM utilises par le projet).
+   * Preferences d'accessibilite (contrainte C10 du sujet, issue #68) : voir
+   * AccessibilityPreference. Tableau Postgres natif "text[]", meme pattern
+   * que preferredTransportModes - une preference "cochee" = presente dans
+   * le tableau. Volontairement pas de seuil numerique (un "max" elimine des
+   * trajets au lieu de les classer) ni de champ libre (inexploitable par
+   * une formule de scoring) : chaque valeur est concue pour devenir une
+   * entree de ponderation du futur service de scoring (partie 7.3 du
+   * dossier), a l'exception possible de wheelchair_accessible dont le
+   * cablage reel (parametre wheelchair d'OpenTripPlanner en dur vs poids de
+   * scoring) reste a trancher lors de l'integration OTP correspondante.
    */
-  @ApiProperty()
-  @Column({ name: 'reduced_mobility', default: false })
-  reducedMobility: boolean;
-
-  /** Distance de marche maximale acceptee, en metres. Optionnel. */
-  @ApiProperty({ nullable: true, type: Number })
-  @Column({ name: 'max_walking_distance_meters', type: 'int', nullable: true })
-  maxWalkingDistanceMeters: number | null;
-
-  /** Nombre de correspondances maximum accepte sur un trajet. Optionnel. */
-  @ApiProperty({ nullable: true, type: Number })
-  @Column({ name: 'max_transfers', type: 'int', nullable: true })
-  maxTransfers: number | null;
+  @ApiProperty({ enum: AccessibilityPreference, isArray: true })
+  @Column({
+    name: 'accessibility_preferences',
+    type: 'text',
+    array: true,
+    default: '{}',
+  })
+  accessibilityPreferences: AccessibilityPreference[];
 
   @ApiProperty()
   @CreateDateColumn({ name: 'created_at' })

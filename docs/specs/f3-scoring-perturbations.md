@@ -76,14 +76,13 @@ Un seul recalcul + une seule notification par perturbation détectée sur le tra
 
 ## 4. Priorisation des critères de scoring par défaut
 
-### 4.1 Ce qui est filtré en amont par OpenTripPlanner, pas par le score
+### 4.1 Ce qui reste filtré en amont par OpenTripPlanner, pas par le score
 
-Certaines préférences du profil de mobilité sont déjà transmises comme **contraintes natives de routage** à OpenTripPlanner, en amont du scoring — elles ne sont donc pas des critères de classement mais des filtres à la source :
+Révision issue #68 : le profil de mobilité expose désormais `accessibilityPreferences` (voir `AccessibilityPreference`, `backend/src/profiles/`), un tableau de préférences cochées/décochées plutôt que les anciens champs `reducedMobility`/`maxWalkingDistanceMeters`/`maxTransfers`. Une seule d'entre elles reste pensée comme un **filtre dur** transmis à OpenTripPlanner en amont du scoring, parce qu'elle correspond à une impossibilité physique et non à une simple préférence :
 
-- `reducedMobility` → paramètre OTP d'accessibilité fauteuil roulant (déjà noté dans `backend/src/profiles/mobility-profile.entity.ts`) : OTP ne renvoie que des itinéraires accessibles, le service de scoring n'a pas à y revenir.
-- `maxWalkingDistanceMeters` / `maxTransfers`, quand renseignés → transmis à OTP comme bornes de recherche plutôt que comme pénalité de score après coup.
+- `wheelchair_accessible` → paramètre OTP d'accessibilité fauteuil roulant : OTP ne renverrait que des itinéraires accessibles, le service de scoring n'aurait pas à y revenir. Câblage réel vers OTP hors périmètre de l'issue #68 (modèle de profil uniquement) — à traiter avec l'intégration OTP du scoring (#16).
 
-Le service de scoring ne fait donc que **classer** des itinéraires déjà conformes à ces contraintes dures — il n'a pas à les re-vérifier.
+`limit_walking_distance` et `limit_transfers` ne sont **plus** des bornes numériques transmises à OTP (un seuil "max" ne fait qu'éliminer des trajets, il ne les classe pas) : ce sont désormais des entrées de **pondération** du score, voir section 4.3.
 
 ### 4.2 Critères pondérés du score
 
@@ -100,9 +99,11 @@ Poids **volontairement simples et documentés en dur dans le code** (pas une con
 
 - `preferredTransportModes` : un itinéraire utilisant un mode **non coché** par l'utilisateur n'est pas exclu, seulement pénalisé (pénalité forte équivalente à environ un tiers de son score total, suffisante pour le reléguer en fin de liste sauf si aucune alternative ne respecte la préférence) — dans le même esprit que la règle déjà actée pour "0 résultat" (section 4 du spec F2) : un écran vide est pire qu'un résultat imparfait, donc jamais un filtre dur qui viderait la liste.
 - Un profil qui n'a pas encore renseigné `preferredTransportModes` (tableau vide) reçoit le classement par défaut, sans pénalité de mode : cohérent avec le fait que la recherche reste utilisable sans compte ([#64](https://github.com/KerdanetYvan/urbanflow-mobility/issues/64)), où aucune préférence n'existe par construction.
-- Pas de re-pondération des 4 critères du tableau 4.2 par profil (ex. ne pas remonter "correspondances" à 40% pour un utilisateur en fauteuil roulant) : `reducedMobility` agit déjà en amont (section 4.1), une double action (filtre ET repondération) rendrait le comportement plus difficile à expliquer dans le dossier sans bénéfice utilisateur clair pour le MVP.
+- `limit_transfers` coché → augmente le poids du critère "nombre de correspondances" (tableau 4.2) pour ce profil, plutôt que d'éliminer les trajets à plus d'une correspondance (voir révision 4.1, issue #68) : reste une préférence classante, jamais un couperet qui pourrait vider la liste de résultats.
+- `limit_walking_distance` coché → pénalise la distance de marche cumulée d'un itinéraire (donnée déjà disponible dans les segments OTP), avec le même principe : un poids plus fort, pas un rejet des trajets qui en comportent.
+- Formules de pondération exactes (valeur du poids renforcé, courbe de pénalité pour la distance de marche) à trancher lors de l'implémentation du service de scoring (#16, Sprint 3) — hors périmètre de cette révision, qui ne porte que sur le modèle de profil.
 
 ## 5. Exemples (personas du dossier, partie 2.3)
 
 - **Antoine** (pressé, aucune contrainte d'accessibilité, préférences larges) : les 4 critères s'appliquent sans repondération. Un itinéraire à pied sous la pluie battante perd des points face à une alternative en transport en commun légèrement plus longue.
-- **Muriel** (mobilité réduite, `maxTransfers: 0`) : OTP ne renvoie que des itinéraires accessibles avec au plus 0 correspondance (filtre amont, section 4.1) ; parmi ceux-ci, le classement reste piloté par les 4 critères du tableau 4.2 sans traitement spécial supplémentaire.
+- **Muriel** (`accessibilityPreferences: [wheelchair_accessible, limit_walking_distance, limit_transfers]`) : OTP ne renvoie que des itinéraires accessibles en fauteuil roulant (filtre amont, section 4.1) ; parmi ceux-ci, le classement pondère plus fortement les correspondances et la distance de marche (section 4.3) plutôt que d'éliminer les trajets qui en comportent.
