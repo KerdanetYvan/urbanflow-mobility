@@ -26,3 +26,28 @@ export async function login(email: string, password: string): Promise<void> {
 export function logout(): void {
   clearTokens();
 }
+
+/**
+ * Demande de reinitialisation de mot de passe (issue #70/#71). Renvoie
+ * toujours un message generique en 200, que l'email existe ou non (pas
+ * d'enumeration, voir AuthService.forgotPassword cote backend) - jamais
+ * d'erreur "metier" a gerer ici, uniquement une eventuelle erreur reseau.
+ */
+export function forgotPassword(email: string): Promise<{ message: string }> {
+  return apiPost<{ message: string }>('/auth/forgot-password', { email });
+}
+
+/**
+ * Confirmation de reinitialisation (issue #70/#71). Leve une ApiError (400)
+ * si le token est invalide, expire ou deja utilise - message deja pret a
+ * afficher tel quel (voir AuthService.resetPassword cote backend).
+ */
+export function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  return apiPost<{ message: string }>('/auth/reset-password', {
+    token,
+    newPassword,
+  });
+}

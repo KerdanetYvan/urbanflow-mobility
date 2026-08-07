@@ -4,8 +4,10 @@ import RequireAuth from './components/RequireAuth';
 import RedirectIfAuthenticated from './components/RedirectIfAuthenticated';
 import { AuthProvider } from './lib/AuthProvider';
 import ConnexionPage from './pages/ConnexionPage/ConnexionPage';
+import MotDePasseOubliePage from './pages/MotDePasseOubliePage/MotDePasseOubliePage';
 import ProfilPage from './pages/ProfilPage/ProfilPage';
 import RecherchePage from './pages/RecherchePage/RecherchePage';
+import ReinitialiserMotDePassePage from './pages/ReinitialiserMotDePassePage/ReinitialiserMotDePassePage';
 import ResultatsPage from './pages/ResultatsPage/ResultatsPage';
 import HistoriquePage from './pages/HistoriquePage';
 
@@ -52,6 +54,19 @@ function App() {
           <Route path="recherche" element={<RecherchePage />} />
           <Route path="resultats" element={<ResultatsPage />} />
           <Route path="historique" element={<HistoriquePage />} />
+          {/* Public : un utilisateur qui a oublie son mot de passe n'est
+              justement pas connecte (issue #71). */}
+          <Route
+            path="mot-de-passe-oublie"
+            element={<MotDePasseOubliePage />}
+          />
+          {/* Route figee cote backend : le lien envoye par email pointe sur
+              ${FRONTEND_URL}/reset-password?token=... (voir
+              AuthService.forgotPassword, backend/src/auth/auth.service.ts). */}
+          <Route
+            path="reset-password"
+            element={<ReinitialiserMotDePassePage />}
+          />
         </Route>
       </Routes>
     </AuthProvider>
