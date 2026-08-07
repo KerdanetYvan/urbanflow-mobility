@@ -38,7 +38,7 @@ const SEED_USERS: SeedUser[] = [
     profile: {
       preferredTransportModes: [
         TransportMode.WALKING,
-        TransportMode.PUBLIC_TRANSPORT,
+        TransportMode.BUS,
         TransportMode.SCOOTER,
       ],
       accessibilityPreferences: [],
@@ -51,10 +51,7 @@ const SEED_USERS: SeedUser[] = [
     email: 'muriel@urbanflow.test',
     password: 'Muriel123!',
     profile: {
-      preferredTransportModes: [
-        TransportMode.PUBLIC_TRANSPORT,
-        TransportMode.WALKING,
-      ],
+      preferredTransportModes: [TransportMode.METRO, TransportMode.WALKING],
       accessibilityPreferences: [
         AccessibilityPreference.WHEELCHAIR_ACCESSIBLE,
         AccessibilityPreference.LIMIT_WALKING_DISTANCE,

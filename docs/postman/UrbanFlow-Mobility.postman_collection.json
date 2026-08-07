@@ -229,7 +229,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"preferredTransportModes\": [\"walking\", \"public_transport\"],\n  \"accessibilityPreferences\": []\n}",
+              "raw": "{\n  \"preferredTransportModes\": [\"walking\", \"bus\"],\n  \"accessibilityPreferences\": []\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -237,7 +237,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["profiles"]
             },
-            "description": "F1 - profil de mobilite (issue #4). Valeurs valides pour preferredTransportModes : walking, cycling, scooter, public_transport, carpooling. Valeurs valides pour accessibilityPreferences (issue #68) : wheelchair_accessible, limit_walking_distance, limit_transfers."
+            "description": "F1 - profil de mobilite (issue #4). Valeurs valides pour preferredTransportModes (transports en commun eclates en 4 modes, issue #66) : walking, cycling, scooter, bus, tram, metro, train_ter, carpooling. Valeurs valides pour accessibilityPreferences (issue #68) : wheelchair_accessible, limit_walking_distance, limit_transfers."
           },
           "response": []
         },
