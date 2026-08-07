@@ -36,7 +36,7 @@ Les 19 issues du Sprint 2 (9 F2 déjà planifiées + 10 issues de correction ajo
 - [x] [#66](https://github.com/KerdanetYvan/urbanflow-mobility/issues/66) (Dev BE) — Étendre les modes de transport en commun (bus/métro/tram/train-TER) — `public_transport` remplacé par `bus`/`tram`/`metro`/`train_ter`, migration de backfill vers `bus` par defaut. Frontend (`TRANSPORT_MODES`/`ProfilPage.tsx`) pas encore mis à jour, cassé jusqu'à #67 juste après.
 - [x] [#67](https://github.com/KerdanetYvan/urbanflow-mobility/issues/67) (Dev FE) — Formulaire de profil : cases par mode de transport en commun
 - [x] [#70](https://github.com/KerdanetYvan/urbanflow-mobility/issues/70) (Dev BE) — Mot de passe oublié (endpoints + envoi d'email) — `POST /auth/forgot-password`/`POST /auth/reset-password`, token SHA-256 a usage unique (pas un JWT), envoi via nodemailer auto-heberge (MailHog dev / Postfix prod avec DKIM auto-genere, pas de SaaS externe). Frontend (ecrans de reinitialisation) pas encore fait, voir #71 juste apres.
-- [*] [#71](https://github.com/KerdanetYvan/urbanflow-mobility/issues/71) (Dev FE) — Écrans de réinitialisation de mot de passe
+- [x] [#71](https://github.com/KerdanetYvan/urbanflow-mobility/issues/71) (Dev FE) — Écrans de réinitialisation de mot de passe — `/mot-de-passe-oublie` et `/reset-password` (route figée côté backend), lien "Mot de passe oublié ?" ajouté sur `ConnexionPage`
 - [ ] [#72](https://github.com/KerdanetYvan/urbanflow-mobility/issues/72) (PO) — Specs de la refonte visuelle mobile-first / desktop
 - [ ] [#73](https://github.com/KerdanetYvan/urbanflow-mobility/issues/73) (Dev FE) — Refonte de la disposition mobile/desktop
 
