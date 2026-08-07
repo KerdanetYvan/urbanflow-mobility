@@ -10,7 +10,13 @@
     { "key": "testEmail", "value": "", "type": "string" },
     { "key": "testPassword", "value": "TestApi123!", "type": "string" },
     { "key": "accessToken", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" }
+    { "key": "refreshToken", "value": "", "type": "string" },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string",
+      "description": "Issue #70 : pas recuperable automatiquement (jamais renvoye par l'API, uniquement par email) - a copier manuellement depuis le lien recu sur l'UI MailHog (http://localhost:8025) apres avoir lance 'Mot de passe oublie', avant de lancer 'Reinitialiser le mot de passe'."
+    }
   ],
   "item": [
     {
@@ -134,6 +140,98 @@
               "path": ["auth", "refresh"]
             },
             "description": "Echange le refresh token stocke contre une nouvelle paire de jetons."
+          },
+          "response": []
+        },
+        {
+          "name": "Mot de passe oublie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('message generique', () => {",
+                  "  pm.expect(pm.response.json().message).to.include('Si un compte existe');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "forgot-password"]
+            },
+            "description": "Issue #70. Envoie un email (via MailHog en dev, http://localhost:8025) contenant le lien de reinitialisation - copier le token du lien dans la variable de collection resetToken avant de lancer 'Reinitialiser le mot de passe'."
+          },
+          "response": []
+        },
+        {
+          "name": "Reinitialiser le mot de passe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"NouveauMotDePasse123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password"]
+            },
+            "description": "Issue #70. Necessite resetToken rempli manuellement (voir 'Mot de passe oublie'). Usage unique : rejoue = 400."
+          },
+          "response": []
+        },
+        {
+          "name": "[Erreurs] Reinitialisation - token invalide",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token-qui-n-existe-pas\",\n  \"newPassword\": \"NouveauMotDePasse123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password"]
+            }
           },
           "response": []
         },

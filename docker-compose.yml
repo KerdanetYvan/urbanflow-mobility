@@ -27,6 +27,17 @@ services:
     ports:
       - "8080:8080"
 
+  # Capture les emails du backend sans les envoyer reellement (issue #70) -
+  # consultables sur l'UI web http://localhost:8025. Equivalent dev de
+  # Postfix en prod (docker-compose.prod.yml), meme code cote backend
+  # (nodemailer, seule la variable MAIL_HOST change).
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   # Le build échouera tant que backend/ ne contient pas de projet NestJS initialisé
   backend:
     build:
@@ -37,6 +48,7 @@ services:
     depends_on:
       - postgres
       - otp
+      - mailhog
     ports:
       - "3000:3000"
     volumes:

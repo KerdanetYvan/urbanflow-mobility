@@ -78,9 +78,10 @@ La solution est en ligne : **[urbanflow-mobility.kerdanetyvan.dev](https://urban
 - Hébergement : VPS OVHcloud (VPS-2, 4 vCPU / 8 Go, Ubuntu 26.04 LTS) — choix argumenté dans le dossier de certification (hébergement UE, RGPD).
 - Accès SSH par clé uniquement (mot de passe désactivé), `ufw` (22/80/443 seulement) + `fail2ban` actifs.
 - **Caddy** en reverse proxy sur l'hôte : HTTPS automatique (Let's Encrypt), sert le build statique du frontend (`/var/www/urbanflow-frontend`) et route `/api/*` vers le conteneur backend.
-- `docker-compose.prod.yml` : uniquement `postgres` + `backend` (le frontend est servi en statique par Caddy, pas besoin de conteneur ; `otp` sera réintroduit avec les vraies données GTFS, F3). Le port du backend est lié à `127.0.0.1` uniquement — Docker contourne `ufw` pour les ports publiés, donc seul Caddy (sur l'hôte) peut atteindre le conteneur.
+- `docker-compose.prod.yml` : `postgres` + `backend` + `postfix` (le frontend est servi en statique par Caddy, pas besoin de conteneur ; `otp` sera réintroduit avec les vraies données GTFS, F3). Le port du backend est lié à `127.0.0.1` uniquement — Docker contourne `ufw` pour les ports publiés, donc seul Caddy (sur l'hôte) peut atteindre le conteneur.
 - Backend construit via `docker/backend.prod.Dockerfile` (multi-étapes : build TypeScript puis image finale sans devDependencies).
 - `TYPEORM_SYNC=false` en production : le schéma est géré par les migrations TypeORM, lancées automatiquement au démarrage du conteneur backend (`npm run migration:run:prod`, voir `backend/README.md`).
+- **`postfix`** (issue #70, réinitialisation de mot de passe par email) : relai SMTP sortant auto-hébergé (image `boky/postfix`), pas de SaaS externe pour ne pas dépendre d'un quota d'envoi tiers — voir `backend/README.md`. Étape manuelle **restant à faire côté DNS** (non couverte par le déploiement automatisé) : publier chez le registrar du domaine un enregistrement SPF, la clé publique DKIM générée par le conteneur (`DKIM_AUTOGENERATE=1`, volume `dkim_keys`), et configurer le rDNS/PTR de l'IP du VPS auprès d'OVHcloud — sans ces trois éléments, les emails partiront mais atterriront probablement en spam.
 
 ## État actuel
 
