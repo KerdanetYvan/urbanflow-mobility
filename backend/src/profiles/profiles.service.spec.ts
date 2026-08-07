@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
+import { AccessibilityPreference } from './accessibility-preference.enum';
 import { MobilityProfile } from './mobility-profile.entity';
 import { ProfilesService } from './profiles.service';
 import { TransportMode } from './transport-mode.enum';
@@ -39,15 +40,15 @@ describe('ProfilesService', () => {
 
       const profile = await service.create('user-1', {
         preferredTransportModes: [TransportMode.CYCLING, TransportMode.WALKING],
-        reducedMobility: true,
-        maxTransfers: 2,
+        accessibilityPreferences: [AccessibilityPreference.LIMIT_TRANSFERS],
       });
 
       expect(repository.save).toHaveBeenCalledTimes(1);
       const [savedProfile] = repository.save.mock.calls[0];
       expect(savedProfile.userId).toBe('user-1');
-      expect(profile.reducedMobility).toBe(true);
-      expect(profile.maxTransfers).toBe(2);
+      expect(profile.accessibilityPreferences).toEqual([
+        AccessibilityPreference.LIMIT_TRANSFERS,
+      ]);
     });
 
     it('refuse la creation si un profil existe deja pour cet utilisateur', async () => {
@@ -59,7 +60,7 @@ describe('ProfilesService', () => {
       await expect(
         service.create('user-1', {
           preferredTransportModes: [],
-          reducedMobility: false,
+          accessibilityPreferences: [],
         }),
       ).rejects.toThrow(ConflictException);
       expect(repository.save).not.toHaveBeenCalled();
@@ -92,14 +93,16 @@ describe('ProfilesService', () => {
         id: 'profile-1',
         userId: 'user-1',
         preferredTransportModes: [TransportMode.WALKING],
-        reducedMobility: false,
-        maxWalkingDistanceMeters: null,
-        maxTransfers: null,
+        accessibilityPreferences: [],
       });
 
-      const updated = await service.update('user-1', { maxTransfers: 1 });
+      const updated = await service.update('user-1', {
+        accessibilityPreferences: [AccessibilityPreference.LIMIT_TRANSFERS],
+      });
 
-      expect(updated.maxTransfers).toBe(1);
+      expect(updated.accessibilityPreferences).toEqual([
+        AccessibilityPreference.LIMIT_TRANSFERS,
+      ]);
       // Les champs non fournis dans la mise a jour restent inchanges.
       expect(updated.preferredTransportModes).toEqual([TransportMode.WALKING]);
     });
@@ -108,7 +111,9 @@ describe('ProfilesService', () => {
       repository.findOneBy.mockResolvedValue(null);
 
       await expect(
-        service.update('user-sans-profil', { maxTransfers: 1 }),
+        service.update('user-sans-profil', {
+          accessibilityPreferences: [AccessibilityPreference.LIMIT_TRANSFERS],
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });

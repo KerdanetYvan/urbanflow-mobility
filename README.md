@@ -80,7 +80,7 @@ La solution est en ligne : **[urbanflow-mobility.kerdanetyvan.dev](https://urban
 - **Caddy** en reverse proxy sur l'hôte : HTTPS automatique (Let's Encrypt), sert le build statique du frontend (`/var/www/urbanflow-frontend`) et route `/api/*` vers le conteneur backend.
 - `docker-compose.prod.yml` : uniquement `postgres` + `backend` (le frontend est servi en statique par Caddy, pas besoin de conteneur ; `otp` sera réintroduit avec les vraies données GTFS, F3). Le port du backend est lié à `127.0.0.1` uniquement — Docker contourne `ufw` pour les ports publiés, donc seul Caddy (sur l'hôte) peut atteindre le conteneur.
 - Backend construit via `docker/backend.prod.Dockerfile` (multi-étapes : build TypeScript puis image finale sans devDependencies).
-- `TYPEORM_SYNC=true` en production pour l'instant (pas encore de migrations TypeORM) — à repasser à `false` une fois les migrations en place (voir `backend/README.md`).
+- `TYPEORM_SYNC=false` en production : le schéma est géré par les migrations TypeORM, lancées automatiquement au démarrage du conteneur backend (`npm run migration:run:prod`, voir `backend/README.md`).
 
 ## État actuel
 

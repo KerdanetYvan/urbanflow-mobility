@@ -229,7 +229,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"preferredTransportModes\": [\"walking\", \"public_transport\"],\n  \"reducedMobility\": false,\n  \"maxWalkingDistanceMeters\": 1000,\n  \"maxTransfers\": 2\n}",
+              "raw": "{\n  \"preferredTransportModes\": [\"walking\", \"public_transport\"],\n  \"accessibilityPreferences\": []\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -237,7 +237,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["profiles"]
             },
-            "description": "F1 - profil de mobilite (issue #4). Valeurs valides pour preferredTransportModes : walking, cycling, scooter, public_transport, carpooling."
+            "description": "F1 - profil de mobilite (issue #4). Valeurs valides pour preferredTransportModes : walking, cycling, scooter, public_transport, carpooling. Valeurs valides pour accessibilityPreferences (issue #68) : wheelchair_accessible, limit_walking_distance, limit_transfers."
           },
           "response": []
         },
@@ -274,7 +274,7 @@
                 "exec": [
                   "pm.test('200 OK', () => pm.response.to.have.status(200));",
                   "pm.test('mise a jour partielle appliquee', () => {",
-                  "  pm.expect(pm.response.json().reducedMobility).to.eql(true);",
+                  "  pm.expect(pm.response.json().accessibilityPreferences).to.include('wheelchair_accessible');",
                   "});"
                 ]
               }
@@ -285,7 +285,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reducedMobility\": true,\n  \"maxTransfers\": 0\n}",
+              "raw": "{\n  \"accessibilityPreferences\": [\"wheelchair_accessible\", \"limit_transfers\"]\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {

@@ -20,6 +20,26 @@ Nécessite une variable d'environnement `DATABASE_URL` (voir `../.env.example`),
 - `npm run lint` — ESLint
 - `npm test` — tests unitaires Jest
 - `npm run seed` — jeu de données de test (voir ci-dessous)
+- `npm run migration:generate -- src/migrations/<Nom>` — génère une migration à partir du diff entités ↔ base connectée (voir ci-dessous)
+- `npm run migration:run` / `npm run migration:revert` — applique/annule les migrations en attente
+
+## Migrations (TypeORM CLI)
+
+Le schéma est géré par des migrations versionnées (`src/migrations/`), pas par `synchronize` (voir plus bas). `src/data-source.ts` définit le `DataSource` utilisé par la CLI, indépendamment du bootstrap Nest (`app.module.ts`).
+
+- Générer une migration après une modification d'entité : `npm run migration:generate -- src/migrations/NomDescriptif` (nécessite une base à jour par rapport à la dernière migration appliquée, pour que le diff ne porte que sur le changement en cours).
+- Appliquer les migrations en attente : `npm run migration:run` (déjà lancé automatiquement au démarrage du conteneur `backend`, dev comme prod — voir `docker/backend.Dockerfile`/`backend.prod.Dockerfile`).
+- Annuler la dernière migration appliquée : `npm run migration:revert`.
+- En production, l'image ne contient pas `ts-node` (`npm ci --omit=dev`) : les scripts `*:prod` (`migration:run:prod`/`migration:revert:prod`) utilisent le binaire `typeorm` compilé contre `dist/data-source.js` plutôt que `typeorm-ts-node-commonjs`.
+
+**Bootstrap ponctuel requis sur tout environnement existant** (déployé avant l'introduction des migrations, schéma déjà créé par `synchronize`) : la migration `Baseline` fait un `CREATE TABLE` qui échouera (`relation "users" already exists`) si elle s'exécute sur une base où `users`/`mobility_profiles` existent déjà. Avant le premier déploiement de ce changement en production, marquer `Baseline` comme déjà appliquée sans l'exécuter :
+
+```sql
+CREATE TABLE IF NOT EXISTS migrations (id SERIAL PRIMARY KEY, timestamp bigint NOT NULL, name character varying NOT NULL);
+INSERT INTO migrations (timestamp, name) VALUES (1786032965519, 'Baseline1786032965519');
+```
+
+`migration:run:prod` exécutera alors uniquement `AccessibilityPreferences` (la vraie modification de schéma + le backfill des données existantes, voir issue #68) au démarrage suivant du conteneur. Étape à ne faire qu'une fois — les migrations futures s'appliqueront normalement.
 
 ## Documentation API (OpenAPI/Swagger)
 
@@ -37,8 +57,8 @@ Issue #40 : permet de développer/démontrer en local sans dépendre des vraies 
 
 | Compte | Mot de passe | Profil |
 | --- | --- | --- |
-| `antoine@urbanflow.test` | `Antoine123!` | Calqué sur le persona Antoine (dossier, partie 2.3) : préférences larges (marche, TC, trottinette), pas de contrainte d'accessibilité |
-| `muriel@urbanflow.test` | `Muriel123!` | Calqué sur le persona Muriel : mobilité réduite, évite les correspondances (`maxTransfers: 0`) |
+| `antoine@urbanflow.test` | `Antoine123!` | Calqué sur le persona Antoine (dossier, partie 2.3) : préférences larges (marche, TC, trottinette), aucune préférence d'accessibilité cochée |
+| `muriel@urbanflow.test` | `Muriel123!` | Calqué sur le persona Muriel : accessibilité fauteuil roulant, marche limitée et correspondances limitées (`accessibilityPreferences`) |
 | `sans-profil@urbanflow.test` | `SansProfil123!` | Aucun profil créé — utile pour tester/démontrer l'état "profil pas encore créé" (`ProfilPage.tsx`, 404 sur `GET /profiles/me`) |
 
 **Lancer le seed** (base déjà démarrée, `docker compose up` en cours) :
@@ -90,7 +110,7 @@ Convention de nommage :
 
 ## Profil de mobilité (F1)
 
-- `src/profiles/` : entité `MobilityProfile` (table `mobility_profiles`, relation one-to-one avec `User`) — préférences de transport (`preferredTransportModes`, voir `TransportMode`), contrainte d'accessibilité PMR (`reducedMobility`, mappée sur le paramètre de routage OpenTripPlanner correspondant), distance de marche max et nombre de correspondances max optionnels (`maxWalkingDistanceMeters`, `maxTransfers`). Pas de champ "éviter les escaliers" : le GTFS/OSM utilisé par OpenTripPlanner ne descend pas à ce niveau de détail.
+- `src/profiles/` : entité `MobilityProfile` (table `mobility_profiles`, relation one-to-one avec `User`) — préférences de transport (`preferredTransportModes`, voir `TransportMode`) et préférences d'accessibilité (`accessibilityPreferences`, voir `AccessibilityPreference` : `wheelchair_accessible`, `limit_walking_distance`, `limit_transfers`). Tableau extensible plutôt que des colonnes dédiées (issue #68) : chaque valeur cochée/décochée est pensée comme une entrée de pondération pour le futur service de scoring (partie 7.3 du dossier), jamais comme un seuil numérique ou un champ libre — un filtre éliminatoire ou une string ne peuvent pas alimenter un classement pondéré. Pas de champ "éviter les escaliers" : le GTFS/OSM utilisé par OpenTripPlanner ne descend pas à ce niveau de détail.
 - Toutes les routes (`POST /profiles`, `GET /profiles/me`, `PATCH /profiles/me`, `DELETE /profiles/me`) sont protégées par `JwtAuthGuard` et n'agissent **que** sur le profil de l'utilisateur authentifié (`user.sub` extrait du JWT via `@CurrentUser()`) — jamais d'id de profil fourni par le client dans l'URL, pour éliminer par construction tout risque d'IDOR.
 - Pas de `GET /profiles/:id` générique : volontairement absent, un utilisateur ne peut jamais consulter le profil de quelqu'un d'autre.
 
@@ -110,4 +130,4 @@ Convention de nommage :
 - Le service de scoring (partie 7.3 du dossier) est un module dédié, interrogé après chaque appel à OpenTripPlanner — poids clairs et modifiables, pas de modèle opaque.
 - Authentification JWT + refresh tokens, mots de passe hachés avec bcrypt (voir annexes C et D du dossier de certification).
 - Respect OWASP Top 10 sur l'ensemble des endpoints exposés.
-- `synchronize` TypeORM (création automatique du schéma) est piloté par sa propre variable `TYPEORM_SYNC` (voir `src/app.module.ts`), indépendamment de `NODE_ENV` : les deux questions ("crée le schéma automatiquement ?" et "tourne-t-on en production ?") sont indépendantes. `TYPEORM_SYNC=true` reste nécessaire même en production tant qu'aucune migration TypeORM n'existe — à repasser à `false` une fois les migrations en place.
+- Le schéma est géré par des migrations TypeORM versionnées (voir section "Migrations" plus haut), pas par `synchronize` (`TYPEORM_SYNC`, voir `src/app.module.ts`) — celui-ci reste disponible comme garde-fou manuel indépendant de `NODE_ENV`, mais doit rester à `false` en usage normal pour ne pas diverger des migrations.

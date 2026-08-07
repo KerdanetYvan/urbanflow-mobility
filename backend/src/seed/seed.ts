@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
+import { AccessibilityPreference } from '../profiles/accessibility-preference.enum';
 import { TransportMode } from '../profiles/transport-mode.enum';
 import { ProfilesService } from '../profiles/profiles.service';
 import { UsersService } from '../users/users.service';
@@ -23,9 +24,7 @@ interface SeedUser {
   password: string;
   profile: {
     preferredTransportModes: TransportMode[];
-    reducedMobility: boolean;
-    maxWalkingDistanceMeters?: number;
-    maxTransfers?: number;
+    accessibilityPreferences: AccessibilityPreference[];
   } | null;
 }
 
@@ -42,13 +41,13 @@ const SEED_USERS: SeedUser[] = [
         TransportMode.PUBLIC_TRANSPORT,
         TransportMode.SCOOTER,
       ],
-      reducedMobility: false,
+      accessibilityPreferences: [],
     },
   },
   {
     // Muriel : sensible aux obstacles d'accessibilite (trottoirs
-    // degrades, absence de banc) et evite les correspondances - profil de
-    // mobilite reduite avec un nombre de correspondances maximum a 0.
+    // degrades, absence de banc) et evite les correspondances - toutes les
+    // preferences d'accessibilite cochees.
     email: 'muriel@urbanflow.test',
     password: 'Muriel123!',
     profile: {
@@ -56,9 +55,11 @@ const SEED_USERS: SeedUser[] = [
         TransportMode.PUBLIC_TRANSPORT,
         TransportMode.WALKING,
       ],
-      reducedMobility: true,
-      maxWalkingDistanceMeters: 500,
-      maxTransfers: 0,
+      accessibilityPreferences: [
+        AccessibilityPreference.WHEELCHAIR_ACCESSIBLE,
+        AccessibilityPreference.LIMIT_WALKING_DISTANCE,
+        AccessibilityPreference.LIMIT_TRANSFERS,
+      ],
     },
   },
   {
