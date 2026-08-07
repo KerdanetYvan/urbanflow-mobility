@@ -2,11 +2,11 @@ import { startTransition, useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
-import FormField from '../../components/FormField/FormField';
 import { ApiError } from '../../lib/api';
 import { logout } from '../../lib/auth';
 import { useAuth } from '../../lib/useAuth';
 import {
+  ACCESSIBILITY_PREFERENCES,
   TRANSPORT_MODES,
   createProfile,
   getMyProfile,
@@ -24,11 +24,11 @@ type Feedback = { variant: 'success' | 'error'; message: string };
  * profil (POST) plutot que de le mettre a jour (PATCH) - transparent pour
  * l'utilisateur, un seul bouton "Enregistrer" quel que soit le cas.
  *
- * Pas de champ "eviter les escaliers" : le GTFS/OSM utilise par
- * OpenTripPlanner ne descend pas a ce niveau de detail, ce serait une
- * preference non exploitable par le moteur de routage. Seules des
- * contraintes reellement actionnables sont proposees (accessibilite PMR
- * via le parametre OTP correspondant, distance de marche, correspondances).
+ * Preferences d'accessibilite (issue #69, apres le changement de modele
+ * backend #68) : un groupe de checkboxes correspondant a l'enum
+ * AccessibilityPreference (voir lib/profile.ts), pas de champ libre ni de
+ * seuil numerique - chaque valeur cochee est une entree de ponderation pour
+ * le futur service de scoring, pas une contrainte qui elimine des trajets.
  */
 function ProfilPage() {
   const navigate = useNavigate();
@@ -36,9 +36,7 @@ function ProfilPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [profileExists, setProfileExists] = useState(false);
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
-  const [reducedMobility, setReducedMobility] = useState(false);
-  const [maxWalkingDistance, setMaxWalkingDistance] = useState('');
-  const [maxTransfers, setMaxTransfers] = useState('');
+  const [selectedAccessibilityPreferences, setSelectedAccessibilityPreferences] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
@@ -51,15 +49,7 @@ function ProfilPage() {
         if (cancelled) return;
         setProfileExists(true);
         setSelectedModes(profile.preferredTransportModes);
-        setReducedMobility(profile.reducedMobility);
-        setMaxWalkingDistance(
-          profile.maxWalkingDistanceMeters != null
-            ? String(profile.maxWalkingDistanceMeters)
-            : '',
-        );
-        setMaxTransfers(
-          profile.maxTransfers != null ? String(profile.maxTransfers) : '',
-        );
+        setSelectedAccessibilityPreferences(profile.accessibilityPreferences);
       } catch (error) {
         if (cancelled) return;
         if (error instanceof ApiError && error.statusCode === 404) {
@@ -127,6 +117,14 @@ function ProfilPage() {
     );
   }
 
+  function toggleAccessibilityPreference(pref: string) {
+    setSelectedAccessibilityPreferences((current) =>
+      current.includes(pref)
+        ? current.filter((p) => p !== pref)
+        : [...current, pref],
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
@@ -134,11 +132,7 @@ function ProfilPage() {
 
     const payload = {
       preferredTransportModes: selectedModes,
-      reducedMobility,
-      ...(maxWalkingDistance !== ''
-        ? { maxWalkingDistanceMeters: Number(maxWalkingDistance) }
-        : {}),
-      ...(maxTransfers !== '' ? { maxTransfers: Number(maxTransfers) } : {}),
+      accessibilityPreferences: selectedAccessibilityPreferences,
     };
 
     try {
@@ -202,36 +196,18 @@ function ProfilPage() {
         </fieldset>
 
         <fieldset className="profil-fieldset">
-          <legend>Accessibilité</legend>
-          <label className="profil-checkbox">
-            <input
-              type="checkbox"
-              checked={reducedMobility}
-              onChange={(event) => setReducedMobility(event.target.checked)}
-            />
-            Mobilité réduite
-          </label>
+          <legend>Préférences d'accessibilité</legend>
+          {ACCESSIBILITY_PREFERENCES.map((pref) => (
+            <label key={pref.value} className="profil-checkbox">
+              <input
+                type="checkbox"
+                checked={selectedAccessibilityPreferences.includes(pref.value)}
+                onChange={() => toggleAccessibilityPreference(pref.value)}
+              />
+              {pref.label}
+            </label>
+          ))}
         </fieldset>
-
-        <FormField
-          id="max-walking-distance"
-          label="Distance de marche maximale (mètres)"
-          type="number"
-          min={0}
-          value={maxWalkingDistance}
-          onChange={(event) => setMaxWalkingDistance(event.target.value)}
-          helpText="Laisser vide pour ne pas limiter."
-        />
-
-        <FormField
-          id="max-transfers"
-          label="Nombre de correspondances maximum"
-          type="number"
-          min={0}
-          value={maxTransfers}
-          onChange={(event) => setMaxTransfers(event.target.value)}
-          helpText="Laisser vide pour ne pas limiter."
-        />
 
         <Button type="submit" disabled={isSaving} className="profil-submit">
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}

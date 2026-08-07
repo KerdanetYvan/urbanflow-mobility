@@ -55,9 +55,7 @@ describe('ProfilPage', () => {
       id: 'profile-1',
       userId: 'user-1',
       preferredTransportModes: ['cycling'],
-      reducedMobility: true,
-      maxWalkingDistanceMeters: null,
-      maxTransfers: null,
+      accessibilityPreferences: ['wheelchair_accessible'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -67,13 +65,15 @@ describe('ProfilPage', () => {
 
     await screen.findByRole('button', { name: 'Enregistrer' });
     await user.click(screen.getByRole('checkbox', { name: 'Vélo' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Mobilité réduite' }));
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Accessible en fauteuil roulant' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
       expect(profileLib.createProfile).toHaveBeenCalledWith({
         preferredTransportModes: ['cycling'],
-        reducedMobility: true,
+        accessibilityPreferences: ['wheelchair_accessible'],
       });
       expect(profileLib.updateProfile).not.toHaveBeenCalled();
     });
@@ -85,9 +85,7 @@ describe('ProfilPage', () => {
       id: 'profile-1',
       userId: 'user-1',
       preferredTransportModes: ['walking'],
-      reducedMobility: false,
-      maxWalkingDistanceMeters: 500,
-      maxTransfers: 2,
+      accessibilityPreferences: ['limit_transfers'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -95,9 +93,7 @@ describe('ProfilPage', () => {
       id: 'profile-1',
       userId: 'user-1',
       preferredTransportModes: ['walking'],
-      reducedMobility: true,
-      maxWalkingDistanceMeters: 500,
-      maxTransfers: 2,
+      accessibilityPreferences: ['limit_transfers', 'wheelchair_accessible'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -105,20 +101,28 @@ describe('ProfilPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    // Pre-remplissage : le mode "Marche" doit deja etre coche.
+    // Pre-remplissage : le mode "Marche" et "Limiter le nombre de
+    // correspondances" doivent deja etre coches.
     const walkingCheckbox = await screen.findByRole('checkbox', {
       name: 'Marche',
     });
     expect(walkingCheckbox).toBeChecked();
-    expect(screen.getByLabelText('Distance de marche maximale (mètres)')).toHaveValue(500);
-    expect(screen.getByLabelText('Nombre de correspondances maximum')).toHaveValue(2);
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Limiter le nombre de correspondances',
+      }),
+    ).toBeChecked();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Mobilité réduite' }));
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Accessible en fauteuil roulant' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
       expect(profileLib.updateProfile).toHaveBeenCalledWith(
-        expect.objectContaining({ reducedMobility: true }),
+        expect.objectContaining({
+          accessibilityPreferences: ['limit_transfers', 'wheelchair_accessible'],
+        }),
       );
       expect(profileLib.createProfile).not.toHaveBeenCalled();
     });
@@ -142,9 +146,7 @@ describe('ProfilPage', () => {
       id: 'profile-1',
       userId: 'user-1',
       preferredTransportModes: [],
-      reducedMobility: false,
-      maxWalkingDistanceMeters: null,
-      maxTransfers: null,
+      accessibilityPreferences: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
