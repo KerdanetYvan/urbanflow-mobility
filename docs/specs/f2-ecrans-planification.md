@@ -61,6 +61,8 @@ Réutilise les composants existants `FormField`, `Button` (voir `frontend/src/co
 
 ## 3. Écran de résultats (`/resultats`, implémenté par #36)
 
+> **Structure révisée** par [`refonte-visuelle-mobile-desktop.md`](refonte-visuelle-mobile-desktop.md) section 2 (issue [#72](https://github.com/KerdanetYvan/urbanflow-mobility/issues/72)) : la route `/resultats` est fusionnée dans `/recherche` (machine à états, plus de route séparée). Les spécifications de contenu ci-dessous (liste, sélection, carte) restent la référence — seule la structure en deux écrans distincts est révisée.
+
 ### 3.1 Liste des itinéraires
 
 Chaque itinéraire de la liste affiche :
