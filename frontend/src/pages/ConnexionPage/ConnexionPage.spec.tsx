@@ -35,6 +35,21 @@ describe('ConnexionPage', () => {
     vi.clearAllMocks();
   });
 
+  it("affiche le lien 'Mot de passe oublié ?' seulement en mode connexion (issue #71)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(
+      screen.getByRole('link', { name: 'Mot de passe oublié ?' }),
+    ).toHaveAttribute('href', '/mot-de-passe-oublie');
+
+    await user.click(screen.getByRole('tab', { name: 'Créer un compte' }));
+
+    expect(
+      screen.queryByRole('link', { name: 'Mot de passe oublié ?' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('affiche les erreurs de validation sans appeler login si le formulaire est vide', async () => {
     const user = userEvent.setup();
     renderPage();

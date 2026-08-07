@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
@@ -168,6 +168,11 @@ function ConnexionPage() {
                 : undefined
             }
           />
+          {mode === 'login' && (
+            <Link to="/mot-de-passe-oublie" className="connexion-forgot-link">
+              Mot de passe oublié ?
+            </Link>
+          )}
           {mode === 'register' && (
             <FormField
               id="confirm-password"
