@@ -10,7 +10,10 @@ export const TRANSPORT_MODES = [
   { value: 'walking', label: 'Marche' },
   { value: 'cycling', label: 'Vélo' },
   { value: 'scooter', label: 'Trottinette' },
-  { value: 'public_transport', label: 'Transports en commun' },
+  { value: 'bus', label: 'Bus' },
+  { value: 'tram', label: 'Tram' },
+  { value: 'metro', label: 'Métro' },
+  { value: 'train_ter', label: 'Train / TER' },
   { value: 'carpooling', label: 'Covoiturage' },
 ] as const;
 
