@@ -24,6 +24,33 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Relai SMTP sortant auto-heberge (issue #70) : pas de SaaS externe
+  # (Resend/SendGrid...) pour ne pas dependre d'un quota d'envoi tiers, voir
+  # backend/README.md. Image boky/postfix (relai communautaire actif,
+  # configurable par variables d'env) plutot qu'une image Postfix maison :
+  # DKIM_AUTOGENERATE=1 genere et applique automatiquement une paire de cles
+  # DKIM (persistee dans le volume dkim_keys pour ne pas en regenerer une
+  # nouvelle a chaque redemarrage, ce qui invaliderait la cle publiee en DNS).
+  #
+  # ETAPE MANUELLE non faite ici (hors de portee du code) : apres le premier
+  # demarrage, publier chez le registrar du domaine (1) un enregistrement
+  # TXT SPF autorisant l'IP du VPS a emettre pour le domaine, (2) la cle
+  # publique DKIM generee (recuperable dans le volume dkim_keys,
+  # mail._domainkey.<domaine>), (3) un rDNS/PTR correct sur l'IP du VPS
+  # aupres d'OVHcloud - sans ces trois elements, les emails partiront mais
+  # atterriront probablement en spam ou seront rejetes.
+  postfix:
+    image: boky/postfix
+    restart: always
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${MAIL_ALLOWED_SENDER_DOMAINS}
+      DKIM_AUTOGENERATE: 1
+    volumes:
+      - dkim_keys:/etc/opendkim/keys
+    # Pas de port publie : seul le reseau docker interne (le service
+    # "backend" ci-dessous) doit pouvoir l'atteindre, sur le port SMTP
+    # standard du conteneur (25).
+
   backend:
     build:
       context: ./backend
@@ -32,8 +59,10 @@ services:
     env_file: .env
     depends_on:
       - postgres
+      - postfix
     ports:
       - "127.0.0.1:3000:3000"
 
 volumes:
   postgres_data:
+  dkim_keys:

@@ -36,6 +36,29 @@ export class User {
   @Column({ name: 'password_hash' })
   passwordHash: string;
 
+  /**
+   * Hash SHA-256 (pas bcrypt) du token de reinitialisation de mot de passe
+   * en cours (issue #70), nul si aucune demande active. SHA-256 plutot que
+   * bcrypt volontairement : le token est deja un secret aleatoire a haute
+   * entropie (voir AuthService.forgotPassword), pas un mot de passe choisi
+   * par un humain a proteger contre le brute-force - un hash rapide et
+   * deterministe suffit, et permet en plus de retrouver l'utilisateur par
+   * un simple `WHERE reset_token_hash = ...` (l'endpoint de confirmation ne
+   * recoit que le token, jamais l'email). Un hash bcrypt, sale et non
+   * deterministe, rendrait cette recherche impossible sans boucler sur tous
+   * les utilisateurs.
+   */
+  @Column({ name: 'reset_token_hash', nullable: true, type: 'varchar' })
+  resetTokenHash: string | null;
+
+  /** Expiration du token ci-dessus - au-dela, meme un hash correct est refuse. */
+  @Column({
+    name: 'reset_token_expires_at',
+    nullable: true,
+    type: 'timestamp',
+  })
+  resetTokenExpiresAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

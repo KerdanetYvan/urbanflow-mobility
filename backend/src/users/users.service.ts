@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
-import { QueryFailedError, Repository } from 'typeorm';
+import { MoreThan, QueryFailedError, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from './user.entity';
 
@@ -65,5 +65,47 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOneBy({ id });
+  }
+
+  /**
+   * Enregistre un token de reinitialisation de mot de passe (deja hache en
+   * SHA-256 par AuthService, jamais en clair) et son expiration. Ecrase une
+   * demande precedente non utilisee s'il y en avait une : une seule
+   * demande active a la fois par utilisateur.
+   */
+  async setResetToken(
+    userId: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.usersRepository.update(userId, {
+      resetTokenHash: tokenHash,
+      resetTokenExpiresAt: expiresAt,
+    });
+  }
+
+  /**
+   * Retrouve l'utilisateur associe a un hash de token de reinitialisation,
+   * seulement s'il n'a pas expire. Utilise par la confirmation
+   * (POST /auth/reset-password), qui ne recoit que le token - jamais l'email.
+   */
+  findByValidResetToken(tokenHash: string): Promise<User | null> {
+    return this.usersRepository.findOneBy({
+      resetTokenHash: tokenHash,
+      resetTokenExpiresAt: MoreThan(new Date()),
+    });
+  }
+
+  /**
+   * Applique le nouveau mot de passe (deja hache en bcrypt par AuthService)
+   * et invalide le token de reinitialisation dans la meme ecriture - usage
+   * unique, un lien de reinitialisation ne peut pas servir deux fois.
+   */
+  async resetPassword(userId: string, newPasswordHash: string): Promise<void> {
+    await this.usersRepository.update(userId, {
+      passwordHash: newPasswordHash,
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+    });
   }
 }

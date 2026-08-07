@@ -1,18 +1,31 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: { findByEmail: jest.Mock; findById: jest.Mock };
+  let usersService: {
+    findByEmail: jest.Mock;
+    findById: jest.Mock;
+    setResetToken: jest.Mock;
+    findByValidResetToken: jest.Mock;
+    resetPassword: jest.Mock;
+  };
   let jwtService: { signAsync: jest.Mock; verifyAsync: jest.Mock };
   let configService: { get: jest.Mock };
+  let mailService: { sendPasswordResetEmail: jest.Mock };
 
   // Instanciation directe (pas de module NestJS complet) : AuthService n'a
   // aucune logique liee au systeme d'injection de dependances lui-meme,
-  // seulement a ses 3 collaborateurs mockes ici a la main.
+  // seulement a ses collaborateurs mockes ici a la main.
   beforeEach(() => {
-    usersService = { findByEmail: jest.fn(), findById: jest.fn() };
+    usersService = {
+      findByEmail: jest.fn(),
+      findById: jest.fn(),
+      setResetToken: jest.fn(),
+      findByValidResetToken: jest.fn(),
+      resetPassword: jest.fn(),
+    };
     jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
     // Renvoie simplement la valeur par defaut passee en 2eme argument : se
     // comporte comme un ConfigService qui n'aurait rien de configure,
@@ -20,11 +33,15 @@ describe('AuthService', () => {
     configService = {
       get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
     };
+    mailService = {
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    };
 
     service = new AuthService(
       usersService as never,
       jwtService as never,
       configService as never,
+      mailService as never,
     );
   });
 
@@ -116,6 +133,106 @@ describe('AuthService', () => {
       await expect(
         service.refresh('token-utilisateur-supprime'),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('genere un token, l enregistre et envoie un email quand le compte existe', async () => {
+      usersService.findByEmail.mockResolvedValue({
+        id: 'user-1',
+        email: 'alice@example.com',
+      });
+
+      const result = await service.forgotPassword({
+        email: 'alice@example.com',
+      });
+
+      expect(usersService.setResetToken).toHaveBeenCalledTimes(1);
+      const [userId, tokenHash, expiresAt] = usersService.setResetToken.mock
+        .calls[0] as [string, string, Date];
+      expect(userId).toBe('user-1');
+      expect(tokenHash).toMatch(/^[0-9a-f]{64}$/); // hex SHA-256
+      expect(expiresAt).toBeInstanceOf(Date);
+      expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
+
+      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'alice@example.com',
+        expect.stringContaining('/reset-password?token='),
+      );
+      expect(result).toEqual({
+        message:
+          'Si un compte existe pour cet email, un lien de reinitialisation a ete envoye.',
+      });
+    });
+
+    it("renvoie le MEME message generique et n'envoie aucun email si le compte n'existe pas (pas d'enumeration)", async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+
+      const result = await service.forgotPassword({
+        email: 'inconnu@example.com',
+      });
+
+      expect(usersService.setResetToken).not.toHaveBeenCalled();
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        message:
+          'Si un compte existe pour cet email, un lien de reinitialisation a ete envoye.',
+      });
+    });
+
+    it("ne fait pas echouer la demande si l'envoi d'email echoue (fire-and-forget)", async () => {
+      usersService.findByEmail.mockResolvedValue({
+        id: 'user-1',
+        email: 'alice@example.com',
+      });
+      mailService.sendPasswordResetEmail.mockRejectedValue(
+        new Error('SMTP indisponible'),
+      );
+
+      await expect(
+        service.forgotPassword({ email: 'alice@example.com' }),
+      ).resolves.toEqual({
+        message:
+          'Si un compte existe pour cet email, un lien de reinitialisation a ete envoye.',
+      });
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('met a jour le mot de passe quand le token est valide', async () => {
+      usersService.findByValidResetToken.mockResolvedValue({
+        id: 'user-1',
+        email: 'alice@example.com',
+      });
+
+      const result = await service.resetPassword({
+        token: 'un-token-valide',
+        newPassword: 'NouveauMotDePasse123!',
+      });
+
+      expect(usersService.findByValidResetToken).toHaveBeenCalledWith(
+        expect.stringMatching(/^[0-9a-f]{64}$/),
+      );
+      expect(usersService.resetPassword).toHaveBeenCalledTimes(1);
+      const [userId, newPasswordHash] = usersService.resetPassword.mock
+        .calls[0] as [string, string];
+      expect(userId).toBe('user-1');
+      expect(
+        await bcrypt.compare('NouveauMotDePasse123!', newPasswordHash),
+      ).toBe(true);
+      expect(result).toEqual({ message: 'Mot de passe reinitialise.' });
+    });
+
+    it('rejette un token invalide ou expire', async () => {
+      usersService.findByValidResetToken.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword({
+          token: 'token-invalide',
+          newPassword: 'NouveauMotDePasse123!',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(usersService.resetPassword).not.toHaveBeenCalled();
     });
   });
 });

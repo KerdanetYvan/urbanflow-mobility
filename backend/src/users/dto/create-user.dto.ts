@@ -1,18 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, Matches } from 'class-validator';
-
-/**
- * Au moins 8 caracteres, une majuscule, une minuscule, un chiffre et un
- * caractere special. Ecrit en 4 lookaheads independants (?=...) plutot
- * qu'une seule expression complexe : chacun verifie la presence d'une
- * categorie sans consommer de caracteres, la longueur minimale etant
- * verifiee par le `.{8,}` final. Coherent avec la regle appliquee cote
- * frontend (voir ConnexionPage.tsx) - meme message des deux cotes.
- */
-const PASSWORD_PATTERN =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-const PASSWORD_MESSAGE =
-  'Le mot de passe doit contenir au moins 8 caracteres, une majuscule, une minuscule, un chiffre et un caractere special';
+import {
+  PASSWORD_MESSAGE,
+  PASSWORD_PATTERN,
+} from '../../common/validators/password.validator';
 
 /**
  * Donnees attendues pour POST /users (inscription).
