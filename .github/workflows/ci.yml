@@ -39,6 +39,15 @@ jobs:
         working-directory: frontend
         run: npm test --if-present
 
+      # Le vrai build (tsc + vite build) - distinct des tests (Vitest, sa
+      # propre transformation TS, plus tolerante) : sans cette etape, une
+      # erreur de compilation peut passer la CI tout en cassant le build
+      # utilise pour le deploiement (issue #104, bug de prod du 2026-08-08).
+      - name: Build
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run build --if-present
+
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists != 'true'
         run: echo "frontend/package.json absent — étape ignorée en attendant l'initialisation du projet."
@@ -74,6 +83,17 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         working-directory: backend
         run: npm test --if-present
+
+      # Le vrai build (nest build / tsc -b) - distinct des tests (Jest via
+      # ts-jest, sa propre transformation TS, plus tolerante) : sans cette
+      # etape, une erreur de compilation peut passer la CI tout en cassant
+      # le build Docker de production (issue #104, bug de prod du
+      # 2026-08-08 - dommage collateral d'un volume Docker dev obsolete,
+      # jamais detecte faute de ce build en CI).
+      - name: Build
+        if: steps.check.outputs.exists == 'true'
+        working-directory: backend
+        run: npm run build --if-present
 
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists != 'true'
