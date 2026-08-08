@@ -1,5 +1,17 @@
 .profil-page {
   max-width: 28rem;
+  /* Bug corrige (issue #73, spec 4.1) : sans ce centrage, la page reste
+     collee au bord gauche sur desktop des que sa largeur maximale est
+     atteinte - contrairement a ConnexionPage.css qui l'avait deja. Regle a
+     appliquer systematiquement a tout conteneur de page avec max-width. */
+  margin-inline: auto;
+}
+
+/* Colonne unique par defaut ; passe en deux colonnes a partir de 768px
+   (issue #73, spec 5.2) - voir .profil-fieldsets ci-dessous. */
+.profil-fieldsets {
+  display: flex;
+  flex-direction: column;
 }
 
 .profil-fieldset {
@@ -45,4 +57,25 @@
 
 .profil-logout {
   width: 100%;
+}
+
+@media (min-width: 768px) {
+  .profil-page {
+    max-width: 36rem;
+    /* Respiration desktop (issue #73, spec 4.2). */
+    margin-top: var(--space-8);
+  }
+
+  .profil-fieldsets {
+    flex-direction: row;
+    gap: var(--space-4);
+  }
+
+  .profil-fieldsets > .profil-fieldset {
+    flex: 1;
+    /* La marge basse individuelle (empilement mobile) devient inutile cote
+       a cote : le bouton Enregistrer suit directement la ligne des deux
+       fieldsets. */
+    margin-bottom: 0;
+  }
 }

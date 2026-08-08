@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
@@ -7,9 +7,29 @@ import { MapPinIcon, SwapIcon } from '../../components/icons';
 import { ApiError } from '../../lib/api';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import { searchPlaces, type PlaceSuggestion } from '../../lib/places';
-import { searchTrips } from '../../lib/trips';
+import { searchTrips, type TripItinerary } from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
+import RecherchePageResults from './RecherchePageResults';
 import './RecherchePage.css';
+
+/**
+ * Etat de l'ecran de recherche fusionne (issue #73, docs/specs/
+ * refonte-visuelle-mobile-desktop.md section 2.2) : un seul ecran, une
+ * seule route (/recherche), plutot que deux routes reliees par une
+ * navigation avec etat React Router (ancien comportement, issue #35/#36).
+ * Machine a etats a 3 valeurs : le formulaire (etat initial et retour
+ * depuis les 2 autres), la recherche en cours (reponse pas encore recue),
+ * les resultats (itineraires recus, eventuellement une liste vide).
+ */
+type Screen =
+  | { kind: 'formulaire' }
+  | { kind: 'recherche'; origin: PlaceSuggestion; destination: PlaceSuggestion }
+  | {
+      kind: 'resultats';
+      origin: PlaceSuggestion;
+      destination: PlaceSuggestion;
+      itineraries: TripItinerary[];
+    };
 
 /** Etat d'un champ origine/destination : le texte tape et, si l'utilisateur a choisi une suggestion, le lieu geocode correspondant. */
 interface AddressFieldState {
@@ -127,6 +147,15 @@ interface AlertState {
  * Ecran de recherche d'itineraire (F2, issue #35) - aussi la page d'accueil
  * de l'application ("/" redirige ici, voir App.tsx).
  *
+ * Ecran fusionne avec l'ancien ResultatsPage/#36 (issue #73, docs/specs/
+ * refonte-visuelle-mobile-desktop.md section 2) : une seule route
+ * /recherche, machine a etats interne (voir le type Screen ci-dessus)
+ * plutot que deux routes reliees par navigation avec etat React Router.
+ * L'etat du formulaire (origine/destination/heure/modes) n'est JAMAIS
+ * reinitialise entre les etats - c'est ce qui permet de le pre-remplir
+ * gratuitement au retour depuis les resultats ("Modifier la recherche",
+ * voir RecherchePageResults).
+ *
  * Utilisable sans compte (issue #64) : un usager de passage doit pouvoir
  * lancer une recherche sans etre bloque par un mur de connexion. Les modes
  * de transport preferes ne sont pre-remplis depuis le profil (F1) que si
@@ -141,7 +170,7 @@ interface AlertState {
  */
 function RecherchePage() {
   const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  const [screen, setScreen] = useState<Screen>({ kind: 'formulaire' });
 
   const [origin, setOrigin] = useState<AddressFieldState>(EMPTY_ADDRESS);
   const [destination, setDestination] =
@@ -162,7 +191,6 @@ function RecherchePage() {
     destination?: string;
   }>({});
   const [alert, setAlert] = useState<AlertState | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
 
   // Pre-remplissage des modes preferes depuis le profil (F1), uniquement si
   // connecte. Echec silencieux (pas de profil, session expiree...) : la
@@ -235,7 +263,13 @@ function RecherchePage() {
       return;
     }
 
-    setIsSearching(true);
+    // Transition vers l'etat "recherche" (issue #73) : la disposition
+    // resultats s'affiche immediatement, en chargement (carte
+    // origine/destination sans trace + squelette, voir
+    // RecherchePageResults) - remplace l'ancien bouton "Recherche…"/
+    // isSearching, la page entiere devient l'indicateur de chargement.
+    setScreen({ kind: 'recherche', origin: origin.selected, destination: destination.selected });
+
     try {
       const itineraries = await searchTrips({
         originLat: origin.selected.lat,
@@ -250,25 +284,36 @@ function RecherchePage() {
           : {}),
       });
 
-      // Criteres transmis via l'etat de navigation plutot qu'en query
-      // params, pour ne pas exposer de coordonnees precises dans l'URL
-      // (contrainte RGPD geolocalisation, voir section 2.4 de la spec).
-      navigate('/resultats', {
-        state: {
-          itineraries,
-          origin: origin.selected,
-          destination: destination.selected,
-        },
+      setScreen({
+        kind: 'resultats',
+        origin: origin.selected,
+        destination: destination.selected,
+        itineraries,
       });
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message
           : 'Connexion indisponible, réessayez.';
+      // Retour au formulaire (pas de route a quitter, juste un changement
+      // d'etat) - les valeurs saisies restent intactes, rien n'est perdu.
+      setScreen({ kind: 'formulaire' });
       setAlert({ variant: 'error', message });
-    } finally {
-      setIsSearching(false);
     }
+  }
+
+  // Etats "recherche" (chargement) et "resultats" (issue #73) : delegue a
+  // RecherchePageResults, qui reprend l'ancienne disposition de
+  // ResultatsPage/#36 - voir le type Screen en tete de fichier.
+  if (screen.kind !== 'formulaire') {
+    return (
+      <RecherchePageResults
+        origin={screen.origin}
+        destination={screen.destination}
+        itineraries={screen.kind === 'resultats' ? screen.itineraries : null}
+        onEditSearch={() => setScreen({ kind: 'formulaire' })}
+      />
+    );
   }
 
   return (
@@ -350,8 +395,8 @@ function RecherchePage() {
           ))}
         </fieldset>
 
-        <Button type="submit" disabled={isSearching} className="recherche-submit">
-          {isSearching ? 'Recherche…' : 'Rechercher'}
+        <Button type="submit" className="recherche-submit">
+          Rechercher
         </Button>
       </form>
     </section>

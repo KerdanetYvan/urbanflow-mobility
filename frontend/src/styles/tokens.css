@@ -6,6 +6,17 @@
  * CSS du projet ne doit contenir de couleur ou de taille en dur : toujours
  * passer par une variable definie ici, pour pouvoir changer la charte en un
  * seul endroit et garantir le support automatique du theme sombre partout.
+ *
+ * Breakpoint desktop/tablette (issue #73, docs/specs/
+ * refonte-visuelle-mobile-desktop.md section 7) : `@media (min-width: 768px)`,
+ * utilise litteralement (pas de variable ici) dans AppLayout.css,
+ * ProfilPage.css, RecherchePage.css, RecherchePageResults.css, MapView.css,
+ * ConnexionPage.css, MotDePasseOubliePage.css, ReinitialiserMotDePassePage.css
+ * et index.css. Ne peut PAS devenir une custom property consultee depuis une
+ * media query : les media queries ne lisent pas les variables CSS en CSS
+ * standard (pas de preprocesseur dans ce projet) - reprendre ce meme seuil
+ * en dur (768px) dans tout nouveau fichier plutot que d'en introduire un
+ * different par erreur.
  */
 
 :root {

@@ -153,37 +153,48 @@ function ConnexionPage() {
             onChange={(event) => setEmail(event.target.value)}
             error={fieldErrors.email}
           />
-          <FormField
-            id="password"
-            label="Mot de passe"
-            type="password"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            icon={<LockIcon />}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            error={fieldErrors.password}
-            helpText={
-              mode === 'register'
-                ? '8 caractères min., avec majuscule, minuscule, chiffre et caractère spécial'
-                : undefined
-            }
-          />
-          {mode === 'login' && (
-            <Link to="/mot-de-passe-oublie" className="connexion-forgot-link">
-              Mot de passe oublié ?
-            </Link>
-          )}
-          {mode === 'register' && (
-            <FormField
-              id="confirm-password"
-              label="Confirmer le mot de passe"
-              type="password"
-              autoComplete="new-password"
-              icon={<LockIcon />}
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              error={fieldErrors.confirmPassword}
-            />
+          {mode === 'login' ? (
+            <>
+              <FormField
+                id="password"
+                label="Mot de passe"
+                type="password"
+                autoComplete="current-password"
+                icon={<LockIcon />}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                error={fieldErrors.password}
+              />
+              <Link to="/mot-de-passe-oublie" className="connexion-forgot-link">
+                Mot de passe oublié ?
+              </Link>
+            </>
+          ) : (
+            // Cote a cote a partir de 768px (issue #73, spec 5.1) - voir
+            // .connexion-passwords dans ConnexionPage.css.
+            <div className="connexion-passwords">
+              <FormField
+                id="password"
+                label="Mot de passe"
+                type="password"
+                autoComplete="new-password"
+                icon={<LockIcon />}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                error={fieldErrors.password}
+                helpText="8 caractères min., avec majuscule, minuscule, chiffre et caractère spécial"
+              />
+              <FormField
+                id="confirm-password"
+                label="Confirmer le mot de passe"
+                type="password"
+                autoComplete="new-password"
+                icon={<LockIcon />}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                error={fieldErrors.confirmPassword}
+              />
+            </div>
           )}
           <Button type="submit" disabled={isSubmitting} className="connexion-submit">
             {isSubmitting

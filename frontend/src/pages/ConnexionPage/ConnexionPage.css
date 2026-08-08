@@ -58,3 +58,29 @@
   outline: 2px solid var(--color-primary-emphasis);
   outline-offset: -2px;
 }
+
+/* Les deux champs mot de passe (mode inscription) cote a cote plutot
+   qu'empiles - voir .connexion-passwords dans ConnexionPage.tsx. Neutre en
+   dessous de 768px (colonne unique, comme le reste du formulaire). */
+.connexion-passwords {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .connexion-page {
+    max-width: 28rem;
+    /* Respiration desktop (issue #73, spec 4.2) : le mobile est compact par
+       necessite, le desktop a la place. */
+    margin-top: var(--space-8);
+  }
+
+  .connexion-passwords {
+    flex-direction: row;
+    gap: var(--space-3);
+  }
+
+  .connexion-passwords > * {
+    flex: 1;
+  }
+}

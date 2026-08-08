@@ -181,33 +181,37 @@ function ProfilPage() {
       )}
 
       <form onSubmit={(event) => void handleSubmit(event)}>
-        <fieldset className="profil-fieldset">
-          <legend>Modes de transport préférés</legend>
-          {TRANSPORT_MODES.map((mode) => (
-            <label key={mode.value} className="profil-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedModes.includes(mode.value)}
-                onChange={() => toggleMode(mode.value)}
-              />
-              {mode.label}
-            </label>
-          ))}
-        </fieldset>
+        {/* Cote a cote a partir de 768px (issue #73, spec 5.2) - voir
+            .profil-fieldsets dans ProfilPage.css. */}
+        <div className="profil-fieldsets">
+          <fieldset className="profil-fieldset">
+            <legend>Modes de transport préférés</legend>
+            {TRANSPORT_MODES.map((mode) => (
+              <label key={mode.value} className="profil-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedModes.includes(mode.value)}
+                  onChange={() => toggleMode(mode.value)}
+                />
+                {mode.label}
+              </label>
+            ))}
+          </fieldset>
 
-        <fieldset className="profil-fieldset">
-          <legend>Préférences d'accessibilité</legend>
-          {ACCESSIBILITY_PREFERENCES.map((pref) => (
-            <label key={pref.value} className="profil-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedAccessibilityPreferences.includes(pref.value)}
-                onChange={() => toggleAccessibilityPreference(pref.value)}
-              />
-              {pref.label}
-            </label>
-          ))}
-        </fieldset>
+          <fieldset className="profil-fieldset">
+            <legend>Préférences d'accessibilité</legend>
+            {ACCESSIBILITY_PREFERENCES.map((pref) => (
+              <label key={pref.value} className="profil-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedAccessibilityPreferences.includes(pref.value)}
+                  onChange={() => toggleAccessibilityPreference(pref.value)}
+                />
+                {pref.label}
+              </label>
+            ))}
+          </fieldset>
+        </div>
 
         <Button type="submit" disabled={isSaving} className="profil-submit">
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}

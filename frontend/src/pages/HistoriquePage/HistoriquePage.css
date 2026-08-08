@@ -1,0 +1,32 @@
+/*
+ * Habillage minimal de coherence (issue #73, spec 5.3) - ce placeholder
+ * Stretch n'a pas encore de vraie disposition a specifier, seulement un
+ * traitement visuel qui ne detonne pas a cote des autres ecrans deja
+ * habilles (centrage, etat vide simple).
+ */
+
+.historique-page {
+  max-width: 28rem;
+  margin-inline: auto;
+}
+
+.historique-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.historique-empty-icon svg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .historique-page {
+    margin-top: var(--space-8);
+  }
+}

@@ -24,3 +24,28 @@
   min-height: var(--touch-target-min);
   line-height: var(--touch-target-min);
 }
+
+/* Les deux champs mot de passe cote a cote a partir de 768px (issue #73,
+   spec 5.1) - voir .reinitialiser-mdp-passwords dans
+   ReinitialiserMotDePassePage.tsx. */
+.reinitialiser-mdp-passwords {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .reinitialiser-mdp-page {
+    max-width: 28rem;
+    /* Respiration desktop (issue #73, spec 4.2). */
+    margin-top: var(--space-8);
+  }
+
+  .reinitialiser-mdp-passwords {
+    flex-direction: row;
+    gap: var(--space-3);
+  }
+
+  .reinitialiser-mdp-passwords > * {
+    flex: 1;
+  }
+}

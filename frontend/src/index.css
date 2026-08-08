@@ -56,6 +56,12 @@ h3 {
 @media (min-width: 768px) {
   h1 {
     font-size: var(--text-3xl);
+    /* Touche de couleur (issue #73, spec 4.3) : accent discret plutot
+       qu'un h1 identique au reste du texte - contribue, avec la bordure
+       d'accent de .app-header (AppLayout.css), a corriger l'impression de
+       rendu "sans vie" repere sur desktop. */
+    border-left: 3px solid var(--color-primary-emphasis);
+    padding-left: var(--space-3);
   }
 }
 

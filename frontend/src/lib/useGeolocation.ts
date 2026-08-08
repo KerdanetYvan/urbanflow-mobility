@@ -47,11 +47,11 @@ const MIN_UPDATE_INTERVAL_MS = 15_000;
  * Position de l'utilisateur en temps reel (issue #9), via la Geolocation
  * API du navigateur. `enabled` controle l'abonnement (pas de sollicitation
  * du capteur GPS tant que la carte qui l'affiche n'est pas visible, voir
- * ResultatsPage).
+ * RecherchePageResults).
  *
  * Permission refusee (AC dediee) : `status` passe a 'denied', jamais
  * d'exception non geree - a l'appelant d'afficher un message adapte s'il le
- * souhaite (voir ResultsList, ResultatsPage.tsx).
+ * souhaite (voir ResultsList, RecherchePageResults.tsx).
  */
 export function useGeolocation(enabled: boolean): GeolocationState {
   // Support de l'API calcule dans l'initialiseur (paresseux, execute une
