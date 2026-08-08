@@ -8,12 +8,6 @@ import * as profileLib from '../../lib/profile';
 import * as tripsLib from '../../lib/trips';
 import RecherchePage from './RecherchePage';
 
-const navigateMock = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return { ...actual, useNavigate: () => navigateMock };
-});
-
 vi.mock('../../lib/places');
 vi.mock('../../lib/trips');
 
@@ -145,11 +139,13 @@ describe('RecherchePage', () => {
     expect(screen.getByLabelText('Destination')).toHaveValue('Gare Part-Dieu');
   });
 
-  it('recherche puis navigue vers /resultats avec les criteres en etat de navigation', async () => {
+  it("recherche et affiche la disposition resultats fusionnee, sans navigation vers une autre route (issue #73)", async () => {
     vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
       Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
     );
-    const itineraries = [{ startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] }];
+    const itineraries = [
+      { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
+    ];
     vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
     const user = userEvent.setup();
     renderPage();
@@ -165,13 +161,20 @@ describe('RecherchePage', () => {
         destinationLat: HOTEL_DE_VILLE.lat,
         destinationLon: HOTEL_DE_VILLE.lon,
       });
-      expect(navigateMock).toHaveBeenCalledWith('/resultats', {
-        state: { itineraries, origin: GARE, destination: HOTEL_DE_VILLE },
-      });
     });
+    // Le formulaire disparait au profit de la disposition resultats (meme
+    // ecran, pas de navigation - voir RecherchePageResults).
+    expect(screen.queryByLabelText('Origine')).not.toBeInTheDocument();
+    // Le texte "De X à Y" est reparti sur plusieurs noeuds texte (JSX) :
+    // on verifie le contenu textuel complet du <p>, pas un noeud isole.
+    expect(
+      (
+        await screen.findAllByRole('button', { name: 'Modifier la recherche' })
+      )[0].closest('p'),
+    ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
   });
 
-  it("affiche une erreur reseau generique quand l'appel a /trips echoue", async () => {
+  it("revient au formulaire, criteres preremplis, quand l'appel a /trips echoue (issue #73)", async () => {
     vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
       Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
     );
@@ -188,7 +191,34 @@ describe('RecherchePage', () => {
     expect(
       await screen.findByText('Moteur de calcul indisponible'),
     ).toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalled();
+    // Retour au formulaire (pas de route a quitter) : les valeurs saisies
+    // avant l'echec restent intactes, rien n'est perdu.
+    expect(screen.getByLabelText('Origine')).toHaveValue('Gare Part-Dieu');
+    expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
+  });
+
+  it("'Modifier la recherche' revient au formulaire avec les criteres preremplis (issue #73)", async () => {
+    vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+      Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+    );
+    const itineraries = [
+      { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
+    ];
+    vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+    const user = userEvent.setup();
+    renderPage();
+
+    await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+    await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+    await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+    await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
+    );
+
+    expect(screen.getByLabelText('Origine')).toHaveValue('Gare Part-Dieu');
+    expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
   });
 
   it('ne pre-remplit pas les modes de transport pour un utilisateur non connecte', () => {

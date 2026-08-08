@@ -6,6 +6,10 @@
 
 .recherche-page {
   max-width: 32rem;
+  /* Bug corrige (issue #73, spec 4.1) : sans ce centrage, la page reste
+     collee au bord gauche sur desktop des que sa largeur maximale est
+     atteinte - voir ProfilPage.css pour le meme correctif. */
+  margin-inline: auto;
 }
 
 /*

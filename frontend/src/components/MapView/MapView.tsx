@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
 import type { GeoPosition } from '../../lib/useGeolocation';
-import type { TripItinerary } from '../../lib/trips';
+import type { TripItinerary, TripPlace } from '../../lib/trips';
 import { getModeStyle } from './modeStyles';
 import './MapView.css';
 
@@ -50,8 +50,22 @@ const USER_POSITION_ICON = L.divIcon({
   iconAnchor: [9, 9],
 });
 
+/** Simple point lat/lon, sans les metadonnees d'un TripPlace (nom...). */
+interface LatLon {
+  lat: number;
+  lon: number;
+}
+
 interface MapViewProps {
-  itinerary: TripItinerary;
+  /**
+   * Absent pendant une recherche en cours (issue #73, spec 2.4 - aucun
+   * itineraire recu du backend pour l'instant) : fournir alors `origin`/
+   * `destination` pour afficher seulement les deux marqueurs, sans trace.
+   */
+  itinerary?: TripItinerary;
+  /** Utilises uniquement quand `itinerary` est absent (recherche en cours). */
+  origin?: LatLon;
+  destination?: LatLon;
   className?: string;
   /** Position de l'utilisateur en temps reel (issue #9), voir lib/useGeolocation.ts. Absente/null : aucun marqueur affiche, la carte reste utilisable sans geolocalisation. */
   userPosition?: GeoPosition | null;
@@ -64,7 +78,8 @@ interface MapViewProps {
    * sans resume ni legende sous elle - utilise par l'ecran de resultats
    * (#36) une fois la carte devenue le fond plein ecran de la page. Dans ce
    * mode, l'equivalent textuel WCAG 1.1.1 (resume + segments) est fourni
-   * par les cards flottantes de ResultatsPage plutot que par ce composant.
+   * par les cards flottantes de RecherchePageResults plutot que par ce
+   * composant.
    */
   variant?: 'boxed' | 'fullBleed';
 }
@@ -75,41 +90,63 @@ interface MapViewProps {
  * reellement parcourues (segment.geometry, decode depuis OpenTripPlanner
  * cote backend - pas une simple ligne droite entre origine et destination),
  * marqueurs origine/destination/correspondances. Integree a l'ecran de
- * resultats (#36), pas une route separee (voir
- * docs/specs/f2-ecrans-planification.md section 3.3).
+ * recherche/resultats fusionne (#36, #73), pas une route separee (voir
+ * docs/specs/f2-ecrans-planification.md section 3.3 et
+ * docs/specs/refonte-visuelle-mobile-desktop.md section 2).
  *
  * Accessibilite (WCAG 1.1.1) : la carte elle-meme est un complement visuel
  * (`aria-hidden`, comme documente dans la spec). En mode 'boxed', le resume
  * textuel et la legende ci-dessous sont l'alternative complete ; en mode
- * 'fullBleed', c'est a l'appelant (ResultatsPage) de fournir cette
+ * 'fullBleed', c'est a l'appelant (RecherchePageResults) de fournir cette
  * alternative via ses propres cards, voir le commentaire sur `variant`.
  */
 function MapView({
   itinerary,
+  origin: originProp,
+  destination: destinationProp,
   className,
   variant = 'boxed',
   userPosition,
 }: MapViewProps) {
-  const segments = itinerary.segments;
-  if (segments.length === 0) return null;
+  const segments = itinerary?.segments ?? [];
+  const hasItinerary = segments.length > 0;
 
-  const origin = segments[0].from;
-  const destination = segments[segments.length - 1].to;
+  // Ni itineraire (avec segments) ni origine/destination de secours : rien a
+  // afficher (evite un crash carte sur itineraire vide, meme comportement
+  // qu'avant l'ajout du mode "recherche en cours").
+  if (!hasItinerary && !(originProp && destinationProp)) return null;
+
+  const origin = hasItinerary ? segments[0].from : (originProp as LatLon);
+  const destination = hasItinerary
+    ? segments[segments.length - 1].to
+    : (destinationProp as LatLon);
   // Points de correspondance = frontieres entre segments (le "from" de tout
-  // segment sauf le premier, deja marque comme origine).
-  const transferPoints = segments.slice(1).map((segment) => segment.from);
+  // segment sauf le premier, deja marque comme origine). Aucun sans
+  // itineraire : rien entre une origine et une destination qui ne sont pas
+  // encore reliees par un trajet.
+  const transferPoints = hasItinerary
+    ? segments.slice(1).map((segment) => segment.from)
+    : [];
 
-  const bounds = L.latLngBounds(
-    segments.flatMap((segment) =>
-      segment.geometry.map(
-        (point) => [point.lat, point.lon] as [number, number],
-      ),
-    ),
-  );
+  const bounds = hasItinerary
+    ? L.latLngBounds(
+        segments.flatMap((segment) =>
+          segment.geometry.map(
+            (point) => [point.lat, point.lon] as [number, number],
+          ),
+        ),
+      )
+    : L.latLngBounds([
+        [origin.lat, origin.lon],
+        [destination.lat, destination.lon],
+      ]);
 
   // Legende : un seul badge par mode present dans l'itineraire, dans
   // l'ordre de premiere apparition (pas d'ordre alphabetique arbitraire).
-  const modesUsed = [...new Set(segments.map((segment) => segment.mode))];
+  // Vide sans itineraire : rien a legender tant qu'aucun mode n'est connu.
+  const modesUsed = hasItinerary
+    ? [...new Set(segments.map((segment) => segment.mode))]
+    : [];
 
   const isFullBleed = variant === 'fullBleed';
 
@@ -130,7 +167,7 @@ function MapView({
         // l'issue #8) pour ne pas capter le defilement de la page quand la
         // carte est un simple encart dans un flux normal ; activee en
         // 'fullBleed' (#36 v2) puisque la page elle-meme ne defile plus
-        // (voir ResultatsPage.css) - rien a proteger.
+        // (voir RecherchePageResults.css) - rien a proteger.
         scrollWheelZoom={isFullBleed}
         // Pincement a deux doigts : deja actif par defaut dans Leaflet,
         // rendu explicite ici pour que l'intention soit claire (zoom
@@ -189,12 +226,14 @@ function MapView({
         )}
       </MapContainer>
 
-      {!isFullBleed && (
+      {/* Sans itineraire (recherche en cours), rien a resumer/legender - le
+          resume/la legende n'ont de sens qu'une fois un trajet connu. */}
+      {!isFullBleed && hasItinerary && (
         <>
           <p className="mapview-summary">
-            De {origin.name} à {destination.name} :{' '}
-            {formatDuration(itinerary.durationSeconds)},{' '}
-            {formatTransfers(itinerary.transfers).toLowerCase()}.
+            De {(origin as TripPlace).name} à {(destination as TripPlace).name} :{' '}
+            {formatDuration((itinerary as TripItinerary).durationSeconds)},{' '}
+            {formatTransfers((itinerary as TripItinerary).transfers).toLowerCase()}.
           </p>
 
           <ul className="mapview-legend">

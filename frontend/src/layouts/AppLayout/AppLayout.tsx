@@ -1,10 +1,14 @@
+import type { ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../lib/useAuth';
+import { HistoryIcon, LockIcon, SearchIcon, UserIcon } from '../../components/icons';
 import './AppLayout.css';
 
 /**
  * Description d'un lien de navigation : le libelle affiche, la route cible,
- * et a quel etat de connexion ce lien est reserve ('always' par defaut).
+ * l'icone associee (issue #73 - nav mobile "icones plutot que texte", voir
+ * docs/specs/refonte-visuelle-mobile-desktop.md section 3), et a quel etat
+ * de connexion ce lien est reserve ('always' par defaut).
  *
  * "Resultats" ne fait volontairement pas partie de cette liste (issue #64) :
  * ce n'est pas un ecran permanent, on n'y arrive que depuis une recherche
@@ -13,6 +17,7 @@ import './AppLayout.css';
 interface NavItem {
   label: string;
   to: string;
+  icon: ReactNode;
   visibility: 'always' | 'authenticated-only' | 'guest-only';
 }
 
@@ -20,10 +25,15 @@ interface NavItem {
 // suffit a mettre a jour a la fois la navigation et les routes (voir
 // src/App.tsx qui reutilise ces memes chemins).
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Recherche', to: '/recherche', visibility: 'always' },
-  { label: 'Connexion', to: '/connexion', visibility: 'guest-only' },
-  { label: 'Profil', to: '/profil', visibility: 'authenticated-only' },
-  { label: 'Historique', to: '/historique', visibility: 'authenticated-only' },
+  { label: 'Recherche', to: '/recherche', icon: <SearchIcon />, visibility: 'always' },
+  { label: 'Connexion', to: '/connexion', icon: <LockIcon />, visibility: 'guest-only' },
+  { label: 'Profil', to: '/profil', icon: <UserIcon />, visibility: 'authenticated-only' },
+  {
+    label: 'Historique',
+    to: '/historique',
+    icon: <HistoryIcon />,
+    visibility: 'authenticated-only',
+  },
 ];
 
 /**
@@ -68,6 +78,9 @@ function AppLayout() {
       <nav className="app-nav" aria-label="Navigation principale">
         {visibleNavItems.map((item) => (
           <NavLink key={item.to} to={item.to} className="app-nav-link">
+            <span className="app-nav-link-icon" aria-hidden="true">
+              {item.icon}
+            </span>
             {item.label}
           </NavLink>
         ))}

@@ -1,8 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { TripItinerary } from '../../lib/trips';
-import ResultatsPage from './ResultatsPage';
+import RecherchePageResults from './RecherchePageResults';
 
 const ORIGIN = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
 const DESTINATION = { label: 'Hôtel de Ville', lat: 45.77, lon: 4.83 };
@@ -65,21 +64,21 @@ const SLOW_ITINERARY: TripItinerary = {
   ],
 };
 
-function renderPage(state?: {
-  itineraries: TripItinerary[];
-  origin: typeof ORIGIN;
-  destination: typeof DESTINATION;
-}) {
-  return render(
-    <MemoryRouter
-      initialEntries={[{ pathname: '/resultats', state: state ?? null }]}
-    >
-      <Routes>
-        <Route path="/resultats" element={<ResultatsPage />} />
-        <Route path="/recherche" element={<p>Page de recherche</p>} />
-      </Routes>
-    </MemoryRouter>,
-  );
+function renderResults(
+  itineraries: TripItinerary[] | null,
+  onEditSearch = vi.fn(),
+) {
+  return {
+    onEditSearch,
+    ...render(
+      <RecherchePageResults
+        origin={ORIGIN}
+        destination={DESTINATION}
+        itineraries={itineraries}
+        onEditSearch={onEditSearch}
+      />,
+    ),
+  };
 }
 
 /**
@@ -96,21 +95,39 @@ function desktopCards(container: HTMLElement) {
   return within(panel as HTMLElement).getAllByRole('button', { name: /min/ });
 }
 
-describe('ResultatsPage', () => {
-  it("renvoie vers /recherche en l'absence de criteres de recherche (navigation directe, pas de resultat a afficher)", () => {
-    renderPage();
-    expect(screen.getByText('Page de recherche')).toBeInTheDocument();
+describe('RecherchePageResults', () => {
+  it("affiche une disposition en chargement (carte origine/destination + squelette) quand itineraries est null (issue #73)", () => {
+    const { container } = renderResults(null);
+
+    // Le texte "De X à Y" est reparti sur plusieurs noeuds texte (JSX) :
+    // on verifie le contenu textuel complet du <p>, pas un noeud isole.
+    expect(
+      screen
+        .getAllByRole('button', { name: 'Modifier la recherche' })[0]
+        .closest('p'),
+    ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
+    expect(container.querySelector('.resultats-skeleton')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /min/ })).not.toBeInTheDocument();
+  });
+
+  it("appelle onEditSearch au clic sur 'Modifier la recherche' pendant le chargement", async () => {
+    const user = userEvent.setup();
+    const { onEditSearch } = renderResults(null);
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
+    );
+
+    expect(onEditSearch).toHaveBeenCalledTimes(1);
   });
 
   it("affiche le contexte de la recherche et la liste dans l'ordre recu, sans re-trier", () => {
-    const { container } = renderPage({
-      itineraries: [FAST_ITINERARY, SLOW_ITINERARY],
-      origin: ORIGIN,
-      destination: DESTINATION,
-    });
+    const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
     expect(
-      screen.getAllByRole('link', { name: 'Modifier la recherche' })[0].closest('p'),
+      screen
+        .getAllByRole('button', { name: 'Modifier la recherche' })[0]
+        .closest('p'),
     ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
 
     const cards = desktopCards(container);
@@ -121,21 +138,12 @@ describe('ResultatsPage', () => {
   });
 
   it("ne montre jamais de valeur de score (uniquement l'ordre recu du backend)", () => {
-    renderPage({
-      itineraries: [FAST_ITINERARY],
-      origin: ORIGIN,
-      destination: DESTINATION,
-    });
-
+    renderResults([FAST_ITINERARY]);
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
   });
 
   it('presente le premier itineraire selectionne par defaut, avec son detail par segment', () => {
-    const { container } = renderPage({
-      itineraries: [FAST_ITINERARY, SLOW_ITINERARY],
-      origin: ORIGIN,
-      destination: DESTINATION,
-    });
+    const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
     const cards = desktopCards(container);
     expect(cards[0]).toHaveAttribute('aria-current', 'true');
@@ -153,11 +161,7 @@ describe('ResultatsPage', () => {
 
   it('change le detail affiche quand un autre itineraire de la liste est selectionne', async () => {
     const user = userEvent.setup();
-    const { container } = renderPage({
-      itineraries: [FAST_ITINERARY, SLOW_ITINERARY],
-      origin: ORIGIN,
-      destination: DESTINATION,
-    });
+    const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
     const cards = desktopCards(container);
     await user.click(cards[1]);
@@ -166,20 +170,21 @@ describe('ResultatsPage', () => {
     expect(cards[0]).not.toHaveAttribute('aria-current');
     // Le detail par segment du deuxieme itineraire (trajet 100% marche) ne
     // contient plus de segment bus, ni dans le panneau desktop ni dans le
-    // bandeau mobile (bascule sur "detail" au clic, voir ResultatsPage.tsx).
+    // bandeau mobile (bascule sur "detail" au clic, voir RecherchePageResults.tsx).
     expect(screen.queryByText('Bus C1')).not.toBeInTheDocument();
   });
 
-  it("affiche un etat vide dedie (pas une erreur) quand aucun itineraire n'est trouve", () => {
-    renderPage({ itineraries: [], origin: ORIGIN, destination: DESTINATION });
+  it("affiche un etat vide dedie (pas une erreur) quand aucun itineraire n'est trouve", async () => {
+    const user = userEvent.setup();
+    const { onEditSearch } = renderResults([]);
 
     expect(
       screen.getByText('Aucun itinéraire trouvé pour ce trajet.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Nouvelle recherche' }),
-    ).toHaveAttribute('href', '/recherche');
+
+    await user.click(screen.getByRole('button', { name: 'Nouvelle recherche' }));
+    expect(onEditSearch).toHaveBeenCalledTimes(1);
   });
 
   describe('bandeau mobile (bottom sheet)', () => {
@@ -190,22 +195,13 @@ describe('ResultatsPage', () => {
     }
 
     it('demarre replie sur la liste des trajets ("list")', () => {
-      const { container } = renderPage({
-        itineraries: [FAST_ITINERARY],
-        origin: ORIGIN,
-        destination: DESTINATION,
-      });
-
+      const { container } = renderResults([FAST_ITINERARY]);
       expect(sheet(container)).toHaveAttribute('data-sheet-state', 'list');
     });
 
     it('la poignee replie puis redeploie le bandeau au tap ("list" -> "collapsed" -> "list")', async () => {
       const user = userEvent.setup();
-      const { container } = renderPage({
-        itineraries: [FAST_ITINERARY],
-        origin: ORIGIN,
-        destination: DESTINATION,
-      });
+      const { container } = renderResults([FAST_ITINERARY]);
       const handleButton = container.querySelector(
         '.resultats-sheet-handle',
       ) as HTMLElement;
@@ -219,11 +215,7 @@ describe('ResultatsPage', () => {
 
     it('affiche un apercu du trajet selectionne dans la poignee une fois replie', async () => {
       const user = userEvent.setup();
-      const { container } = renderPage({
-        itineraries: [FAST_ITINERARY],
-        origin: ORIGIN,
-        destination: DESTINATION,
-      });
+      const { container } = renderResults([FAST_ITINERARY]);
       const handleButton = container.querySelector(
         '.resultats-sheet-handle',
       ) as HTMLElement;
@@ -235,11 +227,7 @@ describe('ResultatsPage', () => {
 
     it('selectionner un trajet dans le bandeau ouvre directement son detail, avec un retour vers la liste', async () => {
       const user = userEvent.setup();
-      const { container } = renderPage({
-        itineraries: [FAST_ITINERARY, SLOW_ITINERARY],
-        origin: ORIGIN,
-        destination: DESTINATION,
-      });
+      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
       const sheetBody = container.querySelector(
         '.resultats-sheet-body',
@@ -261,11 +249,7 @@ describe('ResultatsPage', () => {
     });
 
     it('un glissement vers le bas sur la poignee replie le bandeau', () => {
-      const { container } = renderPage({
-        itineraries: [FAST_ITINERARY],
-        origin: ORIGIN,
-        destination: DESTINATION,
-      });
+      const { container } = renderResults([FAST_ITINERARY]);
       const handleButton = container.querySelector(
         '.resultats-sheet-handle',
       ) as HTMLElement;

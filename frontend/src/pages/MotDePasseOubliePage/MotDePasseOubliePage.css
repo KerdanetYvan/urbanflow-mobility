@@ -24,3 +24,11 @@
   min-height: var(--touch-target-min);
   line-height: var(--touch-target-min);
 }
+
+@media (min-width: 768px) {
+  .mot-de-passe-oublie-page {
+    max-width: 28rem;
+    /* Respiration desktop (issue #73, spec 4.2). */
+    margin-top: var(--space-8);
+  }
+}

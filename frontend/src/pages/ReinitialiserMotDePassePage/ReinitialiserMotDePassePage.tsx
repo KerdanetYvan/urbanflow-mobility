@@ -124,27 +124,30 @@ function ReinitialiserMotDePassePage() {
             )}
 
             <form onSubmit={(event) => void handleSubmit(event)} noValidate>
-              <FormField
-                id="password"
-                label="Nouveau mot de passe"
-                type="password"
-                autoComplete="new-password"
-                icon={<LockIcon />}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                error={fieldErrors.password}
-                helpText="8 caractères min., avec majuscule, minuscule, chiffre et caractère spécial"
-              />
-              <FormField
-                id="confirm-password"
-                label="Confirmer le mot de passe"
-                type="password"
-                autoComplete="new-password"
-                icon={<LockIcon />}
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                error={fieldErrors.confirmPassword}
-              />
+              {/* Cote a cote a partir de 768px (issue #73, spec 5.1). */}
+              <div className="reinitialiser-mdp-passwords">
+                <FormField
+                  id="password"
+                  label="Nouveau mot de passe"
+                  type="password"
+                  autoComplete="new-password"
+                  icon={<LockIcon />}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  error={fieldErrors.password}
+                  helpText="8 caractères min., avec majuscule, minuscule, chiffre et caractère spécial"
+                />
+                <FormField
+                  id="confirm-password"
+                  label="Confirmer le mot de passe"
+                  type="password"
+                  autoComplete="new-password"
+                  icon={<LockIcon />}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  error={fieldErrors.confirmPassword}
+                />
+              </div>
               <Button
                 type="submit"
                 disabled={isSubmitting}

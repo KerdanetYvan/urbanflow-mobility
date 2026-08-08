@@ -8,8 +8,7 @@ import MotDePasseOubliePage from './pages/MotDePasseOubliePage/MotDePasseOublieP
 import ProfilPage from './pages/ProfilPage/ProfilPage';
 import RecherchePage from './pages/RecherchePage/RecherchePage';
 import ReinitialiserMotDePassePage from './pages/ReinitialiserMotDePassePage/ReinitialiserMotDePassePage';
-import ResultatsPage from './pages/ResultatsPage/ResultatsPage';
-import HistoriquePage from './pages/HistoriquePage';
+import HistoriquePage from './pages/HistoriquePage/HistoriquePage';
 
 /**
  * Arbre de routes de l'application.
@@ -52,7 +51,11 @@ function App() {
             }
           />
           <Route path="recherche" element={<RecherchePage />} />
-          <Route path="resultats" element={<ResultatsPage />} />
+          {/* /resultats fusionne dans /recherche (issue #73, docs/specs/
+              refonte-visuelle-mobile-desktop.md section 2.7) : un lien
+              direct/favori existant vers l'ancienne route est redirige,
+              plutot que de casser silencieusement. */}
+          <Route path="resultats" element={<Navigate to="/recherche" replace />} />
           <Route path="historique" element={<HistoriquePage />} />
           {/* Public : un utilisateur qui a oublie son mot de passe n'est
               justement pas connecte (issue #71). */}

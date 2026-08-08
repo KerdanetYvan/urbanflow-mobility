@@ -7,13 +7,19 @@
  * mobile (.resultats-sheet). Ecrit mobile-first comme le reste du projet :
  * .resultats-sheet est la regle de base, .resultats-panels prend le relais
  * a partir de 768px (voir la media query en bas de fichier).
+ *
+ * Classes conservees "resultats-*" (issue #73, fusion de RecherchePage et
+ * ResultatsPage en un seul ecran) : renommer une centaine de selecteurs
+ * n'apporte rien et ajoute du risque, le prefixe reste comprehensible
+ * ("disposition resultats", que ce soit en chargement ou peuplee).
  */
 
 /* --- Etat vide (aucun itineraire) : reste en flux normal, pas de carte
-   plein ecran (voir ResultatsPage.tsx, retour anticipe). --- */
+   plein ecran (voir RecherchePageResults.tsx, retour anticipe). --- */
 
 .resultats-page {
   max-width: 32rem;
+  margin-inline: auto;
 }
 
 .resultats-context {
@@ -22,8 +28,22 @@
   font-size: var(--text-sm);
 }
 
-.resultats-context a {
+/* Le lien "Modifier la recherche"/"Nouvelle recherche" est un <button>
+   (issue #73 : plus de route /resultats a quitter, changement d'etat
+   interne - voir RecherchePageResults.tsx, SearchContext) stylise pour
+   rester visuellement identique a l'ancien <Link>. */
+.resultats-link-button {
+  padding: 0;
+  border: none;
+  background: none;
   color: var(--color-primary-emphasis);
+  font: inherit;
+  cursor: pointer;
+}
+
+.resultats-link-button:hover,
+.resultats-link-button:focus-visible {
+  text-decoration: underline;
 }
 
 /* Position en temps reel indisponible (issue #9, permission refusee ou
@@ -40,8 +60,7 @@
   color: var(--color-text);
 }
 
-.resultats-empty a {
-  color: var(--color-primary-emphasis);
+.resultats-empty .resultats-link-button {
   font-weight: var(--weight-semibold);
 }
 
@@ -57,7 +76,7 @@
   border: 0;
 }
 
-/* --- Coquille plein ecran (itineraires trouves) ---
+/* --- Coquille plein ecran (itineraires trouves ou recherche en cours) ---
  * position:absolute ancre a .app-content (voir AppLayout.css,
  * position:relative dedie) plutot que fixed sur tout le viewport : la carte
  * commence ainsi exactement sous l'entete et la nav (deja correctement
@@ -116,6 +135,43 @@
   box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
   padding: var(--space-4);
   overflow-y: auto;
+}
+
+/* --- Squelette de chargement (issue #73, spec 2.4) --- */
+
+.resultats-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.resultats-skeleton-card {
+  height: 4.5rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-subtle) 25%,
+    var(--color-border) 50%,
+    var(--color-bg-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: resultats-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes resultats-skeleton-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultats-skeleton-card {
+    animation: none;
+    background: var(--color-bg-subtle);
+  }
 }
 
 /* --- Cartes-itineraire (liste, partagee panneau desktop + bandeau mobile) --- */

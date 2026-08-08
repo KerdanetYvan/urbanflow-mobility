@@ -50,10 +50,23 @@ describe('MapView', () => {
     expect(screen.getByText('Bus')).toBeInTheDocument();
   });
 
-  it('ne rend rien si aucun segment (evite un crash carte sur itineraire vide)', () => {
+  it('ne rend rien si aucun segment et aucune origine/destination de secours', () => {
     const { container } = render(
       <MapView itinerary={{ ...ITINERARY, segments: [] }} />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("affiche seulement origine/destination sans resume ni legende quand l'itineraire n'est pas encore connu (issue #73, recherche en cours)", () => {
+    const { container } = render(
+      <MapView
+        origin={{ lat: 45.75, lon: 4.85 }}
+        destination={{ lat: 45.76, lon: 4.86 }}
+      />,
+    );
+
+    expect(container).not.toBeEmptyDOMElement();
+    expect(screen.queryByText(/De .* à .* :/)).not.toBeInTheDocument();
+    expect(container.querySelector('.mapview-legend')).not.toBeInTheDocument();
   });
 });

@@ -145,3 +145,38 @@ export function TransferIcon() {
     </svg>
   );
 }
+
+/**
+ * Icones de la navigation principale (AppLayout, issue #73/docs/specs/
+ * refonte-visuelle-mobile-desktop.md section 3.2). "Connexion" reutilise
+ * LockIcon (deja utilisee sur le champ mot de passe des ecrans
+ * d'authentification, coherente visuellement) - pas de nouvelle icone dediee.
+ */
+export function SearchIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-4.8-4.8" />
+    </svg>
+  );
+}
+
+export function UserIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6" />
+    </svg>
+  );
+}
+
+export function HistoryIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="12" cy="13" r="7.5" />
+      <path d="M12 9v4l3 2" />
+      <path d="M8.5 3.5 5 6" />
+      <path d="M15.5 3.5 19 6" />
+    </svg>
+  );
+}

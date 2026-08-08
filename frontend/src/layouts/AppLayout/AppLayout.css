@@ -71,14 +71,27 @@
 
 .app-nav-link {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
   text-align: center;
-  padding: var(--space-3) var(--space-1);
+  padding: var(--space-2) var(--space-1);
   /* Cible tactile d'au moins 44px de haut (recommandation d'accessibilite
      mobile), pour rester facilement cliquable/tapable. */
   min-height: var(--touch-target-min);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
   text-decoration: none;
+}
+
+/* Icone + libelle visibles ensemble (issue #73) : l'icone seule laisserait
+   planer une ambiguite sur le sens du pictogramme (accessibilite), le
+   libelle seul (comportement precedent) manque de reperage visuel rapide
+   propre a une app mobile. */
+.app-nav-link-icon {
+  display: flex;
 }
 
 /* NavLink ajoute aria-current="page" sur le lien actif : on s'en sert
@@ -104,7 +117,7 @@
   flex: 1;
   padding: var(--space-4);
   /* Sert d'ancrage pour le fond carte plein ecran de l'ecran de resultats
-     (#36 v2, voir ResultatsPage.css .resultats-shell, position:absolute) -
+     (#36 v2, voir RecherchePageResults.css .resultats-shell, position:absolute) -
      ainsi la carte commence exactement sous l'entete/la nav (deja
      correctement positionnes par le flux normal ci-dessus), sans jamais
      passer derriere eux ni necessiter de bidouille de z-index sur eux. */
@@ -118,6 +131,15 @@
     padding-bottom: 0;
   }
 
+  /* Touche de couleur (issue #73, spec 4.3) : bordure d'accent plutot que
+     neutre, pour eviter l'impression de rendu "sans vie" repere sur
+     desktop - reste discret (une bordure, pas un fond plein), coherent
+     avec la direction minimale actee en #33/#52. */
+  .app-header {
+    border-bottom-color: var(--color-primary-emphasis);
+    border-bottom-width: 2px;
+  }
+
   .app-nav {
     position: static;
     justify-content: center;
@@ -128,6 +150,8 @@
 
   .app-nav-link {
     flex: none;
+    flex-direction: row;
     padding: var(--space-4) var(--space-2);
+    font-size: var(--text-sm);
   }
 }

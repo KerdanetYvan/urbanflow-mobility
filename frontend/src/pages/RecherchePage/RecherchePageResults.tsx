@@ -1,5 +1,4 @@
 import { useRef, useState, type TouchEvent } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
 import { getTripModeIcon } from '../../components/tripModeIcon';
@@ -11,21 +10,7 @@ import {
 import type { PlaceSuggestion } from '../../lib/places';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
-import './ResultatsPage.css';
-
-/**
- * Forme de l'etat de navigation transmis par RecherchePage (#35) au succes
- * d'une recherche - voir docs/specs/f2-ecrans-planification.md section 2.4.
- * Ecart volontaire par rapport a la spec stricte (qui prevoit de transmettre
- * les criteres de recherche) : #35 transmet directement les itineraires deja
- * recherches aupres de GET /trips, donc cet ecran n'appelle pas l'API
- * lui-meme - pas de logique de nouvel appel/retry a prevoir ici.
- */
-interface ResultatsLocationState {
-  itineraries: TripItinerary[];
-  origin: PlaceSuggestion;
-  destination: PlaceSuggestion;
-}
+import './RecherchePageResults.css';
 
 /**
  * Etats du bandeau mobile (v2 de #36, disposition "carte plein ecran +
@@ -35,8 +20,8 @@ interface ResultatsLocationState {
  * - list : la liste complete des itineraires, carte partiellement visible.
  * - detail : le detail segment par segment du trajet selectionne, carte
  *   presque entierement masquee.
- * Non pertinent en desktop (voir ResultatsPage.css) : liste et detail y
- * sont deux panneaux flottants toujours visibles simultanement.
+ * Non pertinent en desktop (voir RecherchePageResults.css) : liste et
+ * detail y sont deux panneaux flottants toujours visibles simultanement.
  */
 type SheetState = 'collapsed' | 'list' | 'detail';
 
@@ -68,6 +53,36 @@ function geolocationMessage(status: GeolocationStatus): string | undefined {
     return 'Votre position en temps réel est indisponible pour le moment.';
   }
   return undefined;
+}
+
+interface SearchContextProps {
+  origin: PlaceSuggestion;
+  destination: PlaceSuggestion;
+  onEditSearch: () => void;
+}
+
+/**
+ * Contexte de la recherche ("De X à Y") + action de retour au formulaire.
+ * Ne navigue plus vers une route separee (issue #73) : change simplement
+ * l'etat interne de RecherchePage vers 'formulaire', en preremplissant les
+ * criteres (voir docs/specs/refonte-visuelle-mobile-desktop.md section 2.6).
+ * Un <button> stylise en lien plutot qu'un <Link> - il n'y a plus de route
+ * a atteindre.
+ */
+function SearchContext({ origin, destination, onEditSearch }: SearchContextProps) {
+  return (
+    <p className="resultats-context">
+      De {origin.label} à {destination.label}
+      {' — '}
+      <button
+        type="button"
+        className="resultats-link-button"
+        onClick={onEditSearch}
+      >
+        Modifier la recherche
+      </button>
+    </p>
+  );
 }
 
 interface ItineraryCardProps {
@@ -130,6 +145,7 @@ interface ResultsListProps {
   destination: PlaceSuggestion;
   selectedIndex: number;
   onSelect: (index: number) => void;
+  onEditSearch: () => void;
   /** Message a afficher si la position en temps reel (issue #9) n'est pas disponible - voir geolocationMessage(). */
   geolocationMessage?: string;
 }
@@ -145,15 +161,12 @@ function ResultsList({
   destination,
   selectedIndex,
   onSelect,
+  onEditSearch,
   geolocationMessage,
 }: ResultsListProps) {
   return (
     <>
-      <p className="resultats-context">
-        De {origin.label} à {destination.label}
-        {' — '}
-        <Link to="/recherche">Modifier la recherche</Link>
-      </p>
+      <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
       {geolocationMessage && (
         <p className="resultats-geolocation-hint">{geolocationMessage}</p>
       )}
@@ -180,9 +193,9 @@ interface ItinerarySegmentsProps {
  * Detail de l'itineraire selectionne, segment par segment (mode, duree,
  * arret de correspondance) - section 3.2 de la spec. Ne contient plus sa
  * propre carte (contrairement a la v1 de #36) : la carte de fond plein
- * ecran (variant="fullBleed" de MapView, voir ResultatsPage ci-dessous)
- * affiche deja le trace du trajet selectionne, une deuxieme carte ici serait
- * redondante (decision prise en session le 2026-08-03).
+ * ecran (variant="fullBleed" de MapView, voir RecherchePageResults
+ * ci-dessous) affiche deja le trace du trajet selectionne, une deuxieme
+ * carte ici serait redondante (decision prise en session le 2026-08-03).
  */
 function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
   return (
@@ -237,12 +250,38 @@ function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
 }
 
 /**
- * Ecran de resultats d'itineraires classes (F2, issue #36). Recoit les
- * itineraires deja recherches via l'etat de navigation pousse par
- * RecherchePage (#35) - une navigation directe sur /resultats (rechargement
- * de page, URL tapee a la main) n'a donc pas de criteres a afficher : on
- * renvoie alors vers /recherche plutot que d'afficher un ecran vide sans
- * contexte.
+ * Squelette de chargement (issue #73, spec 2.4) affiche a la place des
+ * cartes-itineraire tant que GET /trips n'a pas repondu - simple bloc
+ * anime en pulsation (voir RecherchePageResults.css), respecte
+ * prefers-reduced-motion comme l'anneau de position temps reel de
+ * MapView.css.
+ */
+function ResultsSkeleton() {
+  return (
+    <div className="resultats-skeleton" aria-hidden="true">
+      <div className="resultats-skeleton-card" />
+      <div className="resultats-skeleton-card" />
+      <div className="resultats-skeleton-card" />
+    </div>
+  );
+}
+
+interface RecherchePageResultsProps {
+  origin: PlaceSuggestion;
+  destination: PlaceSuggestion;
+  /** null = recherche en cours, reponse de GET /trips pas encore recue (issue #73, spec 2.4). */
+  itineraries: TripItinerary[] | null;
+  /** Retour au formulaire (etat 'formulaire' de RecherchePage), preremplissant les criteres. */
+  onEditSearch: () => void;
+}
+
+/**
+ * Disposition "recherche en cours" / "resultats" de l'ecran de recherche
+ * fusionne (F2, issues #36/#73). Recoit ses donnees en props, fournies par
+ * RecherchePage (plus de lecture de useLocation().state - la fusion en un
+ * seul ecran/une seule route elimine la classe de bug "rechargement de
+ * /resultats perd le contexte", voir docs/specs/
+ * refonte-visuelle-mobile-desktop.md section 2.1).
  *
  * Disposition "carte plein ecran" (v2, decidee en session le 2026-08-03,
  * rapprochee des applications de cartographie grand public type Google
@@ -252,47 +291,40 @@ function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
  * detail), un bandeau ("bottom sheet") a 3 etats en mobile (voir
  * SheetState). La navigation principale de l'application (AppLayout) reste
  * visible au-dessus en desktop, mais est volontairement recouverte par le
- * bandeau en mobile (ecran de tache immersif, coherent avec le fait que
- * "Resultats" n'apparait deja pas dans la barre de nav principale, voir
- * AppLayout.tsx) - voir les z-index dans AppLayout.css et ResultatsPage.css.
+ * bandeau en mobile (ecran de tache immersif) - voir les z-index dans
+ * AppLayout.css et RecherchePageResults.css.
  *
- * L'etat vide (aucun itineraire) n'utilise pas cette disposition immersive :
- * pas de trajet a tracer sur une carte, l'ecran reste un simple contenu en
- * flux normal (voir le retour anticipe ci-dessous).
+ * L'etat vide (aucun itineraire) et l'etat "recherche en cours" (itineraries
+ * null) n'utilisent pas la disposition immersive plein ecran pour le
+ * premier (pas de trajet a tracer), mais la reprennent en chargement pour
+ * le second (carte avec origine/destination seules, voir MapView).
  *
- * Note de sequencement (section 3.4 du spec #25) : cet ecran n'a aucune
- * dependance au service de scoring (#16, Sprint 3) - la liste est affichee
- * dans l'ordre renvoye par GET /trips, quel que soit le critere de tri
- * utilise cote backend a ce moment-la. Les badges qualitatifs decrits dans
- * docs/specs/f3-scoring-perturbations.md section 2.2 restent reportes a
- * l'implementation de #16 (decision du 2026-08-03) : les afficher des
- * maintenant, sur un tri encore naïf (duree OTP native), serait trompeur.
+ * Note de sequencement Sprint 2 / Sprint 3 (section 3.4 du spec #25) : cet
+ * ecran n'a aucune dependance visuelle au service de scoring (#16) - la
+ * liste est affichee dans l'ordre renvoye par le backend, quel que soit le
+ * critere de tri utilise a ce moment-la.
  */
-function ResultatsPage() {
-  const location = useLocation();
-  const state = location.state as ResultatsLocationState | null;
-
+function RecherchePageResults({
+  origin,
+  destination,
+  itineraries,
+  onEditSearch,
+}: RecherchePageResultsProps) {
   // Itineraire selectionne par defaut : le premier de la liste (deja en tete
   // du tri backend).
   const [selectedIndex, setSelectedIndex] = useState(0);
-  // Etat du bandeau mobile, ignore en desktop (voir ResultatsPage.css) -
-  // "list" par defaut : la liste des resultats est ce qu'on veut voir en
+  // Etat du bandeau mobile, ignore en desktop (voir RecherchePageResults.css)
+  // - "list" par defaut : la liste des resultats est ce qu'on veut voir en
   // premier apres une recherche, ni trop replie (invisible), ni trop
   // deploye (masquerait la carte inutilement avant toute selection).
   const [sheetState, setSheetState] = useState<SheetState>('list');
   const touchStartY = useRef<number | null>(null);
   // Hook appele inconditionnellement (regle des Hooks React), avant les
-  // retours anticipes ci-dessous - `enabled` reflete simplement si une carte
-  // avec un itineraire est sur le point d'etre affichee : pas de sollicitation
-  // du capteur GPS pour l'etat vide ou l'absence de criteres de recherche.
-  const hasItineraries = state !== null && state.itineraries.length > 0;
-  const geolocation = useGeolocation(hasItineraries);
-
-  if (!state) {
-    return <Navigate to="/recherche" replace />;
-  }
-
-  const { itineraries, origin, destination } = state;
+  // retours anticipes ci-dessous. Activee des que la carte est sur le point
+  // d'etre affichee (chargement ou resultats non vides) - pas de
+  // sollicitation du capteur GPS pour l'etat vide, qui n'affiche pas de carte.
+  const showsMap = itineraries === null || itineraries.length > 0;
+  const geolocation = useGeolocation(showsMap);
 
   function selectItinerary(index: number) {
     setSelectedIndex(index);
@@ -343,25 +375,56 @@ function ResultatsPage() {
     }
   }
 
+  // --- Recherche en cours (issue #73, spec 2.4) : aucun itineraire recu
+  // pour l'instant, carte avec origine/destination seules + squelette. ---
+  if (itineraries === null) {
+    return (
+      <div className="resultats-shell">
+        <h1 className="resultats-visually-hidden">Résultats</h1>
+        <div className="resultats-map-bg">
+          <MapView
+            origin={origin}
+            destination={destination}
+            variant="fullBleed"
+            userPosition={geolocation.position}
+          />
+        </div>
+        <div className="resultats-panels">
+          <div className="resultats-panel resultats-panel-list">
+            <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
+            <ResultsSkeleton />
+          </div>
+        </div>
+        <div className="resultats-sheet" data-sheet-state="list">
+          <div className="resultats-sheet-handle">
+            <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+          </div>
+          <div className="resultats-sheet-body">
+            <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
+            <ResultsSkeleton />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
+  // une erreur, pas d'Alert ici - un message clair et une action de recours
+  // suffisent. Pas de carte plein ecran : rien a y tracer. ---
   if (itineraries.length === 0) {
-    // Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
-    // une erreur, pas d'Alert ici - un message clair et une action de
-    // recours suffisent. Pas de carte plein ecran : rien a y tracer.
     return (
       <section className="resultats-page">
         <h1>Résultats</h1>
-        <p className="resultats-context">
-          De {origin.label} à {destination.label}
-          {' — '}
-          <Link to="/recherche">Modifier la recherche</Link>
-        </p>
+        <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
         <div className="resultats-empty">
           <p>Aucun itinéraire trouvé pour ce trajet.</p>
           <p>
             Essayez d'élargir la plage horaire ou d'ajouter un mode de
             transport a la recherche.
           </p>
-          <Link to="/recherche">Nouvelle recherche</Link>
+          <button type="button" className="resultats-link-button" onClick={onEditSearch}>
+            Nouvelle recherche
+          </button>
         </div>
       </section>
     );
@@ -387,7 +450,7 @@ function ResultatsPage() {
       </div>
 
       {/* Panneaux flottants (desktop uniquement, voir la media query dans
-          ResultatsPage.css - masques en dessous de 768px). */}
+          RecherchePageResults.css - masques en dessous de 768px). */}
       <div className="resultats-panels">
         <div className="resultats-panel resultats-panel-list">
           <ResultsList
@@ -396,6 +459,7 @@ function ResultatsPage() {
             destination={destination}
             selectedIndex={selectedIndex}
             onSelect={selectItinerary}
+            onEditSearch={onEditSearch}
             geolocationMessage={geolocationMessage(geolocation.status)}
           />
         </div>
@@ -439,6 +503,7 @@ function ResultatsPage() {
               destination={destination}
               selectedIndex={selectedIndex}
               onSelect={selectItinerary}
+              onEditSearch={onEditSearch}
               geolocationMessage={geolocationMessage(geolocation.status)}
             />
           )}
@@ -448,4 +513,4 @@ function ResultatsPage() {
   );
 }
 
-export default ResultatsPage;
+export default RecherchePageResults;
