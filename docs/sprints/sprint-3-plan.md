@@ -25,7 +25,7 @@ Les 21 issues ouvertes du Sprint 3 (9 déjà planifiées F3/scoring/audits trans
 ### Phase A — F3 obligatoire (fondations manquantes, le plus gros risque technique)
 
 - [x] [#12](https://github.com/KerdanetYvan/urbanflow-mobility/issues/12) (Dev BE) — Ingestion des flux GTFS statiques de la métropole — source retenue : GTFS open data de Rennes Métropole (STAR), portée PostGIS limitée aux arrêts géolocalisés (`gtfs_stops`)
-- [ ] [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) (Dev BE) — Vérifier le tracé réel (shapes.txt) des lignes de transport après ingestion GTFS
+- [x] [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) (Dev BE) — Vérifier le tracé réel (shapes.txt) des lignes de transport après ingestion GTFS — confirmé (métro ligne a, 295 points de tracé), voir `routing-engine/README.md`
 
 ### Phase B — Scoring (fonctionnalité complémentaire argumentée)
 
