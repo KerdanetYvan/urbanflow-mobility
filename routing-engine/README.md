@@ -13,6 +13,21 @@ Le dossier `data/` n'est volontairement pas versionné (voir `.gitignore`) : ces
 
 Issue #12 : `backend/src/gtfs/` télécharge, valide et dépose ici le vrai export GTFS de Rennes Métropole (réseau STAR) — voir `../backend/README.md` section "Ingestion GTFS statique (F3)" pour la commande (`docker compose exec backend npm run import:gtfs`). Ce script écrit `data/gtfs-metropole.zip`, pris en compte par OTP au prochain `docker compose up otp --build` (`data/` n'étant pas versionné, cette copie doit être refaite sur chaque environnement, exactement comme la copie manuelle des fixtures ci-dessous).
 
+## Vérification du tracé réel (`shapes.txt`, issue #90)
+
+Une fois le vrai flux ingéré (#12), vérification faite en session que `shapes.txt` est bien présent dans l'export réel de Rennes Métropole/STAR (92 298 points, `trips.txt` référence bien `shape_id` pour chaque course) et qu'OTP l'exploite correctement pour tracer les segments de transport en commun.
+
+**Extrait OSM réel utilisé pour la vérification** : aucun extrait OSM réel de Rennes n'était disponible dans le repo — plutôt qu'un extrait de toute la métropole (bbox réelle des 1528 arrêts : lat 47.97–48.30, lon -1.95 à -1.48, inutilement volumineux pour une vérification ciblée), extrait borné à la zone de la ligne de métro **a** (Kennedy ↔ La Poterie, bbox lat 48.075–48.13 / lon -1.73 à -1.63, calculée depuis les points de son tracé dans `shapes.txt`), récupéré via l'API Overpass et converti en `.osm.pbf` avec `osmium` (même outil que pour le fixture de test ci-dessous) :
+
+```bash
+curl "https://overpass-api.de/api/map?bbox=-1.73,48.075,-1.63,48.13" -o routing-engine/data/osm-rennes.osm
+docker run --rm -v "$(pwd)/routing-engine/data:/data" ubuntu:24.04 bash -c "apt-get update -qq && apt-get install -y -qq osmium-tool && osmium cat /data/osm-rennes.osm -o /data/osm-rennes.osm.pbf --overwrite"
+```
+
+(Sous Git Bash/Windows, préfixer la commande `docker run` avec `MSYS_NO_PATHCONV=1` pour éviter que le chemin `/data` du conteneur ne soit réinterprété comme un chemin Windows.)
+
+**Vérifié manuellement** : avec `gtfs-metropole.zip` (vrai flux, #12) + `osm-rennes.osm.pbf` dans `data/`, OTP construit le graphe sans erreur (`Graph built. |V|=46,777 |E|=116,972`, `Transit built. |Stops|=1,496 |Patterns|=347`). `GET /otp/routers/default/plan` entre J.F. Kennedy et La Poterie renvoie un segment `SUBWAY` (ligne `a`) avec un `legGeometry` de **295 points** (contre 2 pour une ligne droite) ; confirmé visuellement dans `MapView` (capture d'écran) : le tracé suit bien les rues du centre-ville de Rennes (Centre-Ville, Champ de Mars) plutôt qu'une ligne droite entre les deux arrêts. Critère d'acceptation de #90 validé, aucune modification de code nécessaire — le pipeline `OtpClientService`/`polyline.ts`/`TripsService`/`MapView` relayait déjà fidèlement tout `legGeometry` fourni par OTP (voir `backend/src/trips/trips.service.ts`, `mapGeometry`).
+
 ## Jeu de données de test (développement local)
 
 Issue #40 : `test-fixtures/` fournit un **petit réseau synthétique versionné**, utile pour développer/démontrer sans dépendre du réseau (le script d'import ci-dessus sait lire ce fichier via `GTFS_LOCAL_PATH` au lieu de télécharger le vrai flux) ou pour tester OTP sans passer par le script d'import :
@@ -42,7 +57,7 @@ cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
 
 Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en dessous d'un certain seuil, OTP juge la marche "triviale" et ne propose jamais le bus dans les résultats — inutile pour tester un vrai scénario multimodal.
 
-**Limitation connue : le tracé du bus `T1` s'affiche en ligne droite sur la carte (issue #8, `MapView` côté frontend).** OpenTripPlanner ne peut fournir un tracé détaillé (`legGeometry`) suivant la route réellement empruntée par une ligne de transport en commun que si le GTFS source contient un fichier `shapes.txt` (forme précise du tracé) - `gtfs-test.zip` n'en fournit volontairement pas, pour rester minimal. Un segment à pied, lui, suit bien le réseau OSM (l'unique rue en boucle de ce fixture) : la limitation ne touche que les segments de transport en commun de ce jeu de données de test. Voir l'issue [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) pour la vérification à faire une fois le vrai export GTFS de la métropole chargé (`shapes.txt` réel, section "Export GTFS réel de la métropole" ci-dessus).
+**Limitation propre à ce jeu de test : le tracé du bus `T1` s'affiche en ligne droite sur la carte (`MapView` côté frontend).** OpenTripPlanner ne peut fournir un tracé détaillé (`legGeometry`) suivant la route réellement empruntée par une ligne de transport en commun que si le GTFS source contient un fichier `shapes.txt` (forme précise du tracé) - `gtfs-test.zip` n'en fournit volontairement pas, pour rester minimal. Un segment à pied, lui, suit bien le réseau OSM (l'unique rue en boucle de ce fixture) : la limitation ne touche que les segments de transport en commun de ce jeu de données de test, **pas** le vrai flux de la métropole (`shapes.txt` réel confirmé exploité correctement, voir section "Vérification du tracé réel" ci-dessus, issue #90).
 
 ## Géocodeur (autocomplétion, issue #81)
 
