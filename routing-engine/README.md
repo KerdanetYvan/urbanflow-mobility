@@ -9,9 +9,13 @@ Les flux **GBFS** (vélos et trottinettes en libre-service) et **GTFS-Realtime**
 
 Le dossier `data/` n'est volontairement pas versionné (voir `.gitignore`) : ces fichiers sont volumineux et propres à l'environnement de chaque développeur.
 
+## Export GTFS réel de la métropole (F3)
+
+Issue #12 : `backend/src/gtfs/` télécharge, valide et dépose ici le vrai export GTFS de Rennes Métropole (réseau STAR) — voir `../backend/README.md` section "Ingestion GTFS statique (F3)" pour la commande (`docker compose exec backend npm run import:gtfs`). Ce script écrit `data/gtfs-metropole.zip`, pris en compte par OTP au prochain `docker compose up otp --build` (`data/` n'étant pas versionné, cette copie doit être refaite sur chaque environnement, exactement comme la copie manuelle des fixtures ci-dessous).
+
 ## Jeu de données de test (développement local)
 
-Issue #40 : en attendant le vrai export GTFS de la métropole (ticket d'ingestion F3), `test-fixtures/` fournit un **petit réseau synthétique versionné** pour développer/démontrer sans dépendre de données réelles :
+Issue #40 : `test-fixtures/` fournit un **petit réseau synthétique versionné**, utile pour développer/démontrer sans dépendre du réseau (le script d'import ci-dessus sait lire ce fichier via `GTFS_LOCAL_PATH` au lieu de télécharger le vrai flux) ou pour tester OTP sans passer par le script d'import :
 
 - `test-fixtures/gtfs-test.zip` — 4 arrêts (`A` Place Centrale, `B` Gare Test, `C` Université, `D` Hôpital, ~1,3 km entre arrêts adjacents), une ligne de bus fictive (`T1`) qui boucle entre eux, 3 départs par jour (8h, 12h, 18h). Généré à la main (pas un export réel) — voir `backend/src/seed/seed.ts` pour le jeu de comptes utilisateur correspondant.
 - `test-fixtures/osm-extract.osm.pbf` — une seule rue en boucle qui passe par les 4 arrêts, suffisante pour qu'OTP construise un graphe piéton/vélo/voiture et calcule de vrais itinéraires porte-à-porte entre eux. Coordonnées purement fictives (aucune rue réelle). Généré depuis `test-fixtures/osm-extract-source.osm` (XML lisible, à éditer en cas de besoin), au format binaire `.osm.pbf` attendu par OTP :
@@ -38,7 +42,7 @@ cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
 
 Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en dessous d'un certain seuil, OTP juge la marche "triviale" et ne propose jamais le bus dans les résultats — inutile pour tester un vrai scénario multimodal.
 
-**Limitation connue : le tracé du bus `T1` s'affiche en ligne droite sur la carte (issue #8, `MapView` côté frontend).** OpenTripPlanner ne peut fournir un tracé détaillé (`legGeometry`) suivant la route réellement empruntée par une ligne de transport en commun que si le GTFS source contient un fichier `shapes.txt` (forme précise du tracé) - `gtfs-test.zip` n'en fournit volontairement pas, pour rester minimal. Un segment à pied, lui, suit bien le réseau OSM (l'unique rue en boucle de ce fixture) : la limitation ne touche que les segments de transport en commun de ce jeu de données de test. Voir l'issue [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) pour la vérification à faire lors de l'ingestion du vrai export GTFS de la métropole (#12).
+**Limitation connue : le tracé du bus `T1` s'affiche en ligne droite sur la carte (issue #8, `MapView` côté frontend).** OpenTripPlanner ne peut fournir un tracé détaillé (`legGeometry`) suivant la route réellement empruntée par une ligne de transport en commun que si le GTFS source contient un fichier `shapes.txt` (forme précise du tracé) - `gtfs-test.zip` n'en fournit volontairement pas, pour rester minimal. Un segment à pied, lui, suit bien le réseau OSM (l'unique rue en boucle de ce fixture) : la limitation ne touche que les segments de transport en commun de ce jeu de données de test. Voir l'issue [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) pour la vérification à faire une fois le vrai export GTFS de la métropole chargé (`shapes.txt` réel, section "Export GTFS réel de la métropole" ci-dessus).
 
 ## Géocodeur (autocomplétion, issue #81)
 

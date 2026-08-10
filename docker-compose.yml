@@ -54,6 +54,11 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      # Acces de `npm run import:gtfs` (issue #12) au meme dossier que le
+      # service otp ci-dessus : lit routing-engine/test-fixtures/ en dev
+      # hors ligne (GTFS_LOCAL_PATH) et ecrit le zip valide dans
+      # routing-engine/data/ pour qu'OTP le charge au prochain --build.
+      - ./routing-engine:/app/routing-engine
 
   # Le build échouera tant que frontend/ ne contient pas de projet Vite initialisé
   frontend:
