@@ -20,6 +20,7 @@ Nécessite une variable d'environnement `DATABASE_URL` (voir `../.env.example`),
 - `npm run lint` — ESLint
 - `npm test` — tests unitaires Jest
 - `npm run seed` — jeu de données de test (voir ci-dessous)
+- `npm run import:gtfs` — ingestion du flux GTFS statique de la métropole (voir ci-dessous)
 - `npm run migration:generate -- src/migrations/<Nom>` — génère une migration à partir du diff entités ↔ base connectée (voir ci-dessous)
 - `npm run migration:run` / `npm run migration:revert` — applique/annule les migrations en attente
 
@@ -76,6 +77,36 @@ DATABASE_URL=postgresql://urbanflow:changeme@localhost:5432/urbanflow npm run se
 **Idempotent** : relancer le script ne duplique rien et n'écrase rien — un email déjà présent (`ConflictException` sur `UsersService.create`) est simplement signalé et ignoré, y compris pour le profil associé.
 
 Mots de passe en clair volontairement dans `seed.ts` et ci-dessus : ce sont des identifiants de développement local documentés, pas des secrets applicatifs.
+
+## Ingestion GTFS statique (F3)
+
+Issue #12 : récupère le flux GTFS statique de la métropole, le valide (`stops.txt`/`routes.txt`/`trips.txt`/`calendar.txt` conformes au spec GTFS, `src/gtfs/gtfs-parser.ts`), upsert les arrêts géolocalisés dans PostGIS (`GtfsStop`, table `gtfs_stops`) et dépose le zip validé dans `routing-engine/data/` pour qu'OpenTripPlanner le charge au prochain démarrage (`docker compose up otp --build` — OTP ne recharge jamais son graphe à chaud, voir `routing-engine/README.md`).
+
+**Source retenue** : flux open data réel de Rennes Métropole (réseau STAR), cohérent avec la relocalisation déjà faite des fixtures de test Lyon → Rennes (issue #8). URL republiée chaque nuit (`GTFS_SOURCE_URL`, voir `../.env.example`).
+
+**Lancer l'import** (base et `otp` déjà démarrés, `docker compose up` en cours) :
+
+```bash
+docker compose exec backend npm run import:gtfs
+```
+
+Comme pour le seed, `DATABASE_URL` pointe déjà vers `postgres` à l'intérieur du conteneur. Pour lancer le script depuis l'hôte (ex. seuls `postgres`/`otp` démarrés via `docker compose up -d postgres otp`), surcharger `DATABASE_URL`, `GTFS_OTP_OUTPUT_PATH` et `GTFS_LOCAL_PATH` (chemins hôte plutôt que chemins du conteneur) :
+
+```bash
+DATABASE_URL=postgresql://urbanflow:changeme@localhost:5432/urbanflow \
+GTFS_OTP_OUTPUT_PATH=../routing-engine/data/gtfs-metropole.zip \
+npm run import:gtfs
+```
+
+**Tester sans dépendre du réseau** (jeu de données de test versionné, `routing-engine/test-fixtures/gtfs-test.zip`, voir `routing-engine/README.md`) : surcharger `GTFS_LOCAL_PATH` pour lire ce fichier local au lieu de télécharger `GTFS_SOURCE_URL` — le script saute alors le téléchargement, mais valide/upsert/écrit exactement comme avec un flux réel.
+
+```bash
+docker compose exec -e GTFS_LOCAL_PATH=routing-engine/test-fixtures/gtfs-test.zip backend npm run import:gtfs
+```
+
+**Idempotent** (`Repository.upsert`, clé de conflit `gtfs_id` — contrainte `UNIQUE`, voir la migration `GtfsStops`) : relancer l'import sur un flux déjà chargé met à jour les arrêts existants sans en dupliquer aucun.
+
+**Portée volontairement limitée à `stops.txt`** (décidé en session) : `routes.txt`/`trips.txt`/`calendar.txt` sont validés mais pas dupliqués en base — OpenTripPlanner reste l'unique source de vérité pour le calcul d'itinéraires à partir du graphe complet qu'il construit lui-même. `gtfs_stops` sert aux futurs besoins du backend nécessitant une recherche géolocalisée sans interroger OTP (ex. raccourcis de recherche, issue #112).
 
 ## Tests
 
