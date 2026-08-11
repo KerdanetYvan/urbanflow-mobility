@@ -28,6 +28,54 @@ docker run --rm -v "$(pwd)/routing-engine/data:/data" ubuntu:24.04 bash -c "apt-
 
 **Vérifié manuellement** : avec `gtfs-metropole.zip` (vrai flux, #12) + `osm-rennes.osm.pbf` dans `data/`, OTP construit le graphe sans erreur (`Graph built. |V|=46,777 |E|=116,972`, `Transit built. |Stops|=1,496 |Patterns|=347`). `GET /otp/routers/default/plan` entre J.F. Kennedy et La Poterie renvoie un segment `SUBWAY` (ligne `a`) avec un `legGeometry` de **295 points** (contre 2 pour une ligne droite) ; confirmé visuellement dans `MapView` (capture d'écran) : le tracé suit bien les rues du centre-ville de Rennes (Centre-Ville, Champ de Mars) plutôt qu'une ligne droite entre les deux arrêts. Critère d'acceptation de #90 validé, aucune modification de code nécessaire — le pipeline `OtpClientService`/`polyline.ts`/`TripsService`/`MapView` relayait déjà fidèlement tout `legGeometry` fourni par OTP (voir `backend/src/trips/trips.service.ts`, `mapGeometry`).
 
+## Déploiement en production (issue #120)
+
+`docker-compose.prod.yml` n'avait jamais eu de service `otp` depuis la mise en place du pipeline de déploiement (#24, Sprint 1) — retiré volontairement en attendant le vrai flux GTFS de la métropole (#12) et sa vérification (#90). Conséquence : `GET /trips` et `GET /places` étaient cassés sur le VPS, F2 (obligatoire) n'était pas démontrable en ligne. Réintroduit une fois les deux prérequis validés.
+
+### Extrait OSM complet de la métropole
+
+Contrairement à l'extrait borné à la ligne de métro **a** utilisé pour la vérification ciblée de #90 ci-dessus, la production a besoin d'un extrait couvrant toute la bbox des 1528 arrêts (lat 47.97–48.30, lon -1.95 à -1.48, déjà citée plus haut). Geofabrik (extrait régional Bretagne) plutôt que l'API Overpass publique, pour éviter le risque de quota/timeout déjà rencontré pour #90 :
+
+```bash
+curl -L "https://download.geofabrik.de/europe/france/bretagne-latest.osm.pbf" -o routing-engine/data/bretagne-latest.osm.pbf
+docker run --rm -v "$(pwd)/routing-engine/data:/data" ubuntu:24.04 bash -c "apt-get update -qq && apt-get install -y -qq osmium-tool && osmium extract --bbox -1.95,47.97,-1.48,48.30 /data/bretagne-latest.osm.pbf -o /data/osm-metropole.osm.pbf --overwrite"
+rm routing-engine/data/bretagne-latest.osm.pbf
+```
+
+(Même remarque que pour l'extrait ligne-a : sous Git Bash/Windows, préfixer `docker run` avec `MSYS_NO_PATHCONV=1` si le montage `/data` est mal interprété.)
+
+**Vérifié manuellement (de-risking local avant déploiement)** : avec `gtfs-metropole.zip` (#12) + `osm-metropole.osm.pbf` dans `data/`, OTP construit le graphe complet en 36s (`Graph built. |V|=157,499 |E|=410,038`, `Transit built. |Stops|=1,496 |Patterns|=347`) et le sert sans erreur. Pic mémoire mesuré via `docker stats` pendant le build et une fois stabilisé : **2,79 Go**, très en dessous du budget du VPS-2 cible (8 Go, partagés avec `postgres`/`postfix`/`backend`) — pas besoin de contraindre le heap JVM (`JAVA_TOOL_OPTIONS=-Xmx...`, supporté par l'image si un jour nécessaire). `GET /otp/routers/default/plan` entre J.F. Kennedy et La Poterie renvoie bien un segment `SUBWAY` sur la ligne `a`, cette fois depuis le graphe métropolitain complet (pas l'extrait borné de #90).
+
+### Runbook de bootstrap initial (premier déploiement avec données réelles)
+
+`routing-engine/data/` n'est pas versionné (voir plus haut) : le déploiement continu (`git reset --hard` + rebuild, voir `.github/workflows/ci.yml`) ne le peuple pas automatiquement. Séquence à exécuter une fois sur le VPS après le premier déploiement de ce changement :
+
+1. Le déploiement normal (push sur `main`) crée le conteneur `otp` mais il démarre avec un dossier `data/` vide.
+2. Régénérer le vrai export GTFS directement sur le VPS (pas de transfert manuel nécessaire, le script télécharge `GTFS_SOURCE_URL`) :
+
+   ```bash
+   docker compose -f docker-compose.prod.yml exec backend npm run import:gtfs
+   ```
+
+3. Transférer l'extrait OSM métropolitain préparé localement (étape ci-dessus) vers le VPS — aucun mécanisme existant ne le fait automatiquement (fichier non versionné, pas de service d'ingestion OSM côté backend) :
+
+   ```bash
+   scp routing-engine/data/osm-metropole.osm.pbf <user>@<vps-host>:/home/ubuntu/app/routing-engine/data/
+   ```
+
+4. Reconstruire le graphe avec les deux fichiers en place :
+
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d otp --build
+   ```
+
+5. Vérifier `GET /trips` et `GET /places` via le domaine public (Caddy → backend → `otp` interne).
+
+### Rafraîchissement futur des données
+
+- **GTFS** : réexécuter `docker compose -f docker-compose.prod.yml exec backend npm run import:gtfs` sur le VPS (idempotent, voir `backend/README.md`) puis relancer `otp` avec `--build` pour recharger le graphe.
+- **OSM** : à refaire seulement si le réseau routier évolue significativement ou si la bbox de la métropole change — répéter l'extraction Geofabrik+osmium ci-dessus et retransférer le fichier par `scp` avant de relancer `otp --build`.
+
 ## Jeu de données de test (développement local)
 
 Issue #40 : `test-fixtures/` fournit un **petit réseau synthétique versionné**, utile pour développer/démontrer sans dépendre du réseau (le script d'import ci-dessus sait lire ce fichier via `GTFS_LOCAL_PATH` au lieu de télécharger le vrai flux) ou pour tester OTP sans passer par le script d'import :
