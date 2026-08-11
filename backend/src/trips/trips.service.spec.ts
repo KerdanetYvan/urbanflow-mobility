@@ -1,12 +1,23 @@
+import { ScoringService } from '../scoring/scoring.service';
 import { TripsService } from './trips.service';
 
 describe('TripsService', () => {
   let service: TripsService;
   let otpClient: { planTrip: jest.Mock };
+  let profilesService: { findByUserIdOrNull: jest.Mock };
 
   beforeEach(() => {
     otpClient = { planTrip: jest.fn() };
-    service = new TripsService(otpClient as never);
+    profilesService = { findByUserIdOrNull: jest.fn() };
+    // ScoringService reel (pas de mock) : fonction pure sans dependance
+    // externe, contrairement a OtpClientService qui fait de vrais appels
+    // HTTP - le comportement du classement est teste separement dans
+    // scoring.service.spec.ts.
+    service = new TripsService(
+      otpClient as never,
+      profilesService as never,
+      new ScoringService(),
+    );
   });
 
   it('transmet les coordonnees et la date de depart telles que fournies a OtpClientService', async () => {
@@ -144,4 +155,46 @@ describe('TripsService', () => {
 
     expect(result).toEqual([]);
   });
+
+  it(
+    "recupere le profil de l'utilisateur authentifie pour personnaliser le " +
+      'classement (issue #16)',
+    async () => {
+      otpClient.planTrip.mockResolvedValue([]);
+      const profile = {
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+      };
+      profilesService.findByUserIdOrNull.mockResolvedValue(profile);
+
+      await service.search(
+        {
+          originLat: 48.85,
+          originLon: 2.35,
+          destinationLat: 48.86,
+          destinationLon: 2.36,
+        },
+        'user-1',
+      );
+
+      expect(profilesService.findByUserIdOrNull).toHaveBeenCalledWith('user-1');
+    },
+  );
+
+  it(
+    "n'appelle pas ProfilesService quand la recherche est anonyme " +
+      '(pas de userId, issue #16)',
+    async () => {
+      otpClient.planTrip.mockResolvedValue([]);
+
+      await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+      });
+
+      expect(profilesService.findByUserIdOrNull).not.toHaveBeenCalled();
+    },
+  );
 });

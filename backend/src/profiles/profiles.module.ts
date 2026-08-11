@@ -11,5 +11,9 @@ import { ProfilesService } from './profiles.service';
   imports: [TypeOrmModule.forFeature([MobilityProfile]), AuthModule],
   controllers: [ProfilesController],
   providers: [ProfilesService],
+  // ProfilesService expose (issue #16) : TripsModule en a besoin pour
+  // recuperer le profil de l'utilisateur authentifie et personnaliser le
+  // classement des itineraires (voir ScoringService).
+  exports: [ProfilesService],
 })
 export class ProfilesModule {}

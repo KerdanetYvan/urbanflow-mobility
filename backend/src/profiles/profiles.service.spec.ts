@@ -87,6 +87,26 @@ describe('ProfilesService', () => {
     });
   });
 
+  describe('findByUserIdOrNull', () => {
+    it("renvoie null (pas d'exception) si l'utilisateur n'a pas encore de profil", async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.findByUserIdOrNull('user-sans-profil'),
+      ).resolves.toBeNull();
+    });
+
+    it('renvoie le profil existant', async () => {
+      repository.findOneBy.mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+      });
+
+      const profile = await service.findByUserIdOrNull('user-1');
+      expect(profile?.userId).toBe('user-1');
+    });
+  });
+
   describe('update', () => {
     it('met a jour uniquement les champs fournis (mise a jour partielle)', async () => {
       repository.findOneBy.mockResolvedValue({

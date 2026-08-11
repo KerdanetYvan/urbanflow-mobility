@@ -11,38 +11,48 @@ import type {
 } from './dto/trip-itinerary.dto';
 import { OtpClientService } from '../otp/otp-client.service';
 import { decodePolyline } from '../otp/polyline';
+import { ProfilesService } from '../profiles/profiles.service';
+import { ScoringService } from '../scoring/scoring.service';
 
 @Injectable()
 export class TripsService {
-  constructor(private readonly otpClient: OtpClientService) {}
+  constructor(
+    private readonly otpClient: OtpClientService,
+    private readonly profilesService: ProfilesService,
+    private readonly scoringService: ScoringService,
+  ) {}
 
   /**
    * Recherche d'itineraires multimodaux (issue #7). Delegue le calcul a OTP
-   * (OtpClientService, issue #6) et reformate sa reponse en segments -
+   * (OtpClientService, issue #6), reformate sa reponse en segments, puis
+   * classe le resultat par score pondere (ScoringService, issue #16) -
    * aucune erreur specifique a gerer ici au-dela de ce que OtpClientService
    * a deja traduit (jetons hors zone -> BadRequestException, OTP
    * injoignable -> ServiceUnavailableException) : un tableau vide est un
    * resultat normal ("aucun itineraire trouve", pas une erreur - voir
    * docs/specs/f2-ecrans-planification.md section 4).
    *
-   * Ordre de tri : natif OpenTripPlanner (duree croissante) pour l'instant -
-   * le classement pondere (temps de trajet, correspondances, meteo...)
-   * arrivera avec le service de scoring (issue #16, Sprint 3), sans
-   * modification attendue cote frontend (voir la note de sequencement du
-   * spec ecrans F2).
+   * `userId` est optionnel (voir TripsController - GET /trips reste
+   * utilisable sans compte, OptionalJwtAuthGuard) : sans profil disponible,
+   * ScoringService applique uniquement ses criteres de base (duree,
+   * correspondances), proche du tri natif d'OTP.
    */
-  async search(dto: SearchTripsDto): Promise<TripItinerary[]> {
-    const itineraries = await this.otpClient.planTrip({
-      originLat: dto.originLat,
-      originLon: dto.originLon,
-      destinationLat: dto.destinationLat,
-      destinationLon: dto.destinationLon,
-      departureTime: dto.departureTime
-        ? new Date(dto.departureTime)
-        : undefined,
-    });
+  async search(dto: SearchTripsDto, userId?: string): Promise<TripItinerary[]> {
+    const [itineraries, profile] = await Promise.all([
+      this.otpClient.planTrip({
+        originLat: dto.originLat,
+        originLon: dto.originLon,
+        destinationLat: dto.destinationLat,
+        destinationLon: dto.destinationLon,
+        departureTime: dto.departureTime
+          ? new Date(dto.departureTime)
+          : undefined,
+      }),
+      userId ? this.profilesService.findByUserIdOrNull(userId) : null,
+    ]);
 
-    return itineraries.map((itinerary) => this.mapItinerary(itinerary));
+    const mapped = itineraries.map((itinerary) => this.mapItinerary(itinerary));
+    return this.scoringService.rank(mapped, profile);
   }
 
   private mapItinerary(itinerary: OtpItinerary): TripItinerary {
