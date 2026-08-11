@@ -9,14 +9,16 @@ describe('TripsService', () => {
   beforeEach(() => {
     otpClient = { planTrip: jest.fn() };
     profilesService = { findByUserIdOrNull: jest.fn() };
-    // ScoringService reel (pas de mock) : fonction pure sans dependance
-    // externe, contrairement a OtpClientService qui fait de vrais appels
-    // HTTP - le comportement du classement est teste separement dans
-    // scoring.service.spec.ts.
+    // ScoringService reel (pas de mock) avec un stub meteo neutre (pas de
+    // pluie) : le comportement du classement (y compris le critere meteo,
+    // issue #17) est teste separement dans scoring.service.spec.ts /
+    // weather.service.spec.ts, pas ici.
     service = new TripsService(
       otpClient as never,
       profilesService as never,
-      new ScoringService(),
+      new ScoringService({
+        getCurrentConditions: () => Promise.resolve(null),
+      } as never),
     );
   });
 

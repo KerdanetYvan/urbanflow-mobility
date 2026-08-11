@@ -31,7 +31,7 @@ Les 21 issues ouvertes du Sprint 3 (9 déjà planifiées F3/scoring/audits trans
 ### Phase B — Scoring (fonctionnalité complémentaire argumentée)
 
 - [x] [#16](https://github.com/KerdanetYvan/urbanflow-mobility/issues/16) (Dev BE) — Service de scoring pondéré des itinéraires — `ScoringService` (poids explicites : durée, correspondances, marche, mode préféré), personnalisation via `OptionalJwtAuthGuard` sur `GET /trips` (aucun 401, profil optionnel), tests unitaires dédiés
-- [ ] [#17](https://github.com/KerdanetYvan/urbanflow-mobility/issues/17) (Dev BE) — Intégration de l'API météo
+- [x] [#17](https://github.com/KerdanetYvan/urbanflow-mobility/issues/17) (Dev BE) — Intégration de l'API météo — `WeatherService` (Open-Meteo, sans clé API, cache en mémoire 30 min), critère pluie intégré à `ScoringService` (base, pas une préférence de profil), interrogée depuis le service de scoring lui-même (conforme au diagramme 8.3 du dossier)
 
 ### Phase C — Refonte `/recherche` et onboarding
 

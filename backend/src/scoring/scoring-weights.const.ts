@@ -41,6 +41,22 @@ export const SCORING_WEIGHTS = {
    * preferredTransportModes du profil.
    */
   PREFERRED_MODE_BONUS_PER_SEGMENT: -3,
+
+  /**
+   * Seuil de precipitations (mm, WeatherService#CurrentWeather) a partir
+   * duquel la pluie est jugee "forte" (issue #17, partie 7.3 du dossier) -
+   * 2.5mm correspond au seuil standard pluie moderee/forte. En dessous, pas
+   * de malus meteo.
+   */
+  RAIN_THRESHOLD_MM: 2.5,
+
+  /**
+   * Cout par metre marche quand RAIN_THRESHOLD_MM est depasse - applique
+   * TOUJOURS (contrairement a WALKING_METER_WHEN_LIMITED, conditionne au
+   * profil) : la meteo en cours est un critere de base du dossier (partie
+   * 7.2), pas une preference enregistree.
+   */
+  WALKING_METER_WHEN_RAINING: 0.08,
 } as const;
 
 // AccessibilityPreference.WHEELCHAIR_ACCESSIBLE n'a volontairement aucun
