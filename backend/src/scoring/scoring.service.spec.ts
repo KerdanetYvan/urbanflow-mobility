@@ -5,6 +5,7 @@ import type {
   TripItinerary,
   TripSegment,
 } from '../trips/dto/trip-itinerary.dto';
+import type { CurrentWeather } from '../weather/weather.service';
 import { ScoringService } from './scoring.service';
 
 const PLACE = { name: 'x', lat: 0, lon: 0 };
@@ -47,16 +48,30 @@ function buildProfile(
 }
 
 describe('ScoringService', () => {
-  const service = new ScoringService();
+  let service: ScoringService;
+  let weatherService: { getCurrentConditions: jest.Mock };
 
-  it("sans profil : l'itineraire le plus court gagne", () => {
+  beforeEach(() => {
+    // Pas de pluie par defaut (voir CurrentWeather) : les tests qui ne
+    // portent pas sur le critere meteo (issue #17) restent inchanges par
+    // rapport a avant son introduction.
+    weatherService = {
+      getCurrentConditions: jest.fn().mockResolvedValue(null),
+    };
+    service = new ScoringService(weatherService as never);
+  });
+
+  it("sans profil ni pluie : l'itineraire le plus court gagne", async () => {
     const court = buildItinerary({ durationSeconds: 600, transfers: 0 });
     const long = buildItinerary({ durationSeconds: 1800, transfers: 0 });
 
-    expect(service.rank([long, court], null)).toEqual([court, long]);
+    await expect(service.rank([long, court], null)).resolves.toEqual([
+      court,
+      long,
+    ]);
   });
 
-  it('sans profil : a duree egale, moins de correspondances gagne (poids de base)', () => {
+  it('sans profil : a duree egale, moins de correspondances gagne (poids de base)', async () => {
     const uneCorrespondance = buildItinerary({
       durationSeconds: 900,
       transfers: 1,
@@ -66,16 +81,16 @@ describe('ScoringService', () => {
       transfers: 0,
     });
 
-    expect(service.rank([uneCorrespondance, zeroCorrespondance], null)).toEqual(
-      [zeroCorrespondance, uneCorrespondance],
-    );
+    await expect(
+      service.rank([uneCorrespondance, zeroCorrespondance], null),
+    ).resolves.toEqual([zeroCorrespondance, uneCorrespondance]);
   });
 
   it(
     'avec LIMIT_TRANSFERS : un itineraire plus long mais avec moins de ' +
       'correspondances passe devant un itineraire plus court mais avec ' +
       'plus de correspondances',
-    () => {
+    async () => {
       // Sans profil, A (plus court, 2 correspondances) devrait gagner sur B
       // (plus long, 0 correspondance) - voir l'assertion "sans profil"
       // ci-dessous, qui documente ce comportement de reference.
@@ -88,12 +103,12 @@ describe('ScoringService', () => {
         transfers: 0,
       });
 
-      expect(
+      await expect(
         service.rank(
           [plusCourtPlusDeCorrespondances, plusLongMoinsDeCorrespondances],
           null,
         ),
-      ).toEqual([
+      ).resolves.toEqual([
         plusCourtPlusDeCorrespondances,
         plusLongMoinsDeCorrespondances,
       ]);
@@ -102,12 +117,12 @@ describe('ScoringService', () => {
         accessibilityPreferences: [AccessibilityPreference.LIMIT_TRANSFERS],
       });
 
-      expect(
+      await expect(
         service.rank(
           [plusCourtPlusDeCorrespondances, plusLongMoinsDeCorrespondances],
           profil,
         ),
-      ).toEqual([
+      ).resolves.toEqual([
         plusLongMoinsDeCorrespondances,
         plusCourtPlusDeCorrespondances,
       ]);
@@ -117,7 +132,7 @@ describe('ScoringService', () => {
   it(
     'avec LIMIT_WALKING_DISTANCE : un itineraire avec moins de marche passe ' +
       'devant un itineraire legerement plus rapide mais plus marche',
-    () => {
+    async () => {
       const rapideMaisBeaucoupDeMarche = buildItinerary({
         durationSeconds: 600,
         segments: [buildSegment({ mode: 'WALK', distanceMeters: 2000 })],
@@ -131,12 +146,15 @@ describe('ScoringService', () => {
       });
 
       // Sans la preference, le trajet le plus rapide gagne malgre la marche.
-      expect(
+      await expect(
         service.rank(
           [rapideMaisBeaucoupDeMarche, unPeuPlusLentMaisPeuDeMarche],
           null,
         ),
-      ).toEqual([rapideMaisBeaucoupDeMarche, unPeuPlusLentMaisPeuDeMarche]);
+      ).resolves.toEqual([
+        rapideMaisBeaucoupDeMarche,
+        unPeuPlusLentMaisPeuDeMarche,
+      ]);
 
       const profil = buildProfile({
         accessibilityPreferences: [
@@ -144,19 +162,22 @@ describe('ScoringService', () => {
         ],
       });
 
-      expect(
+      await expect(
         service.rank(
           [rapideMaisBeaucoupDeMarche, unPeuPlusLentMaisPeuDeMarche],
           profil,
         ),
-      ).toEqual([unPeuPlusLentMaisPeuDeMarche, rapideMaisBeaucoupDeMarche]);
+      ).resolves.toEqual([
+        unPeuPlusLentMaisPeuDeMarche,
+        rapideMaisBeaucoupDeMarche,
+      ]);
     },
   );
 
   it(
     'avec preferredTransportModes contenant METRO : un itineraire avec un ' +
       'segment SUBWAY passe devant un itineraire equivalent en BUS',
-    () => {
+    async () => {
       const enBus = buildItinerary({
         durationSeconds: 900,
         segments: [buildSegment({ mode: 'BUS' })],
@@ -168,26 +189,116 @@ describe('ScoringService', () => {
 
       // Sans profil, aucun des deux modes n'est favorise : egalite (ordre
       // d'entree conserve par le tri stable).
-      expect(service.rank([enBus, enMetro], null)).toEqual([enBus, enMetro]);
+      await expect(service.rank([enBus, enMetro], null)).resolves.toEqual([
+        enBus,
+        enMetro,
+      ]);
 
       const profil = buildProfile({
         preferredTransportModes: [TransportMode.METRO],
       });
 
-      expect(service.rank([enBus, enMetro], profil)).toEqual([enMetro, enBus]);
+      await expect(service.rank([enBus, enMetro], profil)).resolves.toEqual([
+        enMetro,
+        enBus,
+      ]);
     },
   );
 
-  it('ne mute ni le tableau ni les itineraires recus', () => {
+  it('ne mute ni le tableau ni les itineraires recus', async () => {
     const original = [
       buildItinerary({ durationSeconds: 900 }),
       buildItinerary({ durationSeconds: 600 }),
     ];
     const originalCopy = original.map((itinerary) => ({ ...itinerary }));
 
-    const result = service.rank(original, null);
+    const result = await service.rank(original, null);
 
     expect(original).toEqual(originalCopy);
     expect(result).not.toBe(original);
+  });
+
+  describe('critere meteo (issue #17)', () => {
+    function pluie(precipitationMm: number): CurrentWeather {
+      return { precipitationMm };
+    }
+
+    it(
+      'sous le seuil de pluie forte, le trajet le plus rapide gagne malgre ' +
+        'la marche (comme sans pluie)',
+      async () => {
+        weatherService.getCurrentConditions.mockResolvedValue(pluie(1));
+
+        const rapideMaisBeaucoupDeMarche = buildItinerary({
+          durationSeconds: 600,
+          segments: [buildSegment({ mode: 'WALK', distanceMeters: 2000 })],
+        });
+        const unPeuPlusLentMaisPeuDeMarche = buildItinerary({
+          durationSeconds: 700,
+          segments: [buildSegment({ mode: 'WALK', distanceMeters: 100 })],
+        });
+
+        await expect(
+          service.rank(
+            [rapideMaisBeaucoupDeMarche, unPeuPlusLentMaisPeuDeMarche],
+            null,
+          ),
+        ).resolves.toEqual([
+          rapideMaisBeaucoupDeMarche,
+          unPeuPlusLentMaisPeuDeMarche,
+        ]);
+      },
+    );
+
+    it(
+      'en cas de pluie forte, un itineraire avec moins de marche passe ' +
+        'devant un itineraire legerement plus rapide mais plus marche - ' +
+        'meme sans profil (critere de base, pas une preference)',
+      async () => {
+        weatherService.getCurrentConditions.mockResolvedValue(pluie(5));
+
+        const rapideMaisBeaucoupDeMarche = buildItinerary({
+          durationSeconds: 600,
+          segments: [buildSegment({ mode: 'WALK', distanceMeters: 2000 })],
+        });
+        const unPeuPlusLentMaisPeuDeMarche = buildItinerary({
+          durationSeconds: 700,
+          segments: [buildSegment({ mode: 'WALK', distanceMeters: 100 })],
+        });
+
+        await expect(
+          service.rank(
+            [rapideMaisBeaucoupDeMarche, unPeuPlusLentMaisPeuDeMarche],
+            null,
+          ),
+        ).resolves.toEqual([
+          unPeuPlusLentMaisPeuDeMarche,
+          rapideMaisBeaucoupDeMarche,
+        ]);
+      },
+    );
+
+    it('meteo indisponible (null) : pas de malus, pas de crash', async () => {
+      weatherService.getCurrentConditions.mockResolvedValue(null);
+
+      const rapideMaisBeaucoupDeMarche = buildItinerary({
+        durationSeconds: 600,
+        segments: [buildSegment({ mode: 'WALK', distanceMeters: 2000 })],
+      });
+      const unPeuPlusLentMaisPeuDeMarche = buildItinerary({
+        durationSeconds: 700,
+        segments: [buildSegment({ mode: 'WALK', distanceMeters: 100 })],
+      });
+
+      await expect(
+        service.rank(
+          [rapideMaisBeaucoupDeMarche, unPeuPlusLentMaisPeuDeMarche],
+          null,
+        ),
+      ).resolves.toEqual([
+        rapideMaisBeaucoupDeMarche,
+        unPeuPlusLentMaisPeuDeMarche,
+      ]);
+    });
   });
 });
