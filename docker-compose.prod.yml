@@ -4,8 +4,10 @@
 # - pas de service frontend : le build (frontend/dist) est servi en fichiers
 #   statiques directement par Caddy (reverse proxy installe sur l'hote,
 #   voir /etc/caddy/Caddyfile), pas besoin d'un conteneur pour ca
-# - pas de service otp pour l'instant : necessite les vraies donnees GTFS/OSM
-#   de la metropole (issue F3), sera reintroduit a ce moment-la
+# - service otp (issue #120) : reintroduit une fois les vraies donnees
+#   GTFS/OSM de la metropole disponibles (#12/#90) - voir routing-engine/README.md
+#   pour la procedure de bootstrap initial des donnees sur le VPS (routing-engine/data/
+#   n'est pas versionne, donc pas transfere par le "git reset --hard" du deploiement)
 # - postgres n'expose aucun port : seul le reseau docker interne y accede
 # - le port du backend est lie a 127.0.0.1 uniquement (pas 0.0.0.0) : Docker
 #   manipule iptables directement et contourne ufw pour les ports publies,
@@ -51,6 +53,22 @@ services:
     # "backend" ci-dessous) doit pouvoir l'atteindre, sur le port SMTP
     # standard du conteneur (25).
 
+  # Moteur de routage (issue #120). Memes contraintes que le service backend
+  # ci-dessous : pas de port publie, seul le reseau docker interne y accede
+  # (le backend l'appelle via OTP_URL=http://otp:8080/..., voir .env.example) -
+  # pas besoin de passer par Caddy, OTP n'est jamais appele directement par
+  # le navigateur. routing-engine/data/ (gtfs-metropole.zip + extrait OSM
+  # metropolitain) doit etre deja peuple sur le VPS avant le premier
+  # demarrage de ce service - voir routing-engine/README.md, section
+  # "Deploiement en production".
+  otp:
+    image: opentripplanner/opentripplanner:2.5.0
+    restart: always
+    volumes:
+      - ./routing-engine/data:/var/opentripplanner
+      - ./routing-engine/otp-config.json:/var/opentripplanner/otp-config.json:ro
+    command: ["--build", "--serve"]
+
   backend:
     build:
       context: ./backend
@@ -60,6 +78,7 @@ services:
     depends_on:
       - postgres
       - postfix
+      - otp
     ports:
       - "127.0.0.1:3000:3000"
 
