@@ -81,6 +81,13 @@ services:
       - otp
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      # Partage routing-engine/data avec le service otp ci-dessus : sans ce
+      # montage, `npm run import:gtfs` (GTFS_OTP_OUTPUT_PATH) ecrit le zip
+      # dans le systeme de fichiers ephemere du conteneur backend, jamais vu
+      # par otp - meme motif que le montage `./routing-engine` du backend en
+      # dev (docker-compose.yml), limite ici au seul sous-dossier necessaire.
+      - ./routing-engine/data:/app/routing-engine/data
 
 volumes:
   postgres_data:
