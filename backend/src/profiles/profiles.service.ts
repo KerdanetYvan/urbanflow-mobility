@@ -43,6 +43,18 @@ export class ProfilesService {
     return profile;
   }
 
+  /**
+   * Variante de findByUserId qui renvoie null plutot que de lever
+   * NotFoundException - un utilisateur authentifie qui n'a pas encore cree
+   * de profil est un cas normal pour un appelant qui personnalise un
+   * resultat plutot que d'exiger un profil (ex. TripsService#search, issue
+   * #16 : classement pondere degrade sur les criteres de base sans profil,
+   * jamais une erreur).
+   */
+  async findByUserIdOrNull(userId: string): Promise<MobilityProfile | null> {
+    return this.profilesRepository.findOneBy({ userId });
+  }
+
   async update(
     userId: string,
     dto: UpdateProfileDto,
