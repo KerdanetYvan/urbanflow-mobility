@@ -125,11 +125,22 @@
 
 /* --- Panneaux flottants (desktop uniquement, voir media query) --- */
 
+/* Bug corrige (issue #111) : cette enveloppe flex position:absolute (rendue
+   uniquement en desktop, voir display:none puis display:flex plus bas) ne
+   doit jamais capter d'evenements pointeur/molette elle-meme - avant ce
+   correctif, sa boite reelle (calcul flex/max-height:100% contre un
+   ancetre a hauteur non explicite) depassait le rendu visuel des panneaux
+   et bloquait le pan/zoom de la carte sur toute la hauteur de l'ecran,
+   au-dela de leur emprise reelle. pointer-events:auto reapplique sur
+   .resultats-panel (les boites reellement visibles) : seule leur emprise
+   effective bloque desormais la carte, jamais plus. */
 .resultats-panels {
   display: none;
+  pointer-events: none;
 }
 
 .resultats-panel {
+  pointer-events: auto;
   background: var(--color-bg);
   border-radius: var(--radius-md);
   box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);

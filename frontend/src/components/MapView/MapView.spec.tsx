@@ -50,12 +50,20 @@ describe('MapView', () => {
     expect(screen.getByText('Bus')).toBeInTheDocument();
   });
 
-  it('ne rend rien si aucun segment et aucune origine/destination de secours', () => {
-    const { container } = render(
-      <MapView itinerary={{ ...ITINERARY, segments: [] }} />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
+  it(
+    'affiche une vue par defaut (centree sur la metropole, sans marqueur) ' +
+      "quand ni itineraire ni origine/destination ne sont connus (issue #110/#111, carte permanente)",
+    () => {
+      const { container } = render(
+        <MapView itinerary={{ ...ITINERARY, segments: [] }} />,
+      );
+      // Vue permanente desormais (#110) : jamais d'ecran vide, meme sans
+      // aucune donnee - voir RENNES_METROPOLE_CENTER dans MapView.tsx.
+      expect(container).not.toBeEmptyDOMElement();
+      expect(screen.queryByText(/De .* à .* :/)).not.toBeInTheDocument();
+      expect(container.querySelector('.mapview-legend')).not.toBeInTheDocument();
+    },
+  );
 
   it("affiche seulement origine/destination sans resume ni legende quand l'itineraire n'est pas encore connu (issue #73, recherche en cours)", () => {
     const { container } = render(
@@ -69,4 +77,28 @@ describe('MapView', () => {
     expect(screen.queryByText(/De .* à .* :/)).not.toBeInTheDocument();
     expect(container.querySelector('.mapview-legend')).not.toBeInTheDocument();
   });
+
+  it(
+    "affiche un marqueur unique quand seule l'origine est connue " +
+      '(issue #111 - formulaire de recherche, destination pas encore choisie)',
+    () => {
+      const { container } = render(
+        <MapView origin={{ lat: 45.75, lon: 4.85 }} />,
+      );
+
+      expect(container).not.toBeEmptyDOMElement();
+      expect(screen.queryByText(/De .* à .* :/)).not.toBeInTheDocument();
+    },
+  );
+
+  it(
+    'affiche un marqueur unique quand seule la destination est connue',
+    () => {
+      const { container } = render(
+        <MapView destination={{ lat: 45.76, lon: 4.86 }} />,
+      );
+
+      expect(container).not.toBeEmptyDOMElement();
+    },
+  );
 });

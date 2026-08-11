@@ -36,7 +36,7 @@ Les 21 issues ouvertes du Sprint 3 (9 déjà planifiées F3/scoring/audits trans
 ### Phase C — Refonte `/recherche` et onboarding
 
 - [x] [#110](https://github.com/KerdanetYvan/urbanflow-mobility/issues/110) (PO) — Specs : carte permanente + réagencement des champs sur `/recherche` — `docs/specs/recherche-carte-permanente.md` ; identifie au passage un bug d'interaction carte/panneaux existant (zone morte sur toute la hauteur de l'écran, pas seulement l'emprise de la card), à corriger dans #111
-- [ ] [#111](https://github.com/KerdanetYvan/urbanflow-mobility/issues/111) (Dev FE) — Implémenter la carte permanente + le réagencement
+- [x] [#111](https://github.com/KerdanetYvan/urbanflow-mobility/issues/111) (Dev FE) — Implémenter la carte permanente + le réagencement — `MapView` avec vue par défaut/marqueur unique, panneau flottant (desktop)/bandeau 2 états (mobile), "Plus d'options" repliée, correction du bug de zone morte (`pointer-events` sur `.resultats-panels`/`.resultats-panel`)
 - [ ] [#126](https://github.com/KerdanetYvan/urbanflow-mobility/issues/126) (Dev FE) — Badges qualitatifs de scoring sur l'écran de résultats — implémente `docs/specs/f3-scoring-perturbations.md` §2.2 (issue #26), reporté depuis #16/#17 sans ticket Dev FE dédié
 - [ ] [#127](https://github.com/KerdanetYvan/urbanflow-mobility/issues/127) (Dev BE/FE) — Regrouper les itinéraires identiques par prochain passage — constaté en vérifiant #16/#17 (jusqu'à 5 fois le même trajet à des horaires différents)
 - [ ] [#106](https://github.com/KerdanetYvan/urbanflow-mobility/issues/106) (PO) — Specs de l'onboarding du profil + redirection post-connexion
