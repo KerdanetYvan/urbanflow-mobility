@@ -26,7 +26,7 @@ Les 21 issues ouvertes du Sprint 3 (9 déjà planifiées F3/scoring/audits trans
 
 - [x] [#12](https://github.com/KerdanetYvan/urbanflow-mobility/issues/12) (Dev BE) — Ingestion des flux GTFS statiques de la métropole — source retenue : GTFS open data de Rennes Métropole (STAR), portée PostGIS limitée aux arrêts géolocalisés (`gtfs_stops`)
 - [x] [#90](https://github.com/KerdanetYvan/urbanflow-mobility/issues/90) (Dev BE) — Vérifier le tracé réel (shapes.txt) des lignes de transport après ingestion GTFS — confirmé (métro ligne a, 295 points de tracé), voir `routing-engine/README.md`
-- [*] [#120](https://github.com/KerdanetYvan/urbanflow-mobility/issues/120) (Dev BE) — Déployer OTP en production avec les vraies données GTFS/OSM — issue ajoutée en session le 2026-08-10, insérée ici plutôt qu'en Phase E : `docker-compose.prod.yml` n'a jamais eu de service `otp` (retiré volontairement à #24 en attendant #12), donc `/trips`/`/places` sont cassés sur le VPS depuis le début — F2 non démontrable en ligne alors que le déploiement continu est non négociable pour la soutenance
+- [x] [#120](https://github.com/KerdanetYvan/urbanflow-mobility/issues/120) (Dev BE) — Déployer OTP en production avec les vraies données GTFS/OSM — service réintroduit ([#121](https://github.com/KerdanetYvan/urbanflow-mobility/pull/121), fix du partage de volume en [#122](https://github.com/KerdanetYvan/urbanflow-mobility/pull/122)), vraies données GTFS/OSM déployées sur le VPS, `GET /trips`/`GET /places` vérifiés en production (graphe complet 1528 arrêts, `|V|=157,499 |E|=410,038`)
 
 ### Phase B — Scoring (fonctionnalité complémentaire argumentée)
 
