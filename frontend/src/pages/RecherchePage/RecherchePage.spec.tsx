@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
@@ -221,9 +221,96 @@ describe('RecherchePage', () => {
     expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
   });
 
-  it('ne pre-remplit pas les modes de transport pour un utilisateur non connecte', () => {
+  it('ne pre-remplit pas les modes de transport pour un utilisateur non connecte', async () => {
+    const user = userEvent.setup();
     renderPage();
     expect(profileLib.getMyProfile).not.toHaveBeenCalled();
+
+    // Case derriere la divulgation "Plus d'options" (issue #110/#111,
+    // repliee par defaut) : l'ouvrir avant de verifier son etat, comme le
+    // ferait un vrai utilisateur.
+    await user.click(screen.getByText("Plus d'options"));
+
     expect(screen.getByRole('checkbox', { name: 'Vélo' })).not.toBeChecked();
+  });
+
+  describe('panneau formulaire (bandeau mobile, issue #110/#111)', () => {
+    function panel(container: HTMLElement) {
+      const el = container.querySelector('.recherche-panel-form');
+      if (!el) throw new Error('.recherche-panel-form introuvable');
+      return el as HTMLElement;
+    }
+
+    it('demarre deplie ("expanded") - le formulaire est ce qu\'il faut remplir en premier', () => {
+      const { container } = renderPage();
+      expect(panel(container)).toHaveAttribute('data-sheet-state', 'expanded');
+    });
+
+    it('la poignee replie puis redeploie le bandeau au tap', async () => {
+      const user = userEvent.setup();
+      const { container } = renderPage();
+      const handleButton = container.querySelector(
+        '.recherche-panel-form-handle',
+      ) as HTMLElement;
+
+      await user.click(handleButton);
+      expect(panel(container)).toHaveAttribute('data-sheet-state', 'collapsed');
+
+      await user.click(handleButton);
+      expect(panel(container)).toHaveAttribute('data-sheet-state', 'expanded');
+    });
+
+    it('un glissement vers le bas sur la poignee replie le bandeau', () => {
+      const { container } = renderPage();
+      const handleButton = container.querySelector(
+        '.recherche-panel-form-handle',
+      ) as HTMLElement;
+
+      fireEvent.touchStart(handleButton, { touches: [{ clientY: 100 }] });
+      fireEvent.touchEnd(handleButton, {
+        changedTouches: [{ clientY: 220 }],
+      });
+
+      expect(panel(container)).toHaveAttribute('data-sheet-state', 'collapsed');
+    });
+
+    it(
+      'une erreur de recherche redeploie le bandeau si replie (l\'utilisateur ' +
+        'ne doit jamais rater un message d\'erreur)',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockResolvedValue([GARE]);
+        const user = userEvent.setup();
+        const { container } = renderPage();
+
+        const handleButton = container.querySelector(
+          '.recherche-panel-form-handle',
+        ) as HTMLElement;
+        await user.click(handleButton);
+        expect(panel(container)).toHaveAttribute(
+          'data-sheet-state',
+          'collapsed',
+        );
+
+        // Une seule adresse selectionnee (Origine), Destination juste tapee
+        // sans etre choisie dans la liste -> "adresse non resolue".
+        await user.type(screen.getByLabelText('Origine'), 'Gare');
+        const suggestion = await screen.findByRole('button', {
+          name: 'Gare Part-Dieu',
+        });
+        await user.click(suggestion);
+        await user.type(screen.getByLabelText('Destination'), 'Mairie');
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+        expect(
+          await screen.findByText(
+            'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.',
+          ),
+        ).toBeInTheDocument();
+        expect(panel(container)).toHaveAttribute(
+          'data-sheet-state',
+          'expanded',
+        );
+      },
+    );
   });
 });

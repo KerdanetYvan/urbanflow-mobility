@@ -1,9 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type TouchEvent,
+} from 'react';
 import { Link } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
 import { MapPinIcon, SwapIcon } from '../../components/icons';
+import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import { searchPlaces, type PlaceSuggestion } from '../../lib/places';
@@ -11,6 +18,14 @@ import { searchTrips, type TripItinerary } from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
 import RecherchePageResults from './RecherchePageResults';
 import './RecherchePage.css';
+// Classes .resultats-shell/.resultats-map-bg reutilisees telles quelles
+// (issue #111) : deja pensees generiques par leur propre commentaire d'en-
+// tete dans ce fichier, pas besoin de les dupliquer/renommer pour l'etat
+// "formulaire".
+import './RecherchePageResults.css';
+
+/** Meme seuil que RecherchePageResults (poignee du bandeau resultats) - voir le commentaire associe la-bas. */
+const SWIPE_THRESHOLD_PX = 40;
 
 /**
  * Etat de l'ecran de recherche fusionne (issue #73, docs/specs/
@@ -191,6 +206,14 @@ function RecherchePage() {
     destination?: string;
   }>({});
   const [alert, setAlert] = useState<AlertState | null>(null);
+  // Bandeau mobile du panneau formulaire (issue #110/#111, carte permanente)
+  // - 2 etats seulement (contrairement au bandeau resultats a 3 etats,
+  // RecherchePageResults) : "deplie" par defaut, le formulaire est ce que
+  // l'utilisateur doit remplir en premier en arrivant sur l'ecran.
+  const [formSheetState, setFormSheetState] = useState<
+    'collapsed' | 'expanded'
+  >('expanded');
+  const formTouchStartY = useRef<number | null>(null);
 
   // Pre-remplissage des modes preferes depuis le profil (F1), uniquement si
   // connecte. Echec silencieux (pas de profil, session expiree...) : la
@@ -222,6 +245,40 @@ function RecherchePage() {
     setDestination(origin);
   }
 
+  /**
+   * Affiche une erreur ET s'assure qu'elle reste visible (issue #111,
+   * docs/specs/recherche-carte-permanente.md section 2) : si le bandeau
+   * mobile est replie au moment de l'erreur, il se redeploie - l'utilisateur
+   * ne doit jamais rater un message d'erreur parce que le bandeau etait en
+   * position basse. Sans effet en desktop (pas de repli, voir RecherchePage.css).
+   */
+  function showError(message: string) {
+    setAlert({ variant: 'error', message });
+    setFormSheetState('expanded');
+  }
+
+  /** Poignee tapee/cliquee : bascule simplement entre les 2 etats (contrairement au bandeau resultats a 3 etats). */
+  function handleFormHandleClick() {
+    setFormSheetState((current) =>
+      current === 'collapsed' ? 'expanded' : 'collapsed',
+    );
+  }
+
+  function handleFormHandleTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    formTouchStartY.current = event.touches[0].clientY;
+  }
+
+  /** Meme logique de glissement que RecherchePageResults, simplifiee a 2 etats. */
+  function handleFormHandleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
+    if (formTouchStartY.current === null) return;
+    const delta = event.changedTouches[0].clientY - formTouchStartY.current;
+    formTouchStartY.current = null;
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
+
+    event.preventDefault();
+    setFormSheetState(delta > 0 ? 'collapsed' : 'expanded');
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAlert(null);
@@ -234,6 +291,7 @@ function RecherchePage() {
 
     if (errors.origin || errors.destination) {
       setFieldErrors(errors);
+      setFormSheetState('expanded');
       document
         .getElementById(errors.origin ? 'origin-address' : 'destination-address')
         ?.focus();
@@ -244,11 +302,9 @@ function RecherchePage() {
     // traitee comme non resolue (section 2.3/4 de la spec), meme traitement
     // que si le geocodage avait echoue cote serveur.
     if (!origin.selected || !destination.selected) {
-      setAlert({
-        variant: 'error',
-        message:
-          "Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.",
-      });
+      showError(
+        "Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.",
+      );
       return;
     }
 
@@ -256,10 +312,7 @@ function RecherchePage() {
       origin.selected.lat === destination.selected.lat &&
       origin.selected.lon === destination.selected.lon
     ) {
-      setAlert({
-        variant: 'error',
-        message: "L'origine et la destination doivent être différentes.",
-      });
+      showError("L'origine et la destination doivent être différentes.");
       return;
     }
 
@@ -298,7 +351,7 @@ function RecherchePage() {
       // Retour au formulaire (pas de route a quitter, juste un changement
       // d'etat) - les valeurs saisies restent intactes, rien n'est perdu.
       setScreen({ kind: 'formulaire' });
-      setAlert({ variant: 'error', message });
+      showError(message);
     }
   }
 
@@ -316,90 +369,141 @@ function RecherchePage() {
     );
   }
 
+  // Etat "formulaire" (issue #110/#111, carte permanente) : meme coquille
+  // que RecherchePageResults (.resultats-shell/.resultats-map-bg, classes
+  // reutilisees depuis RecherchePageResults.css - voir l'import en tete de
+  // fichier), la carte devient le fond de cet ecran aussi, plus seulement
+  // des etats "recherche"/"resultats". Origine/destination deja resolues
+  // sont transmises a MapView au fur et a mesure qu'elles sont choisies
+  // (voir MapView.tsx, vue par defaut/marqueur unique/paire de marqueurs).
   return (
-    <section className="recherche-page">
-      <h1>Recherche d'itinéraire</h1>
+    <div className="resultats-shell">
+      <h1 className="recherche-visually-hidden">Recherche d'itinéraire</h1>
 
-      {!isAuthenticated && (
-        <p className="recherche-guest-hint">
-          <Link to="/connexion">Connectez-vous</Link> pour retrouver votre
-          profil de mobilité et des trajets personnalisés.
-        </p>
-      )}
-
-      {alert && (
-        <Alert variant={alert.variant} title="Erreur">
-          {alert.message}
-        </Alert>
-      )}
-
-      <form
-        onSubmit={(event) => void handleSubmit(event)}
-        className="recherche-form"
-      >
-        <div className="recherche-addresses">
-          <AddressField
-            id="origin-address"
-            label="Origine"
-            value={origin.query}
-            suggestions={originSuggestions}
-            error={fieldErrors.origin}
-            onChange={(value) => setOrigin({ query: value, selected: null })}
-            onSelect={(place) => setOrigin({ query: place.label, selected: place })}
-          />
-
-          <button
-            type="button"
-            className="recherche-swap"
-            onClick={handleSwap}
-            aria-label="Inverser l'origine et la destination"
-          >
-            <SwapIcon />
-          </button>
-
-          <AddressField
-            id="destination-address"
-            label="Destination"
-            value={destination.query}
-            suggestions={destinationSuggestions}
-            error={fieldErrors.destination}
-            onChange={(value) =>
-              setDestination({ query: value, selected: null })
-            }
-            onSelect={(place) =>
-              setDestination({ query: place.label, selected: place })
-            }
-          />
-        </div>
-
-        <FormField
-          id="departure-time"
-          label="Partir à"
-          type="datetime-local"
-          value={departureTime}
-          onChange={(event) => setDepartureTime(event.target.value)}
-          helpText="Laisser vide pour partir maintenant."
+      <div className="resultats-map-bg">
+        <MapView
+          origin={origin.selected ?? undefined}
+          destination={destination.selected ?? undefined}
+          variant="fullBleed"
         />
+      </div>
 
-        <fieldset className="recherche-fieldset">
-          <legend>Modes de transport pour cette recherche</legend>
-          {TRANSPORT_MODES.map((mode) => (
-            <label key={mode.value} className="recherche-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedModes.includes(mode.value)}
-                onChange={() => toggleMode(mode.value)}
+      <div
+        className="recherche-panel-form"
+        data-sheet-state={formSheetState}
+      >
+        <button
+          type="button"
+          className="recherche-panel-form-handle"
+          onClick={handleFormHandleClick}
+          onTouchStart={handleFormHandleTouchStart}
+          onTouchEnd={handleFormHandleTouchEnd}
+          aria-expanded={formSheetState === 'expanded'}
+        >
+          <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+          {formSheetState === 'collapsed' && (
+            <span className="recherche-panel-form-handle-label">
+              Rechercher un trajet
+            </span>
+          )}
+        </button>
+
+        <div className="recherche-panel-form-body">
+          {!isAuthenticated && (
+            <p className="recherche-guest-hint">
+              <Link to="/connexion">Connectez-vous</Link> pour retrouver
+              votre profil de mobilité et des trajets personnalisés.
+            </p>
+          )}
+
+          {alert && (
+            <Alert variant={alert.variant} title="Erreur">
+              {alert.message}
+            </Alert>
+          )}
+
+          <form
+            onSubmit={(event) => void handleSubmit(event)}
+            className="recherche-form"
+          >
+            <div className="recherche-addresses">
+              <AddressField
+                id="origin-address"
+                label="Origine"
+                value={origin.query}
+                suggestions={originSuggestions}
+                error={fieldErrors.origin}
+                onChange={(value) =>
+                  setOrigin({ query: value, selected: null })
+                }
+                onSelect={(place) =>
+                  setOrigin({ query: place.label, selected: place })
+                }
               />
-              {mode.label}
-            </label>
-          ))}
-        </fieldset>
 
-        <Button type="submit" className="recherche-submit">
-          Rechercher
-        </Button>
-      </form>
-    </section>
+              <button
+                type="button"
+                className="recherche-swap"
+                onClick={handleSwap}
+                aria-label="Inverser l'origine et la destination"
+              >
+                <SwapIcon />
+              </button>
+
+              <AddressField
+                id="destination-address"
+                label="Destination"
+                value={destination.query}
+                suggestions={destinationSuggestions}
+                error={fieldErrors.destination}
+                onChange={(value) =>
+                  setDestination({ query: value, selected: null })
+                }
+                onSelect={(place) =>
+                  setDestination({ query: place.label, selected: place })
+                }
+              />
+            </div>
+
+            {/* Champs secondaires replies par defaut (issue #110/#111) :
+                deja optionnels aujourd'hui (heure vide = "maintenant",
+                modes vides = tous), reduit l'emprise verticale du panneau
+                flottant/bandeau. <details> natif - pas de machinerie ARIA
+                custom, le role/l'etat sont deja corrects nativement. */}
+            <details className="recherche-more-options">
+              <summary>Plus d'options</summary>
+
+              <FormField
+                id="departure-time"
+                label="Partir à"
+                type="datetime-local"
+                value={departureTime}
+                onChange={(event) => setDepartureTime(event.target.value)}
+                helpText="Laisser vide pour partir maintenant."
+              />
+
+              <fieldset className="recherche-fieldset">
+                <legend>Modes de transport pour cette recherche</legend>
+                {TRANSPORT_MODES.map((mode) => (
+                  <label key={mode.value} className="recherche-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedModes.includes(mode.value)}
+                      onChange={() => toggleMode(mode.value)}
+                    />
+                    {mode.label}
+                  </label>
+                ))}
+              </fieldset>
+            </details>
+
+            <Button type="submit" className="recherche-submit">
+              Rechercher
+            </Button>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }
 

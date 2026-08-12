@@ -56,6 +56,17 @@ interface LatLon {
   lon: number;
 }
 
+/**
+ * Point de reference par defaut (centre-ville de Rennes) affiche quand ni
+ * itineraire ni origine/destination ne sont encore connus - issue #110/#111,
+ * carte permanente sur l'etat "formulaire". Memes coordonnees que le point
+ * de reference cote backend (WeatherService, meme raison : une zone
+ * generale pour la metropole, pas une position precise d'usager).
+ */
+const RENNES_METROPOLE_CENTER: LatLon = { lat: 48.1173, lon: -1.6778 };
+const DEFAULT_ZOOM = 13;
+const SINGLE_POINT_ZOOM = 15;
+
 interface MapViewProps {
   /**
    * Absent pendant une recherche en cours (issue #73, spec 2.4 - aucun
@@ -110,16 +121,26 @@ function MapView({
 }: MapViewProps) {
   const segments = itinerary?.segments ?? [];
   const hasItinerary = segments.length > 0;
+  const hasBothPoints = Boolean(originProp && destinationProp);
+  // Un seul point fourni (issue #111 - l'utilisateur n'a choisi que
+  // l'origine ou que la destination sur l'ecran de recherche) : un marqueur,
+  // pas de trace. Rien du tout (ni itineraire, ni un seul point, ni les
+  // deux) : vue par defaut sur la metropole, voir RENNES_METROPOLE_CENTER -
+  // la carte est desormais un fond permanent (#110), plus jamais absente.
+  const singlePoint = !hasItinerary && !hasBothPoints
+    ? (originProp ?? destinationProp)
+    : undefined;
 
-  // Ni itineraire (avec segments) ni origine/destination de secours : rien a
-  // afficher (evite un crash carte sur itineraire vide, meme comportement
-  // qu'avant l'ajout du mode "recherche en cours").
-  if (!hasItinerary && !(originProp && destinationProp)) return null;
-
-  const origin = hasItinerary ? segments[0].from : (originProp as LatLon);
+  const origin = hasItinerary
+    ? segments[0].from
+    : hasBothPoints
+      ? (originProp as LatLon)
+      : undefined;
   const destination = hasItinerary
     ? segments[segments.length - 1].to
-    : (destinationProp as LatLon);
+    : hasBothPoints
+      ? (destinationProp as LatLon)
+      : undefined;
   // Points de correspondance = frontieres entre segments (le "from" de tout
   // segment sauf le premier, deja marque comme origine). Aucun sans
   // itineraire : rien entre une origine et une destination qui ne sont pas
@@ -128,6 +149,9 @@ function MapView({
     ? segments.slice(1).map((segment) => segment.from)
     : [];
 
+  // Vue par bounds (ajuste le zoom pour englober tous les points) quand on a
+  // au moins 2 points a cadrer ; sinon un centre/zoom fixe (un seul point,
+  // ou la vue par defaut sans rien).
   const bounds = hasItinerary
     ? L.latLngBounds(
         segments.flatMap((segment) =>
@@ -136,10 +160,13 @@ function MapView({
           ),
         ),
       )
-    : L.latLngBounds([
-        [origin.lat, origin.lon],
-        [destination.lat, destination.lon],
-      ]);
+    : hasBothPoints
+      ? L.latLngBounds([
+          [(origin as LatLon).lat, (origin as LatLon).lon],
+          [(destination as LatLon).lat, (destination as LatLon).lon],
+        ])
+      : undefined;
+  const fixedCenter = singlePoint ?? RENNES_METROPOLE_CENTER;
 
   // Legende : un seul badge par mode present dans l'itineraire, dans
   // l'ordre de premiere apparition (pas d'ordre alphabetique arbitraire).
@@ -149,6 +176,17 @@ function MapView({
     : [];
 
   const isFullBleed = variant === 'fullBleed';
+
+  // MapContainer de react-leaflet n'applique bounds/center/zoom de facon
+  // fiable qu'au montage - la carte reste desormais montee en continu
+  // pendant tout l'etat "formulaire" (choix successif origine puis
+  // destination, #111), contrairement a avant ou chaque etat remontait une
+  // instance neuve. Cette cle force un remontage propre a chaque changement
+  // de "forme" de la vue plutot que de dependre d'un comportement reactif
+  // non garanti de react-leaflet sur ces props.
+  const viewKey = bounds
+    ? `bounds:${bounds.getSouthWest().toString()}|${bounds.getNorthEast().toString()}`
+    : `point:${fixedCenter.lat},${fixedCenter.lon}`;
 
   return (
     <div
@@ -161,8 +199,13 @@ function MapView({
         .join(' ')}
     >
       <MapContainer
-        bounds={bounds}
-        boundsOptions={{ padding: [24, 24] }}
+        key={viewKey}
+        {...(bounds
+          ? { bounds, boundsOptions: { padding: [24, 24] } }
+          : {
+              center: [fixedCenter.lat, fixedCenter.lon] as [number, number],
+              zoom: singlePoint ? SINGLE_POINT_ZOOM : DEFAULT_ZOOM,
+            })}
         // Molette : desactivee en mode 'boxed' (comportement d'origine de
         // l'issue #8) pour ne pas capter le defilement de la page quand la
         // carte est un simple encart dans un flux normal ; activee en
@@ -201,11 +244,23 @@ function MapView({
             />
           );
         })}
-        <Marker position={[origin.lat, origin.lon]} icon={ORIGIN_ICON} />
-        <Marker
-          position={[destination.lat, destination.lon]}
-          icon={DESTINATION_ICON}
-        />
+        {origin && (
+          <Marker position={[origin.lat, origin.lon]} icon={ORIGIN_ICON} />
+        )}
+        {destination && (
+          <Marker
+            position={[destination.lat, destination.lon]}
+            icon={DESTINATION_ICON}
+          />
+        )}
+        {singlePoint && (
+          <Marker
+            position={[singlePoint.lat, singlePoint.lon]}
+            // originProp fourni (destinationProp absent) -> c'est l'origine
+            // qui manque de contrepartie, meme icone que le cas complet.
+            icon={originProp ? ORIGIN_ICON : DESTINATION_ICON}
+          />
+        )}
         {transferPoints.map((point, index) => (
           <Marker
             key={index}
