@@ -1,0 +1,16 @@
+/* Bordure + fond teinte + texte en --color-primary-emphasis : meme pattern
+   que .alert-* (Alert.css), token concu pour porter du texte directement sur
+   --color-bg avec un contraste AA correct dans les deux themes (voir le
+   commentaire sur --color-primary-emphasis dans tokens.css). */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-primary-emphasis);
+  background: color-mix(in srgb, var(--color-primary-emphasis) 12%, var(--color-bg));
+  color: var(--color-primary-emphasis);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}

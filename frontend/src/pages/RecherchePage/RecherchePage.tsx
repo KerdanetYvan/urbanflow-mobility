@@ -201,6 +201,13 @@ function RecherchePage() {
 
   const [departureTime, setDepartureTime] = useState('');
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
+  // Preferences d'accessibilite du profil connecte (issue #126) - transmises
+  // telles quelles a RecherchePageResults pour le badge cible de scoring.
+  // Tableau vide si non connecte ou profil incomplet (voir #64) : seul le
+  // badge "meilleur choix global" s'affiche alors.
+  const [accessibilityPreferences, setAccessibilityPreferences] = useState<
+    string[]
+  >([]);
   const [fieldErrors, setFieldErrors] = useState<{
     origin?: string;
     destination?: string;
@@ -223,7 +230,10 @@ function RecherchePage() {
     let cancelled = false;
     getMyProfile()
       .then((profile) => {
-        if (!cancelled) setSelectedModes(profile.preferredTransportModes);
+        if (!cancelled) {
+          setSelectedModes(profile.preferredTransportModes);
+          setAccessibilityPreferences(profile.accessibilityPreferences);
+        }
       })
       .catch(() => {});
     return () => {
@@ -365,6 +375,7 @@ function RecherchePage() {
         destination={screen.destination}
         itineraries={screen.kind === 'resultats' ? screen.itineraries : null}
         onEditSearch={() => setScreen({ kind: 'formulaire' })}
+        accessibilityPreferences={accessibilityPreferences}
       />
     );
   }
