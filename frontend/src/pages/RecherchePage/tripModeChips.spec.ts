@@ -1,5 +1,5 @@
 import type { TripItinerary, TripSegment } from '../../lib/trips';
-import { tripModeChips } from './tripModeChips';
+import { isLineMode, tripModeChips } from './tripModeChips';
 
 /** Segment minimal pour ces tests - seuls `mode` et `routeName` comptent. */
 function buildSegment(mode: string, overrides: Partial<TripSegment> = {}): TripSegment {
@@ -96,5 +96,15 @@ describe('tripModeChips', () => {
 
   it('un itineraire sans segment renvoie une liste vide', () => {
     expect(tripModeChips(buildItinerary([]))).toEqual([]);
+  });
+});
+
+describe('isLineMode', () => {
+  it.each(['BUS', 'TRAM', 'RAIL', 'SUBWAY'])('renvoie true pour le mode de ligne %s', (mode) => {
+    expect(isLineMode(mode)).toBe(true);
+  });
+
+  it.each(['WALK', 'BICYCLE', 'SCOOTER', 'CAR'])('renvoie false pour le mode sans ligne %s', (mode) => {
+    expect(isLineMode(mode)).toBe(false);
   });
 });

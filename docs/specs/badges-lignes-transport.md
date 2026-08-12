@@ -13,7 +13,7 @@
 - `ItineraryCard` — carte d'itinéraire de la liste de résultats.
 - `CompactPreview` — résumé compact affiché dans la poignée du bandeau mobile replié.
 
-**Hors périmètre** : `ItinerarySegments` (détail déplié, segment par segment) garde son rendu actuel (icône générique + libellé texte, ex. "Bus C1") — pas de changement demandé, l'information y est déjà explicite en texte.
+**Étendu en session** (retour utilisateur après la première itération) : `ItinerarySegments` (détail déplié, segment par segment) affiche désormais aussi le badge de ligne à la place de l'icône générique, pour rester cohérent visuellement avec `ItineraryCard`/`CompactPreview` — le texte du libellé (ex. "Bus C1") reste inchangé, c'est la seule source d'information pour les lecteurs d'écran (le badge, comme l'icône avant lui, reste dans un conteneur `aria-hidden`).
 
 ## 3. Dédup par ligne, pas par mode
 

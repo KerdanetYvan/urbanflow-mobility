@@ -264,6 +264,23 @@ describe('RecherchePageResults', () => {
 
       expect(within(handleButton).getByText('C1')).toBeInTheDocument();
     });
+
+    it('affiche aussi le badge de ligne dans le detail deplie du trajet selectionne', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const detailPanel = container.querySelector('.resultats-panel-detail') as HTMLElement;
+      expect(within(detailPanel).getByText('C1')).toHaveClass('line-badge--bus');
+    });
+
+    it('garde l icone existante dans le detail deplie pour un segment marche', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const detailPanel = container.querySelector('.resultats-panel-detail') as HTMLElement;
+      const walkSegment = within(detailPanel)
+        .getByText('Marche')
+        .closest('.resultats-segment') as HTMLElement;
+      expect(walkSegment.querySelector('.line-badge')).not.toBeInTheDocument();
+    });
   });
 
   describe('bandeau mobile (bottom sheet)', () => {

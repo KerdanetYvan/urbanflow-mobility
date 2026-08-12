@@ -11,7 +11,7 @@ import {
 import type { PlaceSuggestion } from '../../lib/places';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
-import { tripModeChips } from './tripModeChips';
+import { isLineMode, tripModeChips } from './tripModeChips';
 import './RecherchePageResults.css';
 
 /**
@@ -219,7 +219,14 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
       {itinerary.segments.map((segment, index) => (
         <li key={index} className="resultats-segment">
           <span className="resultats-segment-icon" aria-hidden="true">
-            {getTripModeIcon(segment.mode)}
+            {isLineMode(segment.mode) ? (
+              <LineBadge
+                mode={segment.mode}
+                label={segment.routeName ?? getModeStyle(segment.mode).label}
+              />
+            ) : (
+              getTripModeIcon(segment.mode)
+            )}
           </span>
           <span className="resultats-segment-body">
             <span className="resultats-segment-label">

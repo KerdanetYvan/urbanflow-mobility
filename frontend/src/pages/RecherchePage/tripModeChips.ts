@@ -9,6 +9,17 @@ import type { TripItinerary } from '../../lib/trips';
 const LINE_MODES = new Set(['BUS', 'TRAM', 'RAIL', 'SUBWAY']);
 
 /**
+ * Indique si un mode de transport est identifie par une ligne (numero/nom,
+ * `TripSegment.routeName`) plutot que par une icone generique - utilise
+ * aussi par `ItinerarySegments` (RecherchePageResults.tsx, detail deplie du
+ * trajet selectionne) en plus de `tripModeChips()` ci-dessous, pour garder
+ * la meme regle de decision "badge de ligne vs icone" aux deux endroits.
+ */
+export function isLineMode(mode: string): boolean {
+  return LINE_MODES.has(mode);
+}
+
+/**
  * Un element de la rangee de "puces" de mode affichee sur une carte
  * d'itineraire (issue #129) :
  * - `icon` : mode sans ligne identifiable (marche, velo, trottinette,
