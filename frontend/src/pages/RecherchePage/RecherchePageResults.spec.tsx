@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { TripItinerary } from '../../lib/trips';
+import type { TripItinerary, TripSegment } from '../../lib/trips';
 import RecherchePageResults from './RecherchePageResults';
 
 const ORIGIN = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
@@ -62,6 +62,44 @@ const SLOW_ITINERARY: TripItinerary = {
       ],
     },
   ],
+};
+
+/** Deux lignes de bus distinctes sur le meme trajet (issue #129) - verifie que tripModeChips ne les fusionne pas en un seul badge. */
+const TWO_BUS_LINES_ITINERARY: TripItinerary = {
+  startTime: '2026-08-02T08:00:00.000Z',
+  endTime: '2026-08-02T08:40:00.000Z',
+  durationSeconds: 2400,
+  transfers: 1,
+  segments: [
+    {
+      mode: 'BUS',
+      routeName: '24',
+      startTime: '2026-08-02T08:00:00.000Z',
+      endTime: '2026-08-02T08:15:00.000Z',
+      durationSeconds: 900,
+      distanceMeters: 2500,
+      from: { name: 'Domicile', lat: 45.75, lon: 4.85 },
+      to: { name: 'Republique', lat: 45.758, lon: 4.858 },
+      geometry: [
+        { lat: 45.75, lon: 4.85 },
+        { lat: 45.758, lon: 4.858 },
+      ],
+    },
+    {
+      mode: 'BUS',
+      routeName: 'C6',
+      startTime: '2026-08-02T08:15:00.000Z',
+      endTime: '2026-08-02T08:40:00.000Z',
+      durationSeconds: 1500,
+      distanceMeters: 3800,
+      from: { name: 'Republique', lat: 45.758, lon: 4.858 },
+      to: { name: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 },
+      geometry: [
+        { lat: 45.758, lon: 4.858 },
+        { lat: 45.76, lon: 4.86 },
+      ],
+    },
+  ] satisfies TripSegment[],
 };
 
 function renderResults(
@@ -185,6 +223,47 @@ describe('RecherchePageResults', () => {
 
     await user.click(screen.getByRole('button', { name: 'Nouvelle recherche' }));
     expect(onEditSearch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('badges de ligne par mode de transport (issue #129)', () => {
+    it('affiche un badge de ligne avec le numero de ligne pour un segment BUS, a la place de l icone', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const card = desktopCards(container)[0];
+      expect(within(card).getByText('C1')).toHaveClass('line-badge--bus');
+    });
+
+    it('affiche deux badges distincts pour deux lignes de bus differentes sur le meme itineraire', () => {
+      const { container } = renderResults([TWO_BUS_LINES_ITINERARY]);
+
+      const card = desktopCards(container)[0];
+      expect(within(card).getByText('24')).toBeInTheDocument();
+      expect(within(card).getByText('C6')).toBeInTheDocument();
+    });
+
+    it('garde l icone existante pour un mode sans ligne (marche)', () => {
+      const { container } = renderResults([SLOW_ITINERARY]);
+
+      const card = desktopCards(container)[0];
+      // SLOW_ITINERARY n'a qu'un segment WALK : aucun badge de ligne ne doit apparaitre.
+      expect(card.querySelector('.line-badge')).not.toBeInTheDocument();
+    });
+
+    it('inclut le numero de ligne dans le texte cache pour lecteurs d ecran', () => {
+      renderResults([FAST_ITINERARY]);
+
+      expect(screen.getAllByText('Modes : Marche, Bus C1.')[0]).toBeInTheDocument();
+    });
+
+    it('affiche aussi les badges de ligne dans l apercu compact du bandeau mobile replie', async () => {
+      const user = userEvent.setup();
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const handleButton = container.querySelector('.resultats-sheet-handle') as HTMLElement;
+      await user.click(handleButton);
+
+      expect(within(handleButton).getByText('C1')).toBeInTheDocument();
+    });
   });
 
   describe('bandeau mobile (bottom sheet)', () => {

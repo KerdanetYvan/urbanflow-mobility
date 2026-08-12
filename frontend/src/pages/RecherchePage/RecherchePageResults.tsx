@@ -1,4 +1,5 @@
 import { useRef, useState, type TouchEvent } from 'react';
+import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
 import { getTripModeIcon } from '../../components/tripModeIcon';
@@ -10,6 +11,7 @@ import {
 import type { PlaceSuggestion } from '../../lib/places';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
+import { tripModeChips } from './tripModeChips';
 import './RecherchePageResults.css';
 
 /**
@@ -28,14 +30,6 @@ type SheetState = 'collapsed' | 'list' | 'detail';
 /** Distance verticale minimale (px) pour qu'un geste tactile sur la
  * poignee du bandeau soit traite comme un glissement plutot qu'un tap. */
 const SWIPE_THRESHOLD_PX = 40;
-
-/**
- * Modes de transport uniques utilises par un itineraire, dans l'ordre de
- * premiere apparition des segments (meme logique que MapView#modesUsed).
- */
-function modesUsedBy(itinerary: TripItinerary): string[] {
-  return [...new Set(itinerary.segments.map((segment) => segment.mode))];
-}
 
 /**
  * Message affiche quand la position en temps reel (issue #9) n'est pas
@@ -97,14 +91,29 @@ interface ItineraryCardProps {
  * un lien "Voir le detail" - un <button> natif donne le comportement clavier
  * (Tab, Entree, Espace) sans code supplementaire.
  *
- * Le score n'est jamais affiche (section 3.1) : aucune valeur ni badge ici,
- * seule la position dans la liste (deja triee par le backend) le reflete.
+ * Le score n'est jamais affiche (section 3.1) : aucune valeur chiffree ici.
+ * La rangee de puces de mode peut neanmoins afficher un badge de ligne pour
+ * un transport en commun (bus/tram/metro/train, issue #129, voir
+ * tripModeChips.ts) - le numero de ligne n'est pas le score, juste une
+ * information factuelle sur l'itineraire.
  */
 function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) {
-  const modes = modesUsedBy(itinerary);
-  // Texte cache, lu par les lecteurs d'ecran : les icones de mode ci-dessous
-  // sont `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
-  const modesLabel = modes.map((mode) => getModeStyle(mode).label).join(', ');
+  const chips = tripModeChips(itinerary);
+  // Texte cache, lu par les lecteurs d'ecran : les puces ci-dessous sont
+  // `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1). Un
+  // chip `line` contribue "libelle du mode + numero de ligne" (ex. "Bus
+  // 24") ; SAUF si `chip.label` est deja le libelle du mode lui-meme (repli
+  // de tripModeChips.ts quand `routeName` est absent du segment) - dans ce
+  // cas precis, ne pas le repeter deux fois (ex. "Bus", pas "Bus Bus"). Un
+  // chip `icon` contribue le libelle du mode seul (ex. "Marche"), comme
+  // avant l'introduction des badges de ligne (issue #129).
+  const modesLabel = chips
+    .map((chip) => {
+      const modeLabel = getModeStyle(chip.mode).label;
+      if (chip.kind === 'icon' || chip.label === modeLabel) return modeLabel;
+      return `${modeLabel} ${chip.label}`;
+    })
+    .join(', ');
 
   return (
     <button
@@ -115,11 +124,15 @@ function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) 
     >
       <span className="resultats-visually-hidden">Modes : {modesLabel}.</span>
       <span className="resultats-card-modes" aria-hidden="true">
-        {modes.map((mode) => (
-          <span key={mode} className="resultats-card-mode-icon">
-            {getTripModeIcon(mode)}
-          </span>
-        ))}
+        {chips.map((chip) =>
+          chip.kind === 'line' ? (
+            <LineBadge key={`${chip.mode}:${chip.label}`} mode={chip.mode} label={chip.label} />
+          ) : (
+            <span key={chip.mode} className="resultats-card-mode-icon">
+              {getTripModeIcon(chip.mode)}
+            </span>
+          ),
+        )}
       </span>
       <span className="resultats-card-main">
         <span className="resultats-card-time">
@@ -233,13 +246,17 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
  * celui de la poignee), juste du texte + icones decoratives.
  */
 function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
-  const modes = modesUsedBy(itinerary);
+  const chips = tripModeChips(itinerary);
   return (
     <span className="resultats-sheet-preview">
       <span className="resultats-sheet-preview-modes" aria-hidden="true">
-        {modes.map((mode) => (
-          <span key={mode}>{getTripModeIcon(mode)}</span>
-        ))}
+        {chips.map((chip) =>
+          chip.kind === 'line' ? (
+            <LineBadge key={`${chip.mode}:${chip.label}`} mode={chip.mode} label={chip.label} />
+          ) : (
+            <span key={chip.mode}>{getTripModeIcon(chip.mode)}</span>
+          ),
+        )}
       </span>
       <span className="resultats-sheet-preview-time">
         {formatTime(itinerary.startTime)} → {formatTime(itinerary.endTime)} ·{' '}
