@@ -1,4 +1,5 @@
-import { useRef, useState, type TouchEvent } from 'react';
+import { useMemo, useRef, useState, type TouchEvent } from 'react';
+import Badge from '../../components/Badge/Badge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
 import { getTripModeIcon } from '../../components/tripModeIcon';
@@ -10,6 +11,7 @@ import {
 import type { PlaceSuggestion } from '../../lib/places';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
+import { computeItineraryBadges, type ItineraryBadges } from './itineraryBadges';
 import './RecherchePageResults.css';
 
 /**
@@ -89,6 +91,8 @@ interface ItineraryCardProps {
   itinerary: TripItinerary;
   isSelected: boolean;
   onSelect: () => void;
+  /** Libelles de badges qualitatifs a afficher sur cette carte (issue #126) - jamais plus de 2 sur toute la liste, voir itineraryBadges.ts. */
+  badges: string[];
 }
 
 /**
@@ -97,10 +101,13 @@ interface ItineraryCardProps {
  * un lien "Voir le detail" - un <button> natif donne le comportement clavier
  * (Tab, Entree, Espace) sans code supplementaire.
  *
- * Le score n'est jamais affiche (section 3.1) : aucune valeur ni badge ici,
- * seule la position dans la liste (deja triee par le backend) le reflete.
+ * Le score chiffre n'est jamais affiche (section 3.1) : seule la position
+ * dans la liste (deja triee par le backend) le reflete. Un badge qualitatif
+ * (section 2.2 du spec F3, issue #126) peut neanmoins renforcer visuellement
+ * un choix - jamais une valeur, jamais plus de 2 sur toute la liste, voir
+ * itineraryBadges.ts pour le detail du calcul.
  */
-function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) {
+function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCardProps) {
   const modes = modesUsedBy(itinerary);
   // Texte cache, lu par les lecteurs d'ecran : les icones de mode ci-dessous
   // sont `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
@@ -113,6 +120,13 @@ function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) 
       aria-current={isSelected || undefined}
       onClick={onSelect}
     >
+      {badges.length > 0 && (
+        <span className="resultats-card-badges">
+          {badges.map((label) => (
+            <Badge key={label}>{label}</Badge>
+          ))}
+        </span>
+      )}
       <span className="resultats-visually-hidden">Modes : {modesLabel}.</span>
       <span className="resultats-card-modes" aria-hidden="true">
         {modes.map((mode) => (
@@ -148,6 +162,8 @@ interface ResultsListProps {
   onEditSearch: () => void;
   /** Message a afficher si la position en temps reel (issue #9) n'est pas disponible - voir geolocationMessage(). */
   geolocationMessage?: string;
+  /** Badges qualitatifs par index d'itineraire (issue #126) - voir itineraryBadges.ts. */
+  itineraryBadges: ItineraryBadges;
 }
 
 /**
@@ -163,6 +179,7 @@ function ResultsList({
   onSelect,
   onEditSearch,
   geolocationMessage,
+  itineraryBadges,
 }: ResultsListProps) {
   return (
     <>
@@ -177,6 +194,7 @@ function ResultsList({
               itinerary={itinerary}
               isSelected={index === selectedIndex}
               onSelect={() => onSelect(index)}
+              badges={itineraryBadges[index] ?? []}
             />
           </li>
         ))}
@@ -273,6 +291,8 @@ interface RecherchePageResultsProps {
   itineraries: TripItinerary[] | null;
   /** Retour au formulaire (etat 'formulaire' de RecherchePage), preremplissant les criteres. */
   onEditSearch: () => void;
+  /** Preferences d'accessibilite du profil connecte (issue #126), voir frontend/src/lib/profile.ts. Absent/vide = profil incomplet ou recherche anonyme (issue #64) - seul le badge "meilleur choix global" s'affiche alors. */
+  accessibilityPreferences?: string[];
 }
 
 /**
@@ -309,6 +329,7 @@ function RecherchePageResults({
   destination,
   itineraries,
   onEditSearch,
+  accessibilityPreferences,
 }: RecherchePageResultsProps) {
   // Itineraire selectionne par defaut : le premier de la liste (deja en tete
   // du tri backend).
@@ -325,6 +346,16 @@ function RecherchePageResults({
   // sollicitation du capteur GPS pour l'etat vide, qui n'affiche pas de carte.
   const showsMap = itineraries === null || itineraries.length > 0;
   const geolocation = useGeolocation(showsMap);
+  // Calcule une seule fois les badges qualitatifs (issue #126) - hook
+  // appele inconditionnellement (regle des Hooks React), avant les retours
+  // anticipes ci-dessous, meme si `itineraries` est encore null (auquel cas
+  // il n'y a aucun badge a calculer). Transmis identique aux deux rendus de
+  // ResultsList (panneau desktop et bandeau mobile) pour eviter de refaire
+  // le calcul deux fois.
+  const itineraryBadges = useMemo(
+    () => computeItineraryBadges(itineraries ?? [], accessibilityPreferences ?? []),
+    [itineraries, accessibilityPreferences],
+  );
 
   function selectItinerary(index: number) {
     setSelectedIndex(index);
@@ -461,6 +492,7 @@ function RecherchePageResults({
             onSelect={selectItinerary}
             onEditSearch={onEditSearch}
             geolocationMessage={geolocationMessage(geolocation.status)}
+            itineraryBadges={itineraryBadges}
           />
         </div>
         <div className="resultats-panel resultats-panel-detail">
@@ -505,6 +537,7 @@ function RecherchePageResults({
               onSelect={selectItinerary}
               onEditSearch={onEditSearch}
               geolocationMessage={geolocationMessage(geolocation.status)}
+              itineraryBadges={itineraryBadges}
             />
           )}
         </div>

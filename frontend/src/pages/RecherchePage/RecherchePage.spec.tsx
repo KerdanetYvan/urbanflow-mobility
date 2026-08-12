@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { AuthProvider } from '../../lib/AuthProvider';
+import { clearTokens, saveTokens } from '../../lib/authStorage';
 import * as placesLib from '../../lib/places';
 import * as profileLib from '../../lib/profile';
 import * as tripsLib from '../../lib/trips';
@@ -51,6 +52,10 @@ describe('RecherchePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(placesLib.searchPlaces).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    clearTokens();
   });
 
   it('affiche une invitation discrete a se connecter pour un utilisateur non authentifie', () => {
@@ -232,6 +237,43 @@ describe('RecherchePage', () => {
     await user.click(screen.getByText("Plus d'options"));
 
     expect(screen.getByRole('checkbox', { name: 'Vélo' })).not.toBeChecked();
+  });
+
+  it("transmet accessibilityPreferences du profil connecte a l'ecran de resultats, pour le badge cible de scoring (issue #126)", async () => {
+    saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+    vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+      id: 'profile-1',
+      userId: 'user-1',
+      preferredTransportModes: [],
+      accessibilityPreferences: ['limit_transfers'],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+      Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+    );
+    const itineraries = [
+      { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 2, segments: [] },
+      { startTime: 't2', endTime: 't3', durationSeconds: 900, transfers: 0, segments: [] },
+    ];
+    vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(profileLib.getMyProfile).toHaveBeenCalled());
+
+    await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+    await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+    await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+    // Le premier itineraire (2 correspondances) garde le badge global ; le
+    // second (0 correspondance) recoit le badge cible sur limit_transfers -
+    // seul un profil connecte avec cette preference peut le declencher.
+    // Panneau desktop + bandeau mobile rendent chacun leur propre copie de
+    // la liste (media queries non appliquees en jsdom) : au moins une copie
+    // doit porter le badge.
+    expect(
+      (await screen.findAllByText('Le moins de correspondances')).length,
+    ).toBeGreaterThan(0);
   });
 
   describe('panneau formulaire (bandeau mobile, issue #110/#111)', () => {
