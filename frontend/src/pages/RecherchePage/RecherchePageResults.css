@@ -242,6 +242,15 @@
   flex-shrink: 0;
 }
 
+/* Badges qualitatifs de scoring (issue #126) : force sa propre rangee dans
+   la carte (deja en flex-wrap: wrap ci-dessus), sans perturber la
+   disposition modes/heure/duree/correspondances/action existante. */
+.resultats-card-badges {
+  display: flex;
+  flex-basis: 100%;
+  gap: var(--space-2);
+}
+
 .resultats-card-main {
   display: flex;
   flex-direction: column;

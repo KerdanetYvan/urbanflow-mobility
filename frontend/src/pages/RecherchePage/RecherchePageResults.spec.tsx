@@ -107,6 +107,7 @@ const TWO_BUS_LINES_ITINERARY: TripItinerary = {
 function renderResults(
   itineraries: TripItinerary[] | null,
   onEditSearch = vi.fn(),
+  accessibilityPreferences?: string[],
 ) {
   return {
     onEditSearch,
@@ -116,6 +117,7 @@ function renderResults(
         destination={DESTINATION}
         itineraries={itineraries}
         onEditSearch={onEditSearch}
+        accessibilityPreferences={accessibilityPreferences}
       />,
     ),
   };
@@ -180,6 +182,76 @@ describe('RecherchePageResults', () => {
   it("ne montre jamais de valeur de score (uniquement l'ordre recu du backend)", () => {
     renderResults([FAST_ITINERARY]);
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
+  });
+
+  describe('badges qualitatifs de scoring (issue #126)', () => {
+    it("affiche le badge 'meilleur choix global' sur le premier itineraire, absent des autres, sans preference prioritaire", () => {
+      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+
+      const cards = desktopCards(container);
+      expect(
+        within(cards[0]).getByText('Le plus adapté à vos critères'),
+      ).toBeInTheDocument();
+      expect(
+        within(cards[1]).queryByText('Le plus adapté à vos critères'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("affiche le badge cible sur l'itineraire pertinent (pas forcement le premier) quand limit_transfers est prioritaire", () => {
+      // FAST_ITINERARY (index 0, 1 correspondance) reste le meilleur choix
+      // global ; SLOW_ITINERARY (index 1, 0 correspondance) est celui qui
+      // satisfait le mieux le critere "limit_transfers".
+      const { container } = renderResults(
+        [FAST_ITINERARY, SLOW_ITINERARY],
+        undefined,
+        ['limit_transfers'],
+      );
+
+      const cards = desktopCards(container);
+      expect(
+        within(cards[0]).getByText('Le plus adapté à vos critères'),
+      ).toBeInTheDocument();
+      expect(
+        within(cards[1]).getByText('Le moins de correspondances'),
+      ).toBeInTheDocument();
+    });
+
+    it('n’affiche jamais plus de 2 badges au total sur la liste', () => {
+      const { container } = renderResults(
+        [FAST_ITINERARY, SLOW_ITINERARY],
+        undefined,
+        ['limit_transfers'],
+      );
+
+      const panel = container.querySelector('.resultats-panel-list') as HTMLElement;
+      expect(within(panel).getAllByText(/./, { selector: '.badge' })).toHaveLength(2);
+    });
+
+    it("n'affiche aucune valeur chiffree dans le texte des badges", () => {
+      const { container } = renderResults(
+        [FAST_ITINERARY, SLOW_ITINERARY],
+        undefined,
+        ['limit_transfers'],
+      );
+
+      const panel = container.querySelector('.resultats-panel-list') as HTMLElement;
+      for (const badge of within(panel).getAllByText(/./, { selector: '.badge' })) {
+        expect(badge.textContent).not.toMatch(/\d/);
+      }
+    });
+
+    it('affiche aussi les badges dans le bandeau mobile', () => {
+      const { container } = renderResults(
+        [FAST_ITINERARY, SLOW_ITINERARY],
+        undefined,
+        ['limit_transfers'],
+      );
+
+      const sheetBody = container.querySelector('.resultats-sheet-body') as HTMLElement;
+      expect(
+        within(sheetBody).getByText('Le moins de correspondances'),
+      ).toBeInTheDocument();
+    });
   });
 
   it('presente le premier itineraire selectionne par defaut, avec son detail par segment', () => {
