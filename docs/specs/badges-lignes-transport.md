@@ -64,6 +64,5 @@ Nouveau composant `frontend/src/components/LineBadge/LineBadge.tsx`, props `{ mo
 
 ## 7. Hors périmètre / limites acceptées
 
-- `ItinerarySegments` (détail déplié) n'est pas modifié.
 - Pas de couleur par mode sur les badges (voir section 4) — décision assumée, pas une limitation technique.
 - Le réseau STAR (Rennes Métropole, seule source GTFS ingérée à ce jour) ne comporte pas de ligne RAIL — la forme "train" reste donc non démontrable avec les données réelles actuelles, mais le code la gère pour rester générique vis-à-vis du modèle OTP.
