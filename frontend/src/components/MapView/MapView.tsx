@@ -5,6 +5,7 @@ import { formatDuration, formatTransfers } from '../../lib/format';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
 import { getModeStyle } from './modeStyles';
+import { getSegmentColor } from './segmentColor';
 import './MapView.css';
 
 /**
@@ -236,7 +237,10 @@ function MapView({
                 (point) => [point.lat, point.lon] as [number, number],
               )}
               pathOptions={{
-                color: style.color,
+                // Couleur de ligne GTFS pour un transport en commun connu
+                // (issue #129, section 8.5), repli sur la couleur du mode
+                // sinon - voir segmentColor.ts.
+                color: getSegmentColor(segment),
                 weight: 4,
                 dashArray: style.dashed ? '2 10' : undefined,
                 lineCap: 'round',
