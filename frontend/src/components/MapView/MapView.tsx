@@ -4,6 +4,7 @@ import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
+import { tripModeChips } from '../../lib/tripModeChips';
 import { getModeStyle } from './modeStyles';
 import { getSegmentColor } from './segmentColor';
 import './MapView.css';
@@ -169,12 +170,12 @@ function MapView({
       : undefined;
   const fixedCenter = singlePoint ?? RENNES_METROPOLE_CENTER;
 
-  // Legende : un seul badge par mode present dans l'itineraire, dans
-  // l'ordre de premiere apparition (pas d'ordre alphabetique arbitraire).
-  // Vide sans itineraire : rien a legender tant qu'aucun mode n'est connu.
-  const modesUsed = hasItinerary
-    ? [...new Set(segments.map((segment) => segment.mode))]
-    : [];
+  // Legende : une entree par ligne distincte pour le transport en commun,
+  // une entree par mode pour le reste (marche, velo...) - meme logique de
+  // dedup que les badges de ligne (issue #129, section 8.5), dans l'ordre
+  // de premiere apparition. Vide sans itineraire : rien a legender tant
+  // qu'aucun mode n'est connu.
+  const legendChips = hasItinerary ? tripModeChips(itinerary as TripItinerary) : [];
 
   const isFullBleed = variant === 'fullBleed';
 
@@ -296,16 +297,24 @@ function MapView({
           </p>
 
           <ul className="mapview-legend">
-            {modesUsed.map((mode) => {
-              const style = getModeStyle(mode);
+            {legendChips.map((chip) => {
+              const modeLabel = getModeStyle(chip.mode).label;
+              // Meme convention que modesLabel (RecherchePageResults.tsx) :
+              // "Bus C1" pour une ligne, juste "Marche" pour un mode sans ligne.
+              const label = chip.kind === 'line' ? `${modeLabel} ${chip.label}` : modeLabel;
+              const swatchColor =
+                chip.kind === 'line'
+                  ? (chip.color ?? getModeStyle(chip.mode).color)
+                  : getModeStyle(chip.mode).color;
+              const key = chip.kind === 'line' ? `${chip.mode}:${chip.label}` : chip.mode;
               return (
-                <li key={mode} className="mapview-legend-item">
+                <li key={key} className="mapview-legend-item">
                   <span
                     className="mapview-legend-swatch"
-                    style={{ background: style.color }}
+                    style={{ background: swatchColor }}
                     aria-hidden="true"
                   />
-                  {style.label}
+                  {label}
                 </li>
               );
             })}
