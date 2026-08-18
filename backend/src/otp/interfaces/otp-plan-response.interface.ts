@@ -20,6 +20,19 @@ export interface OtpLeg {
    */
   route?: string;
   routeShortName?: string;
+  /**
+   * Couleur de la ligne definie par l'operateur GTFS (route_color), en
+   * hexadecimal SANS '#' (ex. "EE1D23") - format brut renvoye par OTP,
+   * verifie contre un vrai OTP (issue #129, section 8). Absente pour un
+   * segment a pied ou si l'operateur ne definit pas de couleur.
+   */
+  routeColor?: string;
+  /**
+   * Couleur de texte associee a routeColor (GTFS route_text_color), meme
+   * format brut sans '#' - pensee par l'operateur pour rester lisible sur
+   * routeColor (voir docs/specs/badges-lignes-transport.md section 8.6).
+   */
+  routeTextColor?: string;
   startTime: number;
   endTime: number;
   distance: number;

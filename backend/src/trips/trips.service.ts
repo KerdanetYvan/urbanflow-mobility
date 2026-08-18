@@ -72,6 +72,11 @@ export class TripsService {
       // Boucle Centre") : ce que l'usager reconnait reellement (verifie en
       // testant contre un vrai OTP).
       routeName: leg.routeShortName || undefined,
+      // Couleur de ligne (issue #129, section 8) - relayee telle quelle
+      // (pas de transformation, le frontend prefixe '#' au moment de
+      // l'affichage, voir frontend/src/lib/color.ts).
+      routeColor: leg.routeColor || undefined,
+      routeTextColor: leg.routeTextColor || undefined,
       startTime: new Date(leg.startTime).toISOString(),
       endTime: new Date(leg.endTime).toISOString(),
       durationSeconds: Math.round((leg.endTime - leg.startTime) / 1000),
