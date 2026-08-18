@@ -10,7 +10,7 @@ import {
   formatTransfers,
 } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
-import { isLineMode, tripModeChips } from '../../lib/tripModeChips';
+import { chipLabel, isLineMode, tripModeChips } from '../../lib/tripModeChips';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
 import './RecherchePageResults.css';
@@ -101,20 +101,11 @@ interface ItineraryCardProps {
 function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) {
   const chips = tripModeChips(itinerary);
   // Texte cache, lu par les lecteurs d'ecran : les puces ci-dessous sont
-  // `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1). Un
-  // chip `line` contribue "libelle du mode + numero de ligne" (ex. "Bus
-  // 24") ; SAUF si `chip.label` est deja le libelle du mode lui-meme (repli
-  // de tripModeChips.ts quand `routeName` est absent du segment) - dans ce
-  // cas precis, ne pas le repeter deux fois (ex. "Bus", pas "Bus Bus"). Un
-  // chip `icon` contribue le libelle du mode seul (ex. "Marche"), comme
-  // avant l'introduction des badges de ligne (issue #129).
-  const modesLabel = chips
-    .map((chip) => {
-      const modeLabel = getModeStyle(chip.mode).label;
-      if (chip.kind === 'icon' || chip.label === modeLabel) return modeLabel;
-      return `${modeLabel} ${chip.label}`;
-    })
-    .join(', ');
+  // `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
+  // chipLabel (lib/tripModeChips.ts) est la seule source du libelle par
+  // puce - meme fonction que la legende de MapView, pour ne pas dupliquer
+  // la regle "mode + ligne, sauf repli sans ligne connue" (issue #129).
+  const modesLabel = chips.map((chip) => chipLabel(chip)).join(', ');
 
   return (
     <button

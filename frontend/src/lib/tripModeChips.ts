@@ -81,3 +81,26 @@ export function tripModeChips(itinerary: TripItinerary): TripModeChip[] {
 
   return chips;
 }
+
+/**
+ * Construit le libelle textuel complet d'une puce, pour l'affichage direct
+ * (legende de MapView, section 7.5) ou pour un equivalent accessible WCAG
+ * 1.1.1 (`modesLabel` de `RecherchePageResults.tsx`) - seul et unique
+ * endroit qui doit faire ce calcul, pour eviter que deux copies independantes
+ * du meme "mode + ligne" ne se remettent a diverger (issue #129).
+ *
+ * Un chip `line` contribue "libelle du mode + numero de ligne" (ex.
+ * "Bus C1") ; SAUF si `chip.label` est deja le libelle du mode lui-meme
+ * (repli de `tripModeChips()` ci-dessus quand `routeName` est absent du
+ * segment) - dans ce cas precis, ne pas le repeter deux fois (ex. "Bus",
+ * pas "Bus Bus"). Un chip `icon` contribue le libelle du mode seul (ex.
+ * "Marche").
+ *
+ * @param chip Puce dont on derive le libelle complet.
+ * @returns Le libelle a afficher pour cette puce.
+ */
+export function chipLabel(chip: TripModeChip): string {
+  const modeLabel = getModeStyle(chip.mode).label;
+  if (chip.kind === 'icon' || chip.label === modeLabel) return modeLabel;
+  return `${modeLabel} ${chip.label}`;
+}

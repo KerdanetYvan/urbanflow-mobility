@@ -139,5 +139,22 @@ describe('MapView', () => {
       expect(screen.getByText('Bus 24')).toBeInTheDocument();
       expect(screen.getByText('Bus C6')).toBeInTheDocument();
     });
+
+    it("n'affiche pas un libelle double (\"Bus Bus\") quand le segment n'a pas de routeName", () => {
+      const noRouteName: TripItinerary = {
+        ...ITINERARY,
+        segments: [
+          ITINERARY.segments[0],
+          { ...ITINERARY.segments[1], routeName: undefined },
+        ],
+      };
+      render(<MapView itinerary={noRouteName} />);
+
+      // Repli de tripModeChips() sur le libelle du mode seul quand
+      // `routeName` est absent - chipLabel() doit alors afficher "Bus" une
+      // seule fois, pas "Bus Bus" (issue #129, regression finale review).
+      expect(screen.getByText('Bus')).toBeInTheDocument();
+      expect(screen.queryByText('Bus Bus')).not.toBeInTheDocument();
+    });
   });
 });

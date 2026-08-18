@@ -4,7 +4,7 @@ import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
-import { tripModeChips } from '../../lib/tripModeChips';
+import { chipLabel, tripModeChips } from '../../lib/tripModeChips';
 import { getModeStyle } from './modeStyles';
 import { getSegmentColor } from './segmentColor';
 import './MapView.css';
@@ -298,10 +298,11 @@ function MapView({
 
           <ul className="mapview-legend">
             {legendChips.map((chip) => {
-              const modeLabel = getModeStyle(chip.mode).label;
-              // Meme convention que modesLabel (RecherchePageResults.tsx) :
-              // "Bus C1" pour une ligne, juste "Marche" pour un mode sans ligne.
-              const label = chip.kind === 'line' ? `${modeLabel} ${chip.label}` : modeLabel;
+              // chipLabel (lib/tripModeChips.ts) est la seule source du
+              // libelle affiche - meme fonction que modesLabel
+              // (RecherchePageResults.tsx), pour ne pas dupliquer la regle
+              // "mode + ligne, sauf repli sans ligne connue" (issue #129).
+              const label = chipLabel(chip);
               const swatchColor =
                 chip.kind === 'line'
                   ? (chip.color ?? getModeStyle(chip.mode).color)
