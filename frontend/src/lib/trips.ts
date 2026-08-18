@@ -17,6 +17,10 @@ export interface TripGeoPoint {
 export interface TripSegment {
   mode: string;
   routeName?: string;
+  /** Couleur de la ligne (GTFS route_color, hex SANS '#') - voir backend/src/trips/dto/trip-itinerary.dto.ts et docs/specs/badges-lignes-transport.md section 8. */
+  routeColor?: string;
+  /** Couleur de texte associee a routeColor (GTFS route_text_color, hex SANS '#'). */
+  routeTextColor?: string;
   startTime: string;
   endTime: string;
   durationSeconds: number;

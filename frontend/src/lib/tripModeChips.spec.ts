@@ -1,4 +1,4 @@
-import type { TripItinerary, TripSegment } from '../../lib/trips';
+import type { TripItinerary, TripSegment } from './trips';
 import { isLineMode, tripModeChips } from './tripModeChips';
 
 /** Segment minimal pour ces tests - seuls `mode` et `routeName` comptent. */
@@ -96,6 +96,24 @@ describe('tripModeChips', () => {
 
   it('un itineraire sans segment renvoie une liste vide', () => {
     expect(tripModeChips(buildItinerary([]))).toEqual([]);
+  });
+
+  it('propage color/textColor (prefixes #) quand le segment les porte', () => {
+    const itinerary = buildItinerary([
+      buildSegment('BUS', { routeName: 'C1', routeColor: '95C11E', routeTextColor: '1A171B' }),
+    ]);
+
+    expect(tripModeChips(itinerary)).toEqual([
+      { kind: 'line', mode: 'BUS', label: 'C1', color: '#95C11E', textColor: '#1A171B' },
+    ]);
+  });
+
+  it('laisse color/textColor absents quand le segment ne les porte pas', () => {
+    const itinerary = buildItinerary([buildSegment('BUS', { routeName: 'C1' })]);
+
+    expect(tripModeChips(itinerary)).toEqual([
+      { kind: 'line', mode: 'BUS', label: 'C1', color: undefined, textColor: undefined },
+    ]);
   });
 });
 
