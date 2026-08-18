@@ -9,3 +9,6 @@ coverage/
 # Données volumineuses du moteur de routage (export GTFS, extrait OSM, graphe compilé)
 routing-engine/data/*
 !routing-engine/data/.gitkeep
+
+# Donnes superpowers (Claude Skill)
+superpowers/
