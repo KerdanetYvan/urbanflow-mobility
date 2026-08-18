@@ -15,6 +15,10 @@
   font-weight: var(--weight-semibold);
   line-height: 1;
   white-space: nowrap;
+  /* Uniformise la casse du numero/nom de ligne tel que renvoye par OTP
+     (ex. "a" pour le metro STAR) sans toucher au texte reel (accessibilite,
+     tests) - purement visuel, cf. la signaletique physique des operateurs. */
+  text-transform: uppercase;
 }
 
 /* Bus : rectangle a coins droits. */
