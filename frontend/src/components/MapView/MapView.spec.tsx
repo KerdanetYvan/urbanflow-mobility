@@ -47,7 +47,7 @@ describe('MapView', () => {
       screen.getByText('De Domicile à Gare Part-Dieu : 25 min, 1 correspondance.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Marche')).toBeInTheDocument();
-    expect(screen.getByText('Bus')).toBeInTheDocument();
+    expect(screen.getByText('Bus C1')).toBeInTheDocument();
   });
 
   it(
@@ -101,4 +101,60 @@ describe('MapView', () => {
       expect(container).not.toBeEmptyDOMElement();
     },
   );
+
+  describe('legende par ligne (issue #129, section 8.5)', () => {
+    it('affiche un swatch par ligne colore avec la couleur GTFS quand elle est connue', () => {
+      const itineraryWithColor: TripItinerary = {
+        ...ITINERARY,
+        segments: [
+          ITINERARY.segments[0],
+          { ...ITINERARY.segments[1], routeColor: '95C11E', routeTextColor: '1A171B' },
+        ],
+      };
+      render(<MapView itinerary={itineraryWithColor} />);
+
+      const busItem = screen.getByText('Bus C1').closest('.mapview-legend-item') as HTMLElement;
+      const swatch = busItem.querySelector('.mapview-legend-swatch') as HTMLElement;
+      expect(swatch).toHaveStyle({ background: '#95C11E' });
+    });
+
+    it('retombe sur la couleur du mode pour la legende quand le segment n a pas de couleur GTFS', () => {
+      render(<MapView itinerary={ITINERARY} />);
+
+      const busItem = screen.getByText('Bus C1').closest('.mapview-legend-item') as HTMLElement;
+      const swatch = busItem.querySelector('.mapview-legend-swatch') as HTMLElement;
+      expect(swatch).toHaveStyle({ background: '#2f6fed' });
+    });
+
+    it('affiche deux entrees distinctes pour deux lignes de bus differentes', () => {
+      const twoLines: TripItinerary = {
+        ...ITINERARY,
+        segments: [
+          { ...ITINERARY.segments[1], routeName: '24' },
+          { ...ITINERARY.segments[1], routeName: 'C6' },
+        ],
+      };
+      render(<MapView itinerary={twoLines} />);
+
+      expect(screen.getByText('Bus 24')).toBeInTheDocument();
+      expect(screen.getByText('Bus C6')).toBeInTheDocument();
+    });
+
+    it("n'affiche pas un libelle double (\"Bus Bus\") quand le segment n'a pas de routeName", () => {
+      const noRouteName: TripItinerary = {
+        ...ITINERARY,
+        segments: [
+          ITINERARY.segments[0],
+          { ...ITINERARY.segments[1], routeName: undefined },
+        ],
+      };
+      render(<MapView itinerary={noRouteName} />);
+
+      // Repli de tripModeChips() sur le libelle du mode seul quand
+      // `routeName` est absent - chipLabel() doit alors afficher "Bus" une
+      // seule fois, pas "Bus Bus" (issue #129, regression finale review).
+      expect(screen.getByText('Bus')).toBeInTheDocument();
+      expect(screen.queryByText('Bus Bus')).not.toBeInTheDocument();
+    });
+  });
 });

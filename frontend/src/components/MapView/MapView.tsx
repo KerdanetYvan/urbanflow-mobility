@@ -4,7 +4,9 @@ import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
+import { chipLabel, tripModeChips } from '../../lib/tripModeChips';
 import { getModeStyle } from './modeStyles';
+import { getSegmentColor } from './segmentColor';
 import './MapView.css';
 
 /**
@@ -168,12 +170,12 @@ function MapView({
       : undefined;
   const fixedCenter = singlePoint ?? RENNES_METROPOLE_CENTER;
 
-  // Legende : un seul badge par mode present dans l'itineraire, dans
-  // l'ordre de premiere apparition (pas d'ordre alphabetique arbitraire).
-  // Vide sans itineraire : rien a legender tant qu'aucun mode n'est connu.
-  const modesUsed = hasItinerary
-    ? [...new Set(segments.map((segment) => segment.mode))]
-    : [];
+  // Legende : une entree par ligne distincte pour le transport en commun,
+  // une entree par mode pour le reste (marche, velo...) - meme logique de
+  // dedup que les badges de ligne (issue #129, section 8.5), dans l'ordre
+  // de premiere apparition. Vide sans itineraire : rien a legender tant
+  // qu'aucun mode n'est connu.
+  const legendChips = hasItinerary ? tripModeChips(itinerary as TripItinerary) : [];
 
   const isFullBleed = variant === 'fullBleed';
 
@@ -236,7 +238,10 @@ function MapView({
                 (point) => [point.lat, point.lon] as [number, number],
               )}
               pathOptions={{
-                color: style.color,
+                // Couleur de ligne GTFS pour un transport en commun connu
+                // (issue #129, section 8.5), repli sur la couleur du mode
+                // sinon - voir segmentColor.ts.
+                color: getSegmentColor(segment),
                 weight: 4,
                 dashArray: style.dashed ? '2 10' : undefined,
                 lineCap: 'round',
@@ -292,16 +297,25 @@ function MapView({
           </p>
 
           <ul className="mapview-legend">
-            {modesUsed.map((mode) => {
-              const style = getModeStyle(mode);
+            {legendChips.map((chip) => {
+              // chipLabel (lib/tripModeChips.ts) est la seule source du
+              // libelle affiche - meme fonction que modesLabel
+              // (RecherchePageResults.tsx), pour ne pas dupliquer la regle
+              // "mode + ligne, sauf repli sans ligne connue" (issue #129).
+              const label = chipLabel(chip);
+              const swatchColor =
+                chip.kind === 'line'
+                  ? (chip.color ?? getModeStyle(chip.mode).color)
+                  : getModeStyle(chip.mode).color;
+              const key = chip.kind === 'line' ? `${chip.mode}:${chip.label}` : chip.mode;
               return (
-                <li key={mode} className="mapview-legend-item">
+                <li key={key} className="mapview-legend-item">
                   <span
                     className="mapview-legend-swatch"
-                    style={{ background: style.color }}
+                    style={{ background: swatchColor }}
                     aria-hidden="true"
                   />
-                  {style.label}
+                  {label}
                 </li>
               );
             })}

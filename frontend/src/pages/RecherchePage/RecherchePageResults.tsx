@@ -1,14 +1,17 @@
 import { useMemo, useRef, useState, type TouchEvent } from 'react';
 import Badge from '../../components/Badge/Badge';
+import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
 import { getTripModeIcon } from '../../components/tripModeIcon';
+import { toHexColor } from '../../lib/color';
 import {
   formatDuration,
   formatTime,
   formatTransfers,
 } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
+import { chipLabel, isLineMode, tripModeChips } from '../../lib/tripModeChips';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
 import { computeItineraryBadges, type ItineraryBadges } from './itineraryBadges';
@@ -30,14 +33,6 @@ type SheetState = 'collapsed' | 'list' | 'detail';
 /** Distance verticale minimale (px) pour qu'un geste tactile sur la
  * poignee du bandeau soit traite comme un glissement plutot qu'un tap. */
 const SWIPE_THRESHOLD_PX = 40;
-
-/**
- * Modes de transport uniques utilises par un itineraire, dans l'ordre de
- * premiere apparition des segments (meme logique que MapView#modesUsed).
- */
-function modesUsedBy(itinerary: TripItinerary): string[] {
-  return [...new Set(itinerary.segments.map((segment) => segment.mode))];
-}
 
 /**
  * Message affiche quand la position en temps reel (issue #9) n'est pas
@@ -101,17 +96,20 @@ interface ItineraryCardProps {
  * un lien "Voir le detail" - un <button> natif donne le comportement clavier
  * (Tab, Entree, Espace) sans code supplementaire.
  *
- * Le score chiffre n'est jamais affiche (section 3.1) : seule la position
- * dans la liste (deja triee par le backend) le reflete. Un badge qualitatif
- * (section 2.2 du spec F3, issue #126) peut neanmoins renforcer visuellement
- * un choix - jamais une valeur, jamais plus de 2 sur toute la liste, voir
- * itineraryBadges.ts pour le detail du calcul.
+ * Le score n'est jamais affiche (section 3.1) : aucune valeur chiffree ici.
+ * La rangee de puces de mode peut neanmoins afficher un badge de ligne pour
+ * un transport en commun (bus/tram/metro/train, issue #129, voir
+ * tripModeChips.ts) - le numero de ligne n'est pas le score, juste une
+ * information factuelle sur l'itineraire.
  */
 function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCardProps) {
-  const modes = modesUsedBy(itinerary);
-  // Texte cache, lu par les lecteurs d'ecran : les icones de mode ci-dessous
-  // sont `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
-  const modesLabel = modes.map((mode) => getModeStyle(mode).label).join(', ');
+  const chips = tripModeChips(itinerary);
+  // Texte cache, lu par les lecteurs d'ecran : les puces ci-dessous sont
+  // `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
+  // chipLabel (lib/tripModeChips.ts) est la seule source du libelle par
+  // puce - meme fonction que la legende de MapView, pour ne pas dupliquer
+  // la regle "mode + ligne, sauf repli sans ligne connue" (issue #129).
+  const modesLabel = chips.map((chip) => chipLabel(chip)).join(', ');
 
   return (
     <button
@@ -129,11 +127,21 @@ function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCar
       )}
       <span className="resultats-visually-hidden">Modes : {modesLabel}.</span>
       <span className="resultats-card-modes" aria-hidden="true">
-        {modes.map((mode) => (
-          <span key={mode} className="resultats-card-mode-icon">
-            {getTripModeIcon(mode)}
-          </span>
-        ))}
+        {chips.map((chip) =>
+          chip.kind === 'line' ? (
+            <LineBadge
+              key={`${chip.mode}:${chip.label}`}
+              mode={chip.mode}
+              label={chip.label}
+              color={chip.color}
+              textColor={chip.textColor}
+            />
+          ) : (
+            <span key={chip.mode} className="resultats-card-mode-icon">
+              {getTripModeIcon(chip.mode)}
+            </span>
+          ),
+        )}
       </span>
       <span className="resultats-card-main">
         <span className="resultats-card-time">
@@ -224,7 +232,16 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
       {itinerary.segments.map((segment, index) => (
         <li key={index} className="resultats-segment">
           <span className="resultats-segment-icon" aria-hidden="true">
-            {getTripModeIcon(segment.mode)}
+            {isLineMode(segment.mode) ? (
+              <LineBadge
+                mode={segment.mode}
+                label={segment.routeName ?? getModeStyle(segment.mode).label}
+                color={toHexColor(segment.routeColor)}
+                textColor={toHexColor(segment.routeTextColor)}
+              />
+            ) : (
+              getTripModeIcon(segment.mode)
+            )}
           </span>
           <span className="resultats-segment-body">
             <span className="resultats-segment-label">
@@ -251,13 +268,23 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
  * celui de la poignee), juste du texte + icones decoratives.
  */
 function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
-  const modes = modesUsedBy(itinerary);
+  const chips = tripModeChips(itinerary);
   return (
     <span className="resultats-sheet-preview">
       <span className="resultats-sheet-preview-modes" aria-hidden="true">
-        {modes.map((mode) => (
-          <span key={mode}>{getTripModeIcon(mode)}</span>
-        ))}
+        {chips.map((chip) =>
+          chip.kind === 'line' ? (
+            <LineBadge
+              key={`${chip.mode}:${chip.label}`}
+              mode={chip.mode}
+              label={chip.label}
+              color={chip.color}
+              textColor={chip.textColor}
+            />
+          ) : (
+            <span key={chip.mode}>{getTripModeIcon(chip.mode)}</span>
+          ),
+        )}
       </span>
       <span className="resultats-sheet-preview-time">
         {formatTime(itinerary.startTime)} → {formatTime(itinerary.endTime)} ·{' '}

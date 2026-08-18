@@ -34,6 +34,18 @@ export class TripSegment {
   })
   routeName?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Couleur de la ligne definie par l\'operateur GTFS (route_color), hexadecimal sans "#" - absente pour un segment a pied ou si l\'operateur ne la definit pas',
+  })
+  routeColor?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Couleur de texte associee a routeColor (GTFS route_text_color), hexadecimal sans "#" - pensee par l\'operateur pour rester lisible sur routeColor',
+  })
+  routeTextColor?: string;
+
   @ApiProperty()
   startTime: string;
 

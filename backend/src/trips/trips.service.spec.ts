@@ -85,6 +85,10 @@ describe('TripsService', () => {
             // pour verifier qu'on prend bien le bon champ.
             route: 'Ligne Test - Boucle Centre',
             routeShortName: 'T1',
+            // Couleurs telles que renvoyees par OTP (issue #129, section 8) -
+            // sans '#', relayees telles quelles (voir TripsService#mapLeg).
+            routeColor: 'EE1D23',
+            routeTextColor: 'FFFFFF',
             startTime: 61000,
             endTime: 601000,
             distance: 1300,
@@ -113,6 +117,8 @@ describe('TripsService', () => {
           {
             mode: 'WALK',
             routeName: undefined,
+            routeColor: undefined,
+            routeTextColor: undefined,
             startTime: new Date(1000).toISOString(),
             endTime: new Date(61000).toISOString(),
             durationSeconds: 60,
@@ -127,6 +133,8 @@ describe('TripsService', () => {
           {
             mode: 'BUS',
             routeName: 'T1',
+            routeColor: 'EE1D23',
+            routeTextColor: 'FFFFFF',
             startTime: new Date(61000).toISOString(),
             endTime: new Date(601000).toISOString(),
             durationSeconds: 540,
