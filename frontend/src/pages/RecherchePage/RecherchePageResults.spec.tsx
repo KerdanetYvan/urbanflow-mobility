@@ -28,6 +28,8 @@ const FAST_ITINERARY: TripItinerary = {
     {
       mode: 'BUS',
       routeName: 'C1',
+      routeColor: '95C11E',
+      routeTextColor: '1A171B',
       startTime: '2026-08-02T08:05:00.000Z',
       endTime: '2026-08-02T08:25:00.000Z',
       durationSeconds: 1200,
@@ -280,6 +282,31 @@ describe('RecherchePageResults', () => {
         .getByText('Marche')
         .closest('.resultats-segment') as HTMLElement;
       expect(walkSegment.querySelector('.line-badge')).not.toBeInTheDocument();
+    });
+
+    it('applique la couleur de ligne GTFS en fond plein sur le badge (issue #129, section 8)', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const card = desktopCards(container)[0];
+      expect(within(card).getByText('C1')).toHaveStyle({
+        background: '#95C11E',
+        color: '#1A171B',
+      });
+    });
+
+    it('applique aussi la couleur de ligne dans le detail deplie du trajet selectionne', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const detailPanel = container.querySelector('.resultats-panel-detail') as HTMLElement;
+      expect(within(detailPanel).getByText('C1')).toHaveStyle({ background: '#95C11E' });
+    });
+
+    it('retombe sur le badge neutre quand le segment n a pas de couleur GTFS', () => {
+      const { container } = renderResults([TWO_BUS_LINES_ITINERARY]);
+
+      const card = desktopCards(container)[0];
+      // TWO_BUS_LINES_ITINERARY n'a pas routeColor/routeTextColor sur ses segments.
+      expect(within(card).getByText('24')).not.toHaveAttribute('style');
     });
   });
 

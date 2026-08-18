@@ -3,15 +3,16 @@ import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
 import { getTripModeIcon } from '../../components/tripModeIcon';
+import { toHexColor } from '../../lib/color';
 import {
   formatDuration,
   formatTime,
   formatTransfers,
 } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
+import { isLineMode, tripModeChips } from '../../lib/tripModeChips';
 import type { TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
-import { isLineMode, tripModeChips } from './tripModeChips';
 import './RecherchePageResults.css';
 
 /**
@@ -126,7 +127,13 @@ function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) 
       <span className="resultats-card-modes" aria-hidden="true">
         {chips.map((chip) =>
           chip.kind === 'line' ? (
-            <LineBadge key={`${chip.mode}:${chip.label}`} mode={chip.mode} label={chip.label} />
+            <LineBadge
+              key={`${chip.mode}:${chip.label}`}
+              mode={chip.mode}
+              label={chip.label}
+              color={chip.color}
+              textColor={chip.textColor}
+            />
           ) : (
             <span key={chip.mode} className="resultats-card-mode-icon">
               {getTripModeIcon(chip.mode)}
@@ -223,6 +230,8 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
               <LineBadge
                 mode={segment.mode}
                 label={segment.routeName ?? getModeStyle(segment.mode).label}
+                color={toHexColor(segment.routeColor)}
+                textColor={toHexColor(segment.routeTextColor)}
               />
             ) : (
               getTripModeIcon(segment.mode)
@@ -259,7 +268,13 @@ function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
       <span className="resultats-sheet-preview-modes" aria-hidden="true">
         {chips.map((chip) =>
           chip.kind === 'line' ? (
-            <LineBadge key={`${chip.mode}:${chip.label}`} mode={chip.mode} label={chip.label} />
+            <LineBadge
+              key={`${chip.mode}:${chip.label}`}
+              mode={chip.mode}
+              label={chip.label}
+              color={chip.color}
+              textColor={chip.textColor}
+            />
           ) : (
             <span key={chip.mode}>{getTripModeIcon(chip.mode)}</span>
           ),
