@@ -1,4 +1,5 @@
-import { useRef, useState, type TouchEvent } from 'react';
+import { useMemo, useRef, useState, type TouchEvent } from 'react';
+import Badge from '../../components/Badge/Badge';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
@@ -101,7 +102,7 @@ interface ItineraryCardProps {
  * tripModeChips.ts) - le numero de ligne n'est pas le score, juste une
  * information factuelle sur l'itineraire.
  */
-function ItineraryCard({ itinerary, isSelected, onSelect }: ItineraryCardProps) {
+function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCardProps) {
   const chips = tripModeChips(itinerary);
   // Texte cache, lu par les lecteurs d'ecran : les puces ci-dessous sont
   // `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
