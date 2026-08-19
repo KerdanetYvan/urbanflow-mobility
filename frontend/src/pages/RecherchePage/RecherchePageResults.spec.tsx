@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { formatTime } from '../../lib/format';
 import type { TripItinerary, TripSegment } from '../../lib/trips';
 import RecherchePageResults from './RecherchePageResults';
 
@@ -197,8 +198,12 @@ describe('RecherchePageResults', () => {
       const { container } = renderResults([grouped]);
 
       const cards = desktopCards(container);
+      // Heures formatees dynamiquement (formatTime, fuseau local) plutot que
+      // codees en dur : le fuseau du runner CI n'est pas Europe/Paris comme
+      // en local, un texte fige aurait echoue en CI sans etre faux ici.
       expect(cards[0]).toHaveTextContent(
-        'Prochain passage à 10:00, puis 10:10, 10:20',
+        `Prochain passage à ${formatTime(grouped.nextDepartures![0])}, puis ` +
+          `${formatTime(grouped.nextDepartures![1])}, ${formatTime(grouped.nextDepartures![2])}`,
       );
     });
 
