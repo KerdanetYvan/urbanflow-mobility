@@ -231,12 +231,103 @@ describe('RecherchePage', () => {
     renderPage();
     expect(profileLib.getMyProfile).not.toHaveBeenCalled();
 
-    // Case derriere la divulgation "Plus d'options" (issue #110/#111,
-    // repliee par defaut) : l'ouvrir avant de verifier son etat, comme le
+    // Case derriere le filtre "Modes de transport" (issue #108/#109,
+    // ferme par defaut) : l'ouvrir avant de verifier son etat, comme le
     // ferait un vrai utilisateur.
-    await user.click(screen.getByText("Plus d'options"));
+    await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
 
     expect(screen.getByRole('checkbox', { name: 'Vélo' })).not.toBeChecked();
+  });
+
+  describe('filtre des modes de transport (issue #108/#109)', () => {
+    it("n'affiche aucun compteur tant qu'aucun mode n'est coche", () => {
+      renderPage();
+
+      const trigger = screen.getByRole('button', { name: 'Modes de transport' });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(
+        screen.queryByRole('checkbox', { name: 'Vélo' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('affiche le nombre de modes coches sur le bouton declencheur, mis a jour en direct', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Vélo' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Bus' }));
+
+      expect(
+        screen.getByRole('button', { name: 'Modes de transport · 2' }),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole('checkbox', { name: 'Vélo' }));
+
+      expect(
+        screen.getByRole('button', { name: 'Modes de transport · 1' }),
+      ).toBeInTheDocument();
+    });
+
+    it('ferme le panneau et rend le focus au declencheur au clic sur "Fermer"', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const trigger = screen.getByRole('button', { name: 'Modes de transport' });
+      await user.click(trigger);
+      await user.click(screen.getByRole('button', { name: 'Fermer' }));
+
+      expect(
+        screen.queryByRole('checkbox', { name: 'Vélo' }),
+      ).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
+
+    it('ferme le panneau et rend le focus au declencheur a la touche Echap', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const trigger = screen.getByRole('button', { name: 'Modes de transport' });
+      await user.click(trigger);
+      await user.keyboard('{Escape}');
+
+      expect(
+        screen.queryByRole('checkbox', { name: 'Vélo' }),
+      ).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
+
+    it(
+      "ferme le panneau au clic exterieur, SANS reprendre le focus au " +
+        'declencheur (le clic a deja porte le focus sur sa propre cible)',
+      async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+        await user.click(screen.getByLabelText('Destination'));
+
+        expect(
+          screen.queryByRole('checkbox', { name: 'Vélo' }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Destination')).toHaveFocus();
+      },
+    );
+
+    it('conserve la selection quand le panneau est referme puis rouvert', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Tram' }));
+      await user.keyboard('{Escape}');
+
+      await user.click(
+        screen.getByRole('button', { name: 'Modes de transport · 1' }),
+      );
+
+      expect(screen.getByRole('checkbox', { name: 'Tram' })).toBeChecked();
+    });
   });
 
   it("transmet accessibilityPreferences du profil connecte a l'ecran de resultats, pour le badge cible de scoring (issue #126)", async () => {
