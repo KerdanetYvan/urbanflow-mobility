@@ -47,37 +47,138 @@ describe('ProfilPage', () => {
     clearTokens();
   });
 
-  it("propose un formulaire vide et cree le profil quand l'utilisateur n'en a pas encore", async () => {
-    vi.mocked(profileLib.getMyProfile).mockRejectedValue(
-      new ApiError('Profil introuvable', 404),
-    );
-    vi.mocked(profileLib.createProfile).mockResolvedValue({
-      id: 'profile-1',
-      userId: 'user-1',
-      preferredTransportModes: ['cycling'],
-      accessibilityPreferences: ['wheelchair_accessible'],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  describe("onboarding quand l'utilisateur n'a pas encore de profil (issue #106/#107)", () => {
+    beforeEach(() => {
+      vi.mocked(profileLib.getMyProfile).mockRejectedValue(
+        new ApiError('Profil introuvable', 404),
+      );
     });
 
-    const user = userEvent.setup();
-    renderPage();
+    it('affiche l\'etape 1 (modes de transport) en premier, avec un indicateur de progression', async () => {
+      renderPage();
 
-    await screen.findByRole('button', { name: 'Enregistrer' });
-    await user.click(screen.getByRole('checkbox', { name: 'Vélo' }));
-    await user.click(
-      screen.getByRole('checkbox', { name: 'Accessible en fauteuil roulant' }),
-    );
-    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
-
-    await waitFor(() => {
-      expect(profileLib.createProfile).toHaveBeenCalledWith({
-        preferredTransportModes: ['cycling'],
-        accessibilityPreferences: ['wheelchair_accessible'],
-      });
-      expect(profileLib.updateProfile).not.toHaveBeenCalled();
+      expect(await screen.findByText('Étape 1 sur 2')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Modes de transport préférés' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Vélo' })).not.toBeChecked();
+      expect(
+        screen.queryByRole('checkbox', { name: 'Accessible en fauteuil roulant' }),
+      ).not.toBeInTheDocument();
     });
-    expect(await screen.findByText('Profil enregistré.')).toBeInTheDocument();
+
+    it('passe a l\'etape 2 en conservant la selection au clic sur "Continuer"', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('checkbox', { name: 'Vélo' }));
+      await user.click(screen.getByRole('button', { name: 'Continuer' }));
+
+      expect(await screen.findByText('Étape 2 sur 2')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: "Préférences d'accessibilité" }),
+      ).toBeInTheDocument();
+
+      // Revenir a l'etape 1 (bouton "Precedent") : la selection est conservee.
+      await user.click(screen.getByRole('button', { name: '← Précédent' }));
+      expect(screen.getByRole('checkbox', { name: 'Vélo' })).toBeChecked();
+    });
+
+    it(
+      'cree le profil et termine la sequence au clic sur "Terminer" (issue ' +
+        '#106/#107)',
+      async () => {
+        vi.mocked(profileLib.createProfile).mockResolvedValue({
+          id: 'profile-1',
+          userId: 'user-1',
+          preferredTransportModes: ['cycling'],
+          accessibilityPreferences: ['wheelchair_accessible'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(await screen.findByRole('checkbox', { name: 'Vélo' }));
+        await user.click(screen.getByRole('button', { name: 'Continuer' }));
+        await user.click(
+          await screen.findByRole('checkbox', { name: 'Accessible en fauteuil roulant' }),
+        );
+        await user.click(screen.getByRole('button', { name: 'Terminer' }));
+
+        await waitFor(() => {
+          expect(profileLib.createProfile).toHaveBeenCalledWith({
+            preferredTransportModes: ['cycling'],
+            accessibilityPreferences: ['wheelchair_accessible'],
+          });
+        });
+        // Fin de l'onboarding : redirige vers /recherche, pas de maintien
+        // sur /profil (spec section 3.4).
+        expect(navigateMock).toHaveBeenCalledWith('/recherche');
+      },
+    );
+
+    it('"Passer" a l\'etape 1 vide la selection de modes avant de passer a l\'etape 2', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('checkbox', { name: 'Vélo' }));
+      await user.click(screen.getByRole('button', { name: 'Passer' }));
+
+      await screen.findByText('Étape 2 sur 2');
+      await user.click(screen.getByRole('button', { name: '← Précédent' }));
+      expect(screen.getByRole('checkbox', { name: 'Vélo' })).not.toBeChecked();
+    });
+
+    it(
+      '"Passer" a l\'etape 2 cree le profil sans les preferences ' +
+        "d'accessibilite, meme si une case avait ete cochee",
+      async () => {
+        vi.mocked(profileLib.createProfile).mockResolvedValue({
+          id: 'profile-1',
+          userId: 'user-1',
+          preferredTransportModes: [],
+          accessibilityPreferences: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(await screen.findByRole('button', { name: 'Passer' }));
+        await user.click(
+          await screen.findByRole('checkbox', { name: 'Accessible en fauteuil roulant' }),
+        );
+        await user.click(screen.getByRole('button', { name: 'Passer' }));
+
+        await waitFor(() => {
+          expect(profileLib.createProfile).toHaveBeenCalledWith({
+            preferredTransportModes: [],
+            accessibilityPreferences: [],
+          });
+        });
+        expect(navigateMock).toHaveBeenCalledWith('/recherche');
+      },
+    );
+
+    it("affiche une erreur et reste sur l'etape 2 si la creation du profil echoue", async () => {
+      vi.mocked(profileLib.createProfile).mockRejectedValue(
+        new ApiError('Erreur interne du serveur', 500),
+      );
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: 'Passer' }));
+      await user.click(await screen.findByRole('button', { name: 'Terminer' }));
+
+      expect(
+        await screen.findByText('Erreur interne du serveur'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: "Préférences d'accessibilité" }),
+      ).toBeInTheDocument();
+      expect(navigateMock).not.toHaveBeenCalledWith('/recherche');
+    });
   });
 
   it('pre-remplit le formulaire avec le profil existant et le met a jour', async () => {
@@ -165,11 +266,16 @@ describe('ProfilPage', () => {
     expect(getRefreshToken()).toBeNull();
   });
 
-  it('affiche une erreur si la sauvegarde echoue', async () => {
-    vi.mocked(profileLib.getMyProfile).mockRejectedValue(
-      new ApiError('Profil introuvable', 404),
-    );
-    vi.mocked(profileLib.createProfile).mockRejectedValue(
+  it('affiche une erreur si la sauvegarde du formulaire d\'edition echoue (profil existant)', async () => {
+    vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+      id: 'profile-1',
+      userId: 'user-1',
+      preferredTransportModes: [],
+      accessibilityPreferences: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    vi.mocked(profileLib.updateProfile).mockRejectedValue(
       new ApiError('Erreur interne du serveur', 500),
     );
 

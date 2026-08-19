@@ -16,13 +16,183 @@ import './ProfilPage.css';
 
 type Feedback = { variant: 'success' | 'error'; message: string };
 
+/** Etape courante de l'onboarding (issue #106/#107) - voir ProfileOnboarding. */
+type OnboardingStep = 1 | 2;
+
+interface ProfileOnboardingProps {
+  /** Appele une fois le profil cree (avec ou sans preference cochee) - navigue vers /recherche, voir ProfilPage. */
+  onComplete: () => void;
+}
+
+/**
+ * Sequence d'onboarding affichee a la place du formulaire vide quand
+ * l'utilisateur n'a pas encore de profil (issue #106/#107,
+ * docs/specs/onboarding-profil-redirection.md section 3) - remplace
+ * l'ancien formulaire unique sans guidance par 2 etapes, une par groupe de
+ * preferences deja existant (modes de transport, puis accessibilite),
+ * chacune individuellement franchissable sans rien cocher ("Passer").
+ *
+ * Un seul appel reseau pour toute la sequence : createProfile() a l'etape 2
+ * ("Passer" ou "Terminer"), exactement le meme qu'avant pour le formulaire
+ * non-onboarding - aucune evolution de ProfileInput necessaire, les
+ * preferences non cochees restent de simples tableaux vides.
+ */
+function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
+  const [step, setStep] = useState<OnboardingStep>(1);
+  const [selectedModes, setSelectedModes] = useState<string[]>([]);
+  const [selectedAccessibilityPreferences, setSelectedAccessibilityPreferences] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function toggleMode(mode: string) {
+    setSelectedModes((current) =>
+      current.includes(mode)
+        ? current.filter((m) => m !== mode)
+        : [...current, mode],
+    );
+  }
+
+  function toggleAccessibilityPreference(pref: string) {
+    setSelectedAccessibilityPreferences((current) =>
+      current.includes(pref)
+        ? current.filter((p) => p !== pref)
+        : [...current, pref],
+    );
+  }
+
+  /**
+   * Cree le profil et termine la sequence (issue #106/#107). Recoit les
+   * valeurs explicitement plutot que de relire l'etat courant : "Passer"
+   * sur l'etape 2 doit ignorer une eventuelle selection deja cochee sur
+   * cette meme etape (repli explicite sur un tableau vide, voir son
+   * gestionnaire ci-dessous), ce qu'une lecture directe de l'etat React ne
+   * garantirait pas (mise a jour asynchrone).
+   */
+  async function finish(modes: string[], accessibilityPreferences: string[]) {
+    setError(null);
+    setIsSaving(true);
+    try {
+      await createProfile({
+        preferredTransportModes: modes,
+        accessibilityPreferences,
+      });
+      onComplete();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Une erreur inattendue est survenue.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="onboarding">
+      <p className="onboarding-step-indicator">Étape {step} sur 2</p>
+
+      {error && (
+        <Alert variant="error" title="Erreur">
+          {error}
+        </Alert>
+      )}
+
+      {step === 1 ? (
+        <div className="onboarding-step">
+          <h2>Modes de transport préférés</h2>
+          <p>
+            Quels modes de transport utilisez-vous le plus souvent ? Cela
+            nous aide à classer vos itinéraires — vous pourrez changer cela
+            à tout moment depuis votre profil.
+          </p>
+          <fieldset className="profil-fieldset">
+            <legend>Modes de transport préférés</legend>
+            {TRANSPORT_MODES.map((mode) => (
+              <label key={mode.value} className="profil-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedModes.includes(mode.value)}
+                  onChange={() => toggleMode(mode.value)}
+                />
+                {mode.label}
+              </label>
+            ))}
+          </fieldset>
+          <div className="onboarding-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setSelectedModes([]);
+                setStep(2);
+              }}
+            >
+              Passer
+            </Button>
+            <Button type="button" onClick={() => setStep(2)}>
+              Continuer
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="onboarding-step">
+          <h2>Préférences d'accessibilité</h2>
+          <p>
+            Avez-vous des contraintes de déplacement à prendre en compte ?
+            Ces préférences influencent le classement de vos itinéraires,
+            jamais un trajet ne sera exclu sur cette seule base.
+          </p>
+          <fieldset className="profil-fieldset">
+            <legend>Préférences d'accessibilité</legend>
+            {ACCESSIBILITY_PREFERENCES.map((pref) => (
+              <label key={pref.value} className="profil-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedAccessibilityPreferences.includes(pref.value)}
+                  onChange={() => toggleAccessibilityPreference(pref.value)}
+                />
+                {pref.label}
+              </label>
+            ))}
+          </fieldset>
+          <div className="onboarding-actions">
+            <button
+              type="button"
+              className="onboarding-previous"
+              onClick={() => setStep(1)}
+              disabled={isSaving}
+            >
+              ← Précédent
+            </button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isSaving}
+              onClick={() => void finish(selectedModes, [])}
+            >
+              Passer
+            </Button>
+            <Button
+              type="button"
+              disabled={isSaving}
+              onClick={() => void finish(selectedModes, selectedAccessibilityPreferences)}
+            >
+              {isSaving ? 'Enregistrement…' : 'Terminer'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Ecran de gestion du profil de mobilite (F1, issue #34).
  *
  * Charge le profil existant au montage (GET /profiles/me). S'il n'existe
- * pas encore (404), le formulaire reste vide et la sauvegarde cree le
- * profil (POST) plutot que de le mettre a jour (PATCH) - transparent pour
- * l'utilisateur, un seul bouton "Enregistrer" quel que soit le cas.
+ * pas encore (404), affiche l'onboarding en plusieurs etapes
+ * (ProfileOnboarding, issue #106/#107) plutot que le formulaire d'edition
+ * ci-dessous - celui-ci reste reserve a un profil deja existant (modifier
+ * des preferences deja definies).
  *
  * Preferences d'accessibilite (issue #69, apres le changement de modele
  * backend #68) : un groupe de checkboxes correspondant a l'enum
@@ -125,23 +295,21 @@ function ProfilPage() {
     );
   }
 
+  /**
+   * Reserve a la branche "profil existant" (issue #106/#107) - la branche
+   * "pas de profil" passe desormais par ProfileOnboarding et son propre
+   * appel a createProfile(), plus par ce formulaire.
+   */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
     setIsSaving(true);
 
-    const payload = {
-      preferredTransportModes: selectedModes,
-      accessibilityPreferences: selectedAccessibilityPreferences,
-    };
-
     try {
-      if (profileExists) {
-        await updateProfile(payload);
-      } else {
-        await createProfile(payload);
-        setProfileExists(true);
-      }
+      await updateProfile({
+        preferredTransportModes: selectedModes,
+        accessibilityPreferences: selectedAccessibilityPreferences,
+      });
       setFeedback({ variant: 'success', message: 'Profil enregistré.' });
     } catch (error) {
       const message =
@@ -159,6 +327,28 @@ function ProfilPage() {
       <section>
         <h1>Profil de mobilité</h1>
         <p>Chargement…</p>
+      </section>
+    );
+  }
+
+  // Pas encore de profil : onboarding en plusieurs etapes (issue #106/#107)
+  // plutot que le formulaire d'edition ci-dessous, qui suppose un profil
+  // deja existant a modifier.
+  if (!profileExists) {
+    return (
+      <section className="profil-page">
+        <h1>Profil de mobilité</h1>
+        <ProfileOnboarding onComplete={() => navigate('/recherche')} />
+        <div className="profil-account-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleLogout}
+            className="profil-logout"
+          >
+            Se déconnecter
+          </Button>
+        </div>
       </section>
     );
   }
