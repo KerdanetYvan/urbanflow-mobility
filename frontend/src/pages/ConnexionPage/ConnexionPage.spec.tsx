@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import * as authLib from '../../lib/auth';
 import { AuthProvider } from '../../lib/AuthProvider';
+import * as profileLib from '../../lib/profile';
 import ConnexionPage from './ConnexionPage';
 
 // react-router-dom reel (MemoryRouter fonctionne normalement), seul
@@ -19,6 +20,11 @@ vi.mock('react-router-dom', async () => {
 // l'ecran (validation, appels, affichage d'erreur, navigation), pas le
 // reseau reel (deja verifie manuellement contre le backend, voir la PR).
 vi.mock('../../lib/auth');
+
+// getMyProfile() est appele juste apres login()/register() pour decider de
+// la destination post-connexion (issue #106/#107) - mocke pour chaque test
+// selon le cas a verifier (profil existant, absent, controle en echec).
+vi.mock('../../lib/profile');
 
 function renderPage() {
   return render(
@@ -102,23 +108,77 @@ describe('ConnexionPage', () => {
     expect(authLib.register).not.toHaveBeenCalled();
   });
 
-  it('connecte puis redirige vers /profil quand les identifiants sont corrects', async () => {
-    vi.mocked(authLib.login).mockResolvedValue(undefined);
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.type(screen.getByLabelText('Adresse email'), 'alice@example.com');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse123');
-    await user.click(screen.getByRole('button', { name: 'Se connecter' }));
-
-    await waitFor(() => {
-      expect(authLib.login).toHaveBeenCalledWith(
-        'alice@example.com',
-        'motdepasse123',
+  it(
+    "connecte puis redirige vers /profil (onboarding) quand l'utilisateur " +
+      "n'a pas encore de profil (issue #106/#107)",
+    async () => {
+      vi.mocked(authLib.login).mockResolvedValue(undefined);
+      vi.mocked(profileLib.getMyProfile).mockRejectedValue(
+        new ApiError('Profil introuvable', 404),
       );
-      expect(navigateMock).toHaveBeenCalledWith('/profil');
-    });
-  });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.type(screen.getByLabelText('Adresse email'), 'alice@example.com');
+      await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse123');
+      await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+
+      await waitFor(() => {
+        expect(authLib.login).toHaveBeenCalledWith(
+          'alice@example.com',
+          'motdepasse123',
+        );
+        expect(navigateMock).toHaveBeenCalledWith('/profil');
+      });
+    },
+  );
+
+  it(
+    "connecte puis redirige vers /recherche quand l'utilisateur a deja un " +
+      'profil (issue #106/#107)',
+    async () => {
+      vi.mocked(authLib.login).mockResolvedValue(undefined);
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.type(screen.getByLabelText('Adresse email'), 'alice@example.com');
+      await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse123');
+      await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith('/recherche');
+      });
+    },
+  );
+
+  it(
+    'redirige vers /recherche (repli) si le controle du profil echoue ' +
+      'pour une autre raison qu\'un 404 (issue #106/#107, "fail-open")',
+    async () => {
+      vi.mocked(authLib.login).mockResolvedValue(undefined);
+      vi.mocked(profileLib.getMyProfile).mockRejectedValue(
+        new ApiError('Erreur interne du serveur', 500),
+      );
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.type(screen.getByLabelText('Adresse email'), 'alice@example.com');
+      await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse123');
+      await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith('/recherche');
+      });
+    },
+  );
 
   it("affiche le message d'erreur de l'API en cas d'identifiants invalides, sans naviguer", async () => {
     vi.mocked(authLib.login).mockRejectedValue(
@@ -144,6 +204,10 @@ describe('ConnexionPage', () => {
       createdAt: new Date().toISOString(),
     });
     vi.mocked(authLib.login).mockResolvedValue(undefined);
+    // Un compte tout juste cree n'a jamais encore de profil de mobilite.
+    vi.mocked(profileLib.getMyProfile).mockRejectedValue(
+      new ApiError('Profil introuvable', 404),
+    );
     const user = userEvent.setup();
     renderPage();
 

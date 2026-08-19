@@ -174,9 +174,11 @@ describe('App (navigation)', () => {
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse123');
     await user.click(screen.getByRole('button', { name: 'Se connecter' }));
 
+    // Profil deja existant (getMyProfile mocke ci-dessus) : atterrit sur
+    // /recherche, pas /profil (issue #106/#107, voir ConnexionPage.tsx).
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: 'Profil de mobilité' }),
+        screen.getByRole('heading', { name: "Recherche d'itinéraire" }),
       ).toBeInTheDocument();
     });
 

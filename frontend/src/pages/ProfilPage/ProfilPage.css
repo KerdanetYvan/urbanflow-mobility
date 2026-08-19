@@ -47,6 +47,53 @@
   margin-top: var(--space-2);
 }
 
+/* Onboarding du profil (issue #106/#107) - une seule etape visible a la
+   fois quelle que soit la largeur d'ecran (voir docs/specs/
+   onboarding-profil-redirection.md section 3.5), contrairement aux deux
+   fieldsets du formulaire d'edition ci-dessus qui passent cote a cote a
+   partir de 768px. */
+.onboarding-step-indicator {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.onboarding-step h2 {
+  margin-top: 0;
+}
+
+.onboarding-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* Lien discret plutot qu'un bouton pleine largeur : action secondaire de
+   navigation arriere, pas une action de validation. */
+.onboarding-previous {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  margin-right: auto;
+  padding: var(--space-2);
+}
+
+@media (max-width: 767px) {
+  .onboarding-actions {
+    flex-wrap: wrap;
+  }
+
+  .onboarding-actions > .btn {
+    flex: 1;
+  }
+}
+
 /* Separee visuellement du formulaire de preferences (bordure au-dessus) :
    la deconnexion n'est pas une action "profil", c'est une action "compte". */
 .profil-account-actions {

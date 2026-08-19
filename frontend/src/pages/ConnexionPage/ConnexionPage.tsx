@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { startTransition, type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
@@ -6,6 +6,7 @@ import FormField from '../../components/FormField/FormField';
 import { EnvelopeIcon, LockIcon } from '../../components/icons';
 import { login, register } from '../../lib/auth';
 import { ApiError } from '../../lib/api';
+import { getMyProfile } from '../../lib/profile';
 import { useAuth } from '../../lib/useAuth';
 import './ConnexionPage.css';
 
@@ -83,6 +84,32 @@ function ConnexionPage() {
     return Object.keys(errors).length === 0;
   }
 
+  /**
+   * Destination post-connexion (issue #106/#107, docs/specs/
+   * onboarding-profil-redirection.md section 2) : /recherche si
+   * l'utilisateur a deja un profil de mobilite, /profil sinon (declenche
+   * l'onboarding, voir ProfilPage.tsx). login()/register() ne renvoient que
+   * des jetons (voir lib/auth.ts) - GET /profiles/me est le seul moyen de
+   * savoir si un profil existe deja.
+   *
+   * Repli sur /recherche si ce controle lui-meme echoue (reseau/500, pas un
+   * 404 propre) : /recherche reste utilisable sans profil (issue #64),
+   * alors que rediriger vers /profil dans ce cas exposerait immediatement
+   * son propre ecran d'erreur juste apres une connexion par ailleurs
+   * reussie (spec section 2.2, "fail-open").
+   */
+  async function resolvePostLoginDestination(): Promise<string> {
+    try {
+      await getMyProfile();
+      return '/recherche';
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 404) {
+        return '/profil';
+      }
+      return '/recherche';
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError(null);
@@ -97,8 +124,23 @@ function ConnexionPage() {
         await register(email, password);
       }
       await login(email, password);
-      setAuthenticated(true);
-      navigate('/profil');
+      const destination = await resolvePostLoginDestination();
+      // startTransition() indispensable ici, meme raison que
+      // ProfilPage.tsx#handleLogout : navigate() de react-router-dom v7 est
+      // une mise a jour basse priorite (sa propre transition interne),
+      // tandis que setAuthenticated() est normale/haute priorite. Sans les
+      // grouper dans la MEME transition, setAuthenticated(true) se
+      // commettrait seul en premier, avec la route encore sur /connexion -
+      // RedirectIfAuthenticated s'y re-rendrait alors avec une session
+      // valide et imposerait SA PROPRE redirection (toujours vers /profil,
+      // codee en dur) avant que notre navigate(destination) n'ait eu la
+      // main, ecrasant silencieusement /recherche par /profil quand les
+      // deux destinations different (constate en session, regression
+      // reproduite dans App.spec.tsx).
+      startTransition(() => {
+        setAuthenticated(true);
+        navigate(destination);
+      });
     } catch (error) {
       // Message renvoye tel quel par l'API (voir ApiError) : deja pense
       // pour etre affiche directement (ex. "Email ou mot de passe incorrect").
