@@ -150,6 +150,18 @@ function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCar
         <span className="resultats-card-duration">
           {formatDuration(itinerary.durationSeconds)}
         </span>
+        {itinerary.nextDepartures && itinerary.nextDepartures.length > 1 && (
+          // Itineraires identiques regroupes sous ce resultat (issue #127) -
+          // affiche les prochains departs en plus du premier deja visible
+          // ci-dessus (resultats-card-time), sans dupliquer ce dernier.
+          <span className="resultats-card-next-departures">
+            Prochain passage à {formatTime(itinerary.nextDepartures[0])}, puis{' '}
+            {itinerary.nextDepartures
+              .slice(1)
+              .map((departure) => formatTime(departure))
+              .join(', ')}
+          </span>
+        )}
       </span>
       <span className="resultats-card-transfers">
         {formatTransfers(itinerary.transfers)}

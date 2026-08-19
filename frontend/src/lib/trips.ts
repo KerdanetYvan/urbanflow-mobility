@@ -38,6 +38,8 @@ export interface TripItinerary {
   durationSeconds: number;
   transfers: number;
   segments: TripSegment[];
+  /** Horaires de depart (ISO 8601, tries) des itineraires strictement identiques regroupes sous ce resultat (issue #127) - voir backend/src/trips/trips.service.ts#groupByRoute. Absent si aucun regroupement n'a eu lieu pour cet itineraire (deja distinct). startTime correspond au premier element. */
+  nextDepartures?: string[];
 }
 
 /**

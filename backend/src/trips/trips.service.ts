@@ -52,7 +52,70 @@ export class TripsService {
     ]);
 
     const mapped = itineraries.map((itinerary) => this.mapItinerary(itinerary));
-    return this.scoringService.rank(mapped, profile);
+    const grouped = this.groupByRoute(mapped);
+    return this.scoringService.rank(grouped, profile);
+  }
+
+  /**
+   * Regroupe les itineraires strictement identiques (meme succession de
+   * mode/ligne/arrets, hors horaire) sous un seul resultat (issue #127) -
+   * evite d'afficher jusqu'a 5 fois le meme trajet a des horaires
+   * differents quand une seule ligne dessert la demande (OTP renvoie ses
+   * numItineraries prochains departs sans deduplication, voir
+   * OtpClientService). Fait AVANT le passage au scoring (ScoringService,
+   * issue #16) : celui-ci continue de recevoir un itineraire par resultat
+   * distinct affiche, pas un par horaire - sinon des departs identiques
+   * auraient pese plusieurs fois plus lourd dans le classement final sans
+   * que ca se reflete dans l'affichage.
+   *
+   * L'itineraire dont le depart est le plus proche sert de representant
+   * (celui affiche/detaille) ; les horaires de tous les membres du groupe
+   * sont exposes via `nextDepartures` (tries par ordre chronologique).
+   * Ce champ reste absent quand le groupe n'a qu'un seul membre, pour ne
+   * rien changer au contrat existant quand aucun regroupement n'a lieu
+   * (dernier critere d'acceptation de #127).
+   */
+  private groupByRoute(itineraries: TripItinerary[]): TripItinerary[] {
+    const groups = new Map<string, TripItinerary[]>();
+    for (const itinerary of itineraries) {
+      const key = this.routeKey(itinerary);
+      const group = groups.get(key);
+      if (group) {
+        group.push(itinerary);
+      } else {
+        groups.set(key, [itinerary]);
+      }
+    }
+
+    return Array.from(groups.values()).map((group) => {
+      if (group.length === 1) {
+        return group[0];
+      }
+      const sorted = [...group].sort(
+        (a, b) => Date.parse(a.startTime) - Date.parse(b.startTime),
+      );
+      return {
+        ...sorted[0],
+        nextDepartures: sorted.map((itinerary) => itinerary.startTime),
+      };
+    });
+  }
+
+  /**
+   * Cle de regroupement d'un itineraire (voir groupByRoute) : suite
+   * ordonnee de (mode, ligne, arret de depart, arret d'arrivee) par
+   * segment - suffisant pour distinguer deux trajets reellement differents
+   * (itineraire alternatif, correspondance differente) sans dependre d'un
+   * identifiant GTFS route_id qu'OTP ne renvoie pas dans notre integration
+   * (voir OtpLeg).
+   */
+  private routeKey(itinerary: TripItinerary): string {
+    return itinerary.segments
+      .map(
+        (segment) =>
+          `${segment.mode}|${segment.routeName ?? ''}|${segment.from.name}|${segment.to.name}`,
+      )
+      .join('>');
   }
 
   private mapItinerary(itinerary: OtpItinerary): TripItinerary {

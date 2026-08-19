@@ -267,6 +267,13 @@
   font-size: var(--text-sm);
 }
 
+/* Prochains departs d'un resultat regroupe (issue #127) - meme traitement
+   discret que la duree/les correspondances ci-dessus. */
+.resultats-card-next-departures {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
 .resultats-card-transfers {
   color: var(--color-text-muted);
   font-size: var(--text-sm);

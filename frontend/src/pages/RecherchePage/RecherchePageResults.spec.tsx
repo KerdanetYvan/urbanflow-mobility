@@ -184,6 +184,32 @@ describe('RecherchePageResults', () => {
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
   });
 
+  describe('itineraires regroupes par prochain passage (issue #127)', () => {
+    it('affiche les prochains passages quand le backend a regroupe plusieurs departs identiques', () => {
+      const grouped: TripItinerary = {
+        ...FAST_ITINERARY,
+        nextDepartures: [
+          '2026-08-02T08:00:00.000Z',
+          '2026-08-02T08:10:00.000Z',
+          '2026-08-02T08:20:00.000Z',
+        ],
+      };
+      const { container } = renderResults([grouped]);
+
+      const cards = desktopCards(container);
+      expect(cards[0]).toHaveTextContent(
+        'Prochain passage à 10:00, puis 10:10, 10:20',
+      );
+    });
+
+    it("n'affiche aucun texte de prochain passage quand l'itineraire n'a pas ete regroupe (nextDepartures absent)", () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const cards = desktopCards(container);
+      expect(cards[0]).not.toHaveTextContent('Prochain passage');
+    });
+  });
+
   describe('badges qualitatifs de scoring (issue #126)', () => {
     it("affiche le badge 'meilleur choix global' sur le premier itineraire, absent des autres, sans preference prioritaire", () => {
       const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
