@@ -88,4 +88,12 @@ export class TripItinerary {
 
   @ApiProperty({ type: TripSegment, isArray: true })
   segments: TripSegment[];
+
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description:
+      'Horaires de depart (ISO 8601, tries par ordre chronologique) de tous les itineraires strictement identiques (hors horaire) regroupes sous ce resultat (issue #127) - present uniquement quand au moins deux itineraires ont ete regroupes, absent sinon (pas de regroupement artificiel quand chaque itineraire renvoye par OTP est deja distinct). startTime correspond toujours au premier element de ce tableau.',
+  })
+  nextDepartures?: string[];
 }

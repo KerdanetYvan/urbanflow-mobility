@@ -207,4 +207,83 @@ describe('TripsService', () => {
       expect(profilesService.findByUserIdOrNull).not.toHaveBeenCalled();
     },
   );
+
+  /** Construit un itineraire OTP a un leg BUS, seul le depart varie d'un appel a l'autre (issue #127). */
+  function busItinerary(startTime: number, endTime: number) {
+    return {
+      startTime,
+      endTime,
+      duration: endTime - startTime,
+      transfers: 0,
+      legs: [
+        {
+          mode: 'BUS',
+          route: 'Ligne Test - Boucle Centre',
+          routeShortName: 'T1',
+          startTime,
+          endTime,
+          distance: 1300,
+          from: { name: 'Arret Bus A', lat: 48.851, lon: 2.351 },
+          to: { name: 'Université', lat: 48.86, lon: 2.36 },
+        },
+      ],
+    };
+  }
+
+  it(
+    'regroupe les itineraires strictement identiques (meme ligne, memes ' +
+      'arrets) sous un seul resultat, avec les horaires suivants exposes ' +
+      'via nextDepartures (issue #127)',
+    async () => {
+      // Trois departs de la meme ligne T1, memes arrets - reproduit le cas
+      // observe en session (Kennedy -> La Poterie, 5 fois le meme trajet).
+      // Volontairement hors ordre chronologique en entree : verifie que le
+      // regroupement trie lui-meme par depart, sans dependre de l'ordre OTP.
+      otpClient.planTrip.mockResolvedValue([
+        busItinerary(600_000, 1_200_000),
+        busItinerary(0, 600_000),
+        busItinerary(1_200_000, 1_800_000),
+      ]);
+
+      const result = await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].startTime).toEqual(new Date(0).toISOString());
+      expect(result[0].nextDepartures).toEqual([
+        new Date(0).toISOString(),
+        new Date(600_000).toISOString(),
+        new Date(1_200_000).toISOString(),
+      ]);
+    },
+  );
+
+  it(
+    'ne regroupe pas des itineraires distincts (lignes differentes) - ' +
+      'aucun champ nextDepartures ajoute, comportement inchange (issue #127)',
+    async () => {
+      otpClient.planTrip.mockResolvedValue([
+        busItinerary(0, 600_000),
+        {
+          ...busItinerary(0, 600_000),
+          legs: [{ ...busItinerary(0, 600_000).legs[0], routeShortName: 'T2' }],
+        },
+      ]);
+
+      const result = await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result[0].nextDepartures).toBeUndefined();
+      expect(result[1].nextDepartures).toBeUndefined();
+    },
+  );
 });

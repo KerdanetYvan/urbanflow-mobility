@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { formatTime } from '../../lib/format';
 import type { TripItinerary, TripSegment } from '../../lib/trips';
 import RecherchePageResults from './RecherchePageResults';
 
@@ -182,6 +183,36 @@ describe('RecherchePageResults', () => {
   it("ne montre jamais de valeur de score (uniquement l'ordre recu du backend)", () => {
     renderResults([FAST_ITINERARY]);
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
+  });
+
+  describe('itineraires regroupes par prochain passage (issue #127)', () => {
+    it('affiche les prochains passages quand le backend a regroupe plusieurs departs identiques', () => {
+      const grouped: TripItinerary = {
+        ...FAST_ITINERARY,
+        nextDepartures: [
+          '2026-08-02T08:00:00.000Z',
+          '2026-08-02T08:10:00.000Z',
+          '2026-08-02T08:20:00.000Z',
+        ],
+      };
+      const { container } = renderResults([grouped]);
+
+      const cards = desktopCards(container);
+      // Heures formatees dynamiquement (formatTime, fuseau local) plutot que
+      // codees en dur : le fuseau du runner CI n'est pas Europe/Paris comme
+      // en local, un texte fige aurait echoue en CI sans etre faux ici.
+      expect(cards[0]).toHaveTextContent(
+        `Prochain passage à ${formatTime(grouped.nextDepartures![0])}, puis ` +
+          `${formatTime(grouped.nextDepartures![1])}, ${formatTime(grouped.nextDepartures![2])}`,
+      );
+    });
+
+    it("n'affiche aucun texte de prochain passage quand l'itineraire n'a pas ete regroupe (nextDepartures absent)", () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const cards = desktopCards(container);
+      expect(cards[0]).not.toHaveTextContent('Prochain passage');
+    });
   });
 
   describe('badges qualitatifs de scoring (issue #126)', () => {
