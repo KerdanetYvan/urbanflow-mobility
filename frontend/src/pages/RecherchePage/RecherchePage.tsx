@@ -158,6 +158,112 @@ interface AlertState {
   message: string;
 }
 
+interface TransportModesFilterProps {
+  selectedModes: string[];
+  onToggleMode: (mode: string) => void;
+}
+
+/**
+ * Filtre des modes de transport pour cette recherche (issue #108/#109, voir
+ * docs/specs/filtre-modes-transport.md) - extrait de "Plus d'options" vers
+ * un bouton dedie toujours visible (section 2 de la spec), qui ouvre un
+ * panneau en popover ancre juste en dessous (section 3). Reprend le
+ * fieldset/les cases a cocher existants tels quels (section 4) - seul le
+ * conteneur change, la logique de selection (selectedModes/toggleMode)
+ * reste portee par RecherchePage.
+ */
+function TransportModesFilter({
+  selectedModes,
+  onToggleMode,
+}: TransportModesFilterProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  /**
+   * Fermeture "deliberee" (Echap, bouton "Fermer") : rend le focus au
+   * declencheur, comme demande par la spec section 3. Le clic exterieur
+   * (voir l'ecouteur ci-dessous) ne passe PAS par cette fonction - un clic
+   * en dehors a deja porte le focus sur sa propre cible (ex. le champ
+   * Destination), le lui reprendre de force romprait ce que l'utilisateur
+   * vient de faire ; seules Echap/"Fermer" n'ont pas de cible de focus
+   * concurrente a respecter.
+   */
+  function closeAndRefocusTrigger() {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  // Fermeture au clic exterieur et a la touche Echap (section 3 de la
+  // spec) - ecouteurs poses uniquement quand le panneau est ouvert, retires
+  // a la fermeture.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeAndRefocusTrigger();
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="recherche-modes-filter" ref={containerRef}>
+      <Button
+        type="button"
+        variant="secondary"
+        ref={triggerRef}
+        className="recherche-modes-trigger"
+        aria-expanded={isOpen}
+        aria-controls="recherche-modes-panel"
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        {selectedModes.length > 0
+          ? `Modes de transport · ${selectedModes.length}`
+          : 'Modes de transport'}
+      </Button>
+
+      {isOpen && (
+        <div id="recherche-modes-panel" className="recherche-modes-panel">
+          <fieldset className="recherche-fieldset">
+            <legend>Modes de transport pour cette recherche</legend>
+            {TRANSPORT_MODES.map((mode) => (
+              <label key={mode.value} className="recherche-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedModes.includes(mode.value)}
+                  onChange={() => onToggleMode(mode.value)}
+                />
+                {mode.label}
+              </label>
+            ))}
+          </fieldset>
+          <Button
+            type="button"
+            variant="secondary"
+            className="recherche-modes-close"
+            onClick={closeAndRefocusTrigger}
+          >
+            Fermer
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Ecran de recherche d'itineraire (F2, issue #35) - aussi la page d'accueil
  * de l'application ("/" redirige ici, voir App.tsx).
@@ -476,11 +582,20 @@ function RecherchePage() {
               />
             </div>
 
-            {/* Champs secondaires replies par defaut (issue #110/#111) :
-                deja optionnels aujourd'hui (heure vide = "maintenant",
-                modes vides = tous), reduit l'emprise verticale du panneau
-                flottant/bandeau. <details> natif - pas de machinerie ARIA
-                custom, le role/l'etat sont deja corrects nativement. */}
+            {/* Bouton dedie toujours visible (issue #108/#109, voir
+                docs/specs/filtre-modes-transport.md section 2) - extrait de
+                "Plus d'options" ci-dessous, qui ne conserve donc plus que la
+                date/heure de depart. */}
+            <TransportModesFilter
+              selectedModes={selectedModes}
+              onToggleMode={toggleMode}
+            />
+
+            {/* Champ secondaire replie par defaut (issue #110/#111) : deja
+                optionnel aujourd'hui (heure vide = "maintenant"), reduit
+                l'emprise verticale du panneau flottant/bandeau. <details>
+                natif - pas de machinerie ARIA custom, le role/l'etat sont
+                deja corrects nativement. */}
             <details className="recherche-more-options">
               <summary>Plus d'options</summary>
 
@@ -492,20 +607,6 @@ function RecherchePage() {
                 onChange={(event) => setDepartureTime(event.target.value)}
                 helpText="Laisser vide pour partir maintenant."
               />
-
-              <fieldset className="recherche-fieldset">
-                <legend>Modes de transport pour cette recherche</legend>
-                {TRANSPORT_MODES.map((mode) => (
-                  <label key={mode.value} className="recherche-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedModes.includes(mode.value)}
-                      onChange={() => toggleMode(mode.value)}
-                    />
-                    {mode.label}
-                  </label>
-                ))}
-              </fieldset>
             </details>
 
             <Button type="submit" className="recherche-submit">
