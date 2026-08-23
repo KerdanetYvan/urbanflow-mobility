@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 import { AccessibilityPreference } from './accessibility-preference.enum';
@@ -63,6 +67,40 @@ describe('ProfilesService', () => {
           accessibilityPreferences: [],
         }),
       ).rejects.toThrow(ConflictException);
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('accepte une adresse domicile complete (issue #113)', async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      const profile = await service.create('user-1', {
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        homeLabel: 'Domicile',
+        homeLat: 48.111,
+        homeLon: -1.682,
+      });
+
+      expect(profile.homeLabel).toBe('Domicile');
+      expect(profile.homeLat).toBe(48.111);
+      expect(profile.homeLon).toBe(-1.682);
+      // Travail non fourni : normalise a null plutot que laisse undefined
+      // (voir ProfilesService#create).
+      expect(profile.workLat).toBeNull();
+      expect(profile.workLon).toBeNull();
+    });
+
+    it('refuse une paire lat/lon incomplete (issue #113)', async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.create('user-1', {
+          preferredTransportModes: [],
+          accessibilityPreferences: [],
+          homeLat: 48.111,
+          // homeLon absent : paire incomplete.
+        }),
+      ).rejects.toThrow(BadRequestException);
       expect(repository.save).not.toHaveBeenCalled();
     });
   });
@@ -135,6 +173,60 @@ describe('ProfilesService', () => {
           accessibilityPreferences: [AccessibilityPreference.LIMIT_TRANSFERS],
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('complete une adresse domicile deja partiellement enregistree (issue #113)', async () => {
+      repository.findOneBy.mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        homeLat: 48.111,
+        homeLon: null,
+      });
+
+      const updated = await service.update('user-1', { homeLon: -1.682 });
+
+      expect(updated.homeLat).toBe(48.111);
+      expect(updated.homeLon).toBe(-1.682);
+    });
+
+    it(
+      'ne touche pas a une adresse domicile deja complete quand la mise a ' +
+        'jour ne la concerne pas (issue #113)',
+      async () => {
+        repository.findOneBy.mockResolvedValue({
+          id: 'profile-1',
+          userId: 'user-1',
+          preferredTransportModes: [],
+          accessibilityPreferences: [],
+          homeLat: 48.111,
+          homeLon: -1.682,
+        });
+
+        const updated = await service.update('user-1', {
+          accessibilityPreferences: [AccessibilityPreference.LIMIT_TRANSFERS],
+        });
+
+        expect(updated.homeLat).toBe(48.111);
+        expect(updated.homeLon).toBe(-1.682);
+      },
+    );
+
+    it('refuse de rendre une paire lat/lon incomplete (issue #113)', async () => {
+      repository.findOneBy.mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        homeLat: null,
+        homeLon: null,
+      });
+
+      await expect(
+        service.update('user-1', { homeLat: 48.111 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.save).not.toHaveBeenCalled();
     });
   });
 

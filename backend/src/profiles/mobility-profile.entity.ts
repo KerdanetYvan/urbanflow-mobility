@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { createEncryptedColumnTransformer } from '../common/encryption/encrypted-column.transformer';
 import { User } from '../users/user.entity';
 import { AccessibilityPreference } from './accessibility-preference.enum';
 import { TransportMode } from './transport-mode.enum';
@@ -73,6 +74,76 @@ export class MobilityProfile {
     default: '{}',
   })
   accessibilityPreferences: AccessibilityPreference[];
+
+  /**
+   * Adresse domicile/travail (issue #113), utilisees comme raccourcis
+   * d'origine sur l'ecran de recherche (issue #93). Chiffrees au repos
+   * (RGPD, meme transformer que TripHistoryEntry - issue #22/#11, voir
+   * docs/specs/rgpd-geolocalisation.md section 2.2) : une adresse
+   * domicile/travail est une donnee de geolocalisation aussi sensible qu'un
+   * trajet historise. Contrairement a l'historique, pas de purge temporelle
+   * (section 3.2 de la meme spec) - donnee de profil durable, effacee
+   * uniquement par une mise a jour explicite ou la suppression du compte
+   * (CASCADE, deja en place via la relation `user` ci-dessus).
+   *
+   * Chaque paire lat/lon est complete ou totalement absente (jamais une
+   * moitie seule, inexploitable comme origine de recherche) - verifie par
+   * ProfilesService, pas par ce decorateur (une contrainte inter-champs ne
+   * se modelise pas avec class-validator sur un champ isole).
+   */
+  @ApiPropertyOptional({ example: 'Domicile' })
+  @Column({
+    name: 'home_label',
+    type: 'text',
+    nullable: true,
+    transformer: createEncryptedColumnTransformer<string>(),
+  })
+  homeLabel: string | null;
+
+  @ApiPropertyOptional({ example: 48.111 })
+  @Column({
+    name: 'home_lat',
+    type: 'text',
+    nullable: true,
+    transformer: createEncryptedColumnTransformer<number>(),
+  })
+  homeLat: number | null;
+
+  @ApiPropertyOptional({ example: -1.682 })
+  @Column({
+    name: 'home_lon',
+    type: 'text',
+    nullable: true,
+    transformer: createEncryptedColumnTransformer<number>(),
+  })
+  homeLon: number | null;
+
+  @ApiPropertyOptional({ example: 'Travail' })
+  @Column({
+    name: 'work_label',
+    type: 'text',
+    nullable: true,
+    transformer: createEncryptedColumnTransformer<string>(),
+  })
+  workLabel: string | null;
+
+  @ApiPropertyOptional({ example: 48.127 })
+  @Column({
+    name: 'work_lat',
+    type: 'text',
+    nullable: true,
+    transformer: createEncryptedColumnTransformer<number>(),
+  })
+  workLat: number | null;
+
+  @ApiPropertyOptional({ example: -1.682 })
+  @Column({
+    name: 'work_lon',
+    type: 'text',
+    nullable: true,
+    transformer: createEncryptedColumnTransformer<number>(),
+  })
+  workLon: number | null;
 
   @ApiProperty()
   @CreateDateColumn({ name: 'created_at' })
