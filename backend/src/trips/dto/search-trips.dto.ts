@@ -5,6 +5,8 @@ import {
   IsLatitude,
   IsLongitude,
   IsOptional,
+  IsString,
+  MaxLength,
 } from 'class-validator';
 
 /**
@@ -50,4 +52,24 @@ export class SearchTripsDto {
   @IsOptional()
   @IsISO8601()
   departureTime?: string;
+
+  /**
+   * Libelle d'adresse d'origine (ex. "Part-Dieu"), envoye uniquement par le
+   * frontend quand l'utilisateur est authentifie (voir RecherchePage.tsx) -
+   * sert uniquement a l'historique des trajets (issue #11,
+   * TripHistoryService#record) pour afficher un libelle lisible plutot que
+   * des coordonnees brutes ; jamais transmis a OpenTripPlanner. Absent =
+   * pas de libellé disponible (ex. position geolocalisee).
+   */
+  @ApiPropertyOptional({ example: 'Part-Dieu' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  originLabel?: string;
+
+  @ApiPropertyOptional({ example: 'Bellecour' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  destinationLabel?: string;
 }

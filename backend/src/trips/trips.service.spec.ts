@@ -5,10 +5,12 @@ describe('TripsService', () => {
   let service: TripsService;
   let otpClient: { planTrip: jest.Mock };
   let profilesService: { findByUserIdOrNull: jest.Mock };
+  let tripHistoryService: { record: jest.Mock };
 
   beforeEach(() => {
     otpClient = { planTrip: jest.fn() };
     profilesService = { findByUserIdOrNull: jest.fn() };
+    tripHistoryService = { record: jest.fn().mockResolvedValue(undefined) };
     // ScoringService reel (pas de mock) avec un stub meteo neutre (pas de
     // pluie) : le comportement du classement (y compris le critere meteo,
     // issue #17) est teste separement dans scoring.service.spec.ts /
@@ -19,6 +21,7 @@ describe('TripsService', () => {
       new ScoringService({
         getCurrentConditions: () => Promise.resolve(null),
       } as never),
+      tripHistoryService as never,
     );
   });
 
@@ -205,6 +208,43 @@ describe('TripsService', () => {
       });
 
       expect(profilesService.findByUserIdOrNull).not.toHaveBeenCalled();
+    },
+  );
+
+  it(
+    "enregistre la recherche dans l'historique quand un utilisateur " +
+      'authentifie est fourni (issue #11)',
+    async () => {
+      otpClient.planTrip.mockResolvedValue([]);
+      const dto = {
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+        originLabel: 'Part-Dieu',
+        destinationLabel: 'Bellecour',
+      };
+
+      await service.search(dto, 'user-1');
+
+      expect(tripHistoryService.record).toHaveBeenCalledWith('user-1', dto);
+    },
+  );
+
+  it(
+    "n'enregistre rien dans l'historique pour une recherche anonyme " +
+      '(pas de userId, issue #11)',
+    async () => {
+      otpClient.planTrip.mockResolvedValue([]);
+
+      await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+      });
+
+      expect(tripHistoryService.record).not.toHaveBeenCalled();
     },
   );
 

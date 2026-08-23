@@ -6,10 +6,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { TripItinerary } from './dto/trip-itinerary.dto';
+import { TripHistoryEntryDto } from './dto/trip-history-entry.dto';
 import { SearchTripsDto } from './dto/search-trips.dto';
+import { TripHistoryService } from './history/trip-history.service';
 import { TripsService } from './trips.service';
 
 /**
@@ -23,7 +26,10 @@ import { TripsService } from './trips.service';
 @ApiTags('trips')
 @Controller('trips')
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) {}
+  constructor(
+    private readonly tripsService: TripsService,
+    private readonly tripHistoryService: TripHistoryService,
+  ) {}
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
@@ -51,5 +57,24 @@ export class TripsController {
   })
   search(@Query() dto: SearchTripsDto, @CurrentUser() user?: JwtPayload) {
     return this.tripsService.search(dto, user?.sub);
+  }
+
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Historique des trajets recemment recherches (issue #11)',
+    description:
+      'Necessite un compte (JwtAuthGuard obligatoire, contrairement a la recherche) - chaque recherche authentifiee via GET /trips est enregistree automatiquement cote serveur (TripHistoryService#record). Renvoie les couples origine/destination distincts les plus recents, deja deduplique et trie par recence.',
+  })
+  @ApiResponse({
+    status: 200,
+    type: TripHistoryEntryDto,
+    isArray: true,
+    description: 'Tableau vide = aucun trajet recherche pour le moment',
+  })
+  @ApiResponse({ status: 401, description: 'Jeton absent, invalide ou expire' })
+  findHistory(@CurrentUser() user: JwtPayload) {
+    return this.tripHistoryService.findRecent(user.sub);
   }
 }

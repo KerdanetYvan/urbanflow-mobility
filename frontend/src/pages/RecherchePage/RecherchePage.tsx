@@ -451,6 +451,16 @@ function RecherchePage() {
         ...(departureTime
           ? { departureTime: new Date(departureTime).toISOString() }
           : {}),
+        // Libelles d'adresse (issue #11) : envoyes uniquement si connecte -
+        // seule une recherche authentifiee est historisee cote backend
+        // (TripsService#search -> TripHistoryService#record), inutile
+        // sinon.
+        ...(isAuthenticated
+          ? {
+              originLabel: origin.selected.label,
+              destinationLabel: destination.selected.label,
+            }
+          : {}),
       });
 
       setScreen({
