@@ -1,9 +1,13 @@
 import { startTransition, useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
+import AddressField from '../../components/AddressField/AddressField';
+import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import { ApiError } from '../../lib/api';
 import { logout } from '../../lib/auth';
+import { formatCoordinates } from '../../lib/format';
+import type { PlaceSuggestion } from '../../lib/places';
 import { useAuth } from '../../lib/useAuth';
 import {
   ACCESSIBILITY_PREFERENCES,
@@ -13,6 +17,14 @@ import {
   updateProfile,
 } from '../../lib/profile';
 import './ProfilPage.css';
+
+/** Etat d'un champ domicile/travail (issue #113/#114) : meme forme que dans RecherchePage.tsx (issue #35). */
+interface AddressFieldState {
+  query: string;
+  selected: PlaceSuggestion | null;
+}
+
+const EMPTY_ADDRESS: AddressFieldState = { query: '', selected: null };
 
 type Feedback = { variant: 'success' | 'error'; message: string };
 
@@ -207,6 +219,22 @@ function ProfilPage() {
   const [profileExists, setProfileExists] = useState(false);
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
   const [selectedAccessibilityPreferences, setSelectedAccessibilityPreferences] = useState<string[]>([]);
+  // Domicile/travail (issue #113/#114) - memes etats que les champs
+  // origine/destination de RecherchePage.tsx (issue #35), un par adresse.
+  const [homeAddress, setHomeAddress] = useState<AddressFieldState>(EMPTY_ADDRESS);
+  const [workAddress, setWorkAddress] = useState<AddressFieldState>(EMPTY_ADDRESS);
+  const homeSuggestions = useAddressSuggestions(
+    homeAddress.query,
+    homeAddress.selected?.label ?? null,
+  );
+  const workSuggestions = useAddressSuggestions(
+    workAddress.query,
+    workAddress.selected?.label ?? null,
+  );
+  const [addressErrors, setAddressErrors] = useState<{
+    home?: string;
+    work?: string;
+  }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
@@ -220,6 +248,28 @@ function ProfilPage() {
         setProfileExists(true);
         setSelectedModes(profile.preferredTransportModes);
         setSelectedAccessibilityPreferences(profile.accessibilityPreferences);
+        // Preremplissage domicile/travail (issue #113/#114) : traite comme
+        // une suggestion deja resolue (pas juste un texte tape), pour
+        // qu'un "Enregistrer" sans y toucher renvoie la meme valeur
+        // (idempotent) plutot que d'exiger une nouvelle selection.
+        if (profile.homeLat != null && profile.homeLon != null) {
+          const label =
+            profile.homeLabel ??
+            formatCoordinates(profile.homeLat, profile.homeLon);
+          setHomeAddress({
+            query: label,
+            selected: { label, lat: profile.homeLat, lon: profile.homeLon },
+          });
+        }
+        if (profile.workLat != null && profile.workLon != null) {
+          const label =
+            profile.workLabel ??
+            formatCoordinates(profile.workLat, profile.workLon);
+          setWorkAddress({
+            query: label,
+            selected: { label, lat: profile.workLat, lon: profile.workLon },
+          });
+        }
       } catch (error) {
         if (cancelled) return;
         if (error instanceof ApiError && error.statusCode === 404) {
@@ -303,12 +353,49 @@ function ProfilPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
+
+    // Adresse tapee mais jamais choisie dans la liste d'autocompletion :
+    // traitee comme non resolue (meme motif que RecherchePage.tsx, issue
+    // #35) - un champ laisse totalement vide n'est pas une erreur, il
+    // signifie simplement "ne rien envoyer pour cette adresse" (voir plus
+    // bas).
+    const errors: { home?: string; work?: string } = {};
+    if (homeAddress.query.trim() && !homeAddress.selected) {
+      errors.home =
+        'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.';
+    }
+    if (workAddress.query.trim() && !workAddress.selected) {
+      errors.work =
+        'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.';
+    }
+    setAddressErrors(errors);
+    if (errors.home || errors.work) return;
+
     setIsSaving(true);
 
     try {
       await updateProfile({
         preferredTransportModes: selectedModes,
         accessibilityPreferences: selectedAccessibilityPreferences,
+        // Domicile/travail (issue #113/#114) : omis entierement si non
+        // resolu (champ vide) - pas de semantique "effacer" cote backend a
+        // ce jour (voir docs/sprints/sprint-3-plan.md, PR #140), un champ
+        // vide laisse donc l'adresse deja enregistree intacte plutot que de
+        // l'effacer.
+        ...(homeAddress.selected
+          ? {
+              homeLabel: homeAddress.selected.label,
+              homeLat: homeAddress.selected.lat,
+              homeLon: homeAddress.selected.lon,
+            }
+          : {}),
+        ...(workAddress.selected
+          ? {
+              workLabel: workAddress.selected.label,
+              workLat: workAddress.selected.lat,
+              workLon: workAddress.selected.lon,
+            }
+          : {}),
       });
       setFeedback({ variant: 'success', message: 'Profil enregistré.' });
     } catch (error) {
@@ -402,6 +489,44 @@ function ProfilPage() {
             ))}
           </fieldset>
         </div>
+
+        {/* Bloc separe des 2 fieldsets ci-dessus (issue #113/#114) - pas
+            dans .profil-fieldsets (grille a 2 colonnes en desktop) : passer
+            a 3 colonnes serait trop serre pour des champs d'adresse. */}
+        <fieldset className="profil-fieldset profil-addresses">
+          <legend>Domicile et travail</legend>
+          <p className="profil-addresses-hint">
+            Utilisées comme raccourcis d'origine lors d'une recherche.
+          </p>
+          <div className="profil-addresses-fields">
+            <AddressField
+              id="home-address"
+              label="Domicile"
+              value={homeAddress.query}
+              suggestions={homeSuggestions}
+              error={addressErrors.home}
+              onChange={(value) =>
+                setHomeAddress({ query: value, selected: null })
+              }
+              onSelect={(place) =>
+                setHomeAddress({ query: place.label, selected: place })
+              }
+            />
+            <AddressField
+              id="work-address"
+              label="Travail"
+              value={workAddress.query}
+              suggestions={workSuggestions}
+              error={addressErrors.work}
+              onChange={(value) =>
+                setWorkAddress({ query: value, selected: null })
+              }
+              onSelect={(place) =>
+                setWorkAddress({ query: place.label, selected: place })
+              }
+            />
+          </div>
+        </fieldset>
 
         <Button type="submit" disabled={isSaving} className="profil-submit">
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}

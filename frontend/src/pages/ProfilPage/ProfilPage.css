@@ -47,6 +47,20 @@
   margin-top: var(--space-2);
 }
 
+/* Domicile/travail (issue #113/#114) - bloc separe des 2 fieldsets
+   cote-a-cote (.profil-fieldsets), voir ProfilPage.tsx pour le pourquoi. */
+.profil-addresses-hint {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.profil-addresses-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Onboarding du profil (issue #106/#107) - une seule etape visible a la
    fois quelle que soit la largeur d'ecran (voir docs/specs/
    onboarding-profil-redirection.md section 3.5), contrairement aux deux

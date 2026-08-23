@@ -7,14 +7,16 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
+import AddressField from '../../components/AddressField/AddressField';
+import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { HistoryIcon, MapPinIcon, SwapIcon } from '../../components/icons';
+import { HistoryIcon, SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
 import { formatCoordinates } from '../../lib/format';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
-import { searchPlaces, type PlaceSuggestion } from '../../lib/places';
+import type { PlaceSuggestion } from '../../lib/places';
 import {
   getTripHistory,
   searchTrips,
@@ -59,105 +61,6 @@ interface AddressFieldState {
 }
 
 const EMPTY_ADDRESS: AddressFieldState = { query: '', selected: null };
-
-/**
- * Suggestions d'autocompletion pour un champ origine/destination (debounce
- * 300ms). Ne relance pas de recherche si le texte correspond deja au libelle
- * de la suggestion selectionnee (evite un aller-retour reseau inutile juste
- * apres un clic sur une suggestion).
- */
-function useAddressSuggestions(
-  query: string,
-  selectedLabel: string | null,
-): PlaceSuggestion[] {
-  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
-  const trimmed = query.trim();
-  // "Resolu" = rien a chercher (texte trop court) ou texte deja egal au
-  // libelle de la suggestion selectionnee : la liste doit disparaitre
-  // immediatement dans ce cas, calcule au rendu plutot que par un setState
-  // synchrone dans l'effet (voir react-hooks/set-state-in-effect).
-  const isResolved = trimmed.length < 2 || trimmed === selectedLabel;
-
-  useEffect(() => {
-    if (isResolved) return;
-
-    let cancelled = false;
-    const timeoutId = setTimeout(() => {
-      searchPlaces(trimmed)
-        .then((results) => {
-          if (!cancelled) setSuggestions(results);
-        })
-        .catch(() => {
-          if (!cancelled) setSuggestions([]);
-        });
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-    };
-  }, [trimmed, isResolved]);
-
-  return isResolved ? [] : suggestions;
-}
-
-interface AddressFieldProps {
-  id: string;
-  label: string;
-  value: string;
-  suggestions: PlaceSuggestion[];
-  error?: string;
-  onChange: (value: string) => void;
-  onSelect: (place: PlaceSuggestion) => void;
-}
-
-/**
- * Champ origine/destination avec autocompletion (issue #35, voir
- * docs/specs/f2-ecrans-planification.md section 2.1). Reutilise FormField
- * pour l'input lui-meme ; la liste de suggestions est une simple liste de
- * boutons (chacun deja focusable/activable au clavier nativement), pas un
- * pattern combobox ARIA complet - suffisant pour ce projet, coherent avec le
- * niveau d'effort d'accessibilite du reste de l'ecran.
- */
-function AddressField({
-  id,
-  label,
-  value,
-  suggestions,
-  error,
-  onChange,
-  onSelect,
-}: AddressFieldProps) {
-  return (
-    <div className="recherche-address-field">
-      <FormField
-        id={id}
-        label={label}
-        icon={<MapPinIcon />}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        error={error}
-        autoComplete="off"
-      />
-      <div aria-live="polite" className="recherche-visually-hidden">
-        {suggestions.length > 0
-          ? `${suggestions.length} suggestion(s) disponible(s)`
-          : ''}
-      </div>
-      {suggestions.length > 0 && (
-        <ul className="recherche-suggestions">
-          {suggestions.map((suggestion) => (
-            <li key={`${suggestion.lat}-${suggestion.lon}`}>
-              <button type="button" onClick={() => onSelect(suggestion)}>
-                {suggestion.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 interface AlertState {
   variant: 'error';
