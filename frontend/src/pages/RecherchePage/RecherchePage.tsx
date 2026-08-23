@@ -9,12 +9,18 @@ import { Link } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { MapPinIcon, SwapIcon } from '../../components/icons';
+import { HistoryIcon, MapPinIcon, SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
+import { formatCoordinates } from '../../lib/format';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import { searchPlaces, type PlaceSuggestion } from '../../lib/places';
-import { searchTrips, type TripItinerary } from '../../lib/trips';
+import {
+  getTripHistory,
+  searchTrips,
+  type TripHistoryEntry,
+  type TripItinerary,
+} from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
 import RecherchePageResults from './RecherchePageResults';
 import './RecherchePage.css';
@@ -264,6 +270,77 @@ function TransportModesFilter({
   );
 }
 
+/** Nombre max de raccourcis affiches - le backend en renvoie jusqu'a 10 (MAX_RECENT_ENTRIES, TripHistoryService#findRecent), on n'en montre qu'une partie pour ne pas allonger davantage le panneau/bandeau formulaire (issue #110/#111). */
+const MAX_QUICK_SHORTCUTS = 5;
+
+interface RechercheQuickShortcutsProps {
+  entries: TripHistoryEntry[];
+  onSelect: (origin: PlaceSuggestion, destination: PlaceSuggestion) => void;
+}
+
+/**
+ * Raccourcis de recherche rapide (issue #112) : reprend les trajets recents
+ * de l'utilisateur connecte (GET /trips/history, issue #11) sous forme de
+ * boutons juste sous le formulaire. Un clic relance directement la
+ * recherche (voir handleQuickSearch dans RecherchePage) sans repasser par la
+ * validation manuelle du formulaire - une entree d'historique est deja une
+ * recherche valide passee (origine/destination resolues).
+ *
+ * N'affiche rien tant qu'aucune entree n'est disponible (pas connecte,
+ * historique vide, ou pas encore charge) - pas d'etat vide ici,
+ * contrairement a l'ecran /historique complet (#11) : ce widget est une
+ * commodite optionnelle, pas une destination en soi.
+ */
+function RechercheQuickShortcuts({
+  entries,
+  onSelect,
+}: RechercheQuickShortcutsProps) {
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="recherche-quick-shortcuts">
+      <p className="recherche-quick-shortcuts-title">Trajets récents</p>
+      <ul className="recherche-quick-shortcuts-list">
+        {entries.slice(0, MAX_QUICK_SHORTCUTS).map((entry) => {
+          const originLabel =
+            entry.originLabel ??
+            formatCoordinates(entry.originLat, entry.originLon);
+          const destinationLabel =
+            entry.destinationLabel ??
+            formatCoordinates(entry.destinationLat, entry.destinationLon);
+          return (
+            <li key={entry.id}>
+              <button
+                type="button"
+                className="recherche-quick-shortcut"
+                onClick={() =>
+                  onSelect(
+                    {
+                      label: originLabel,
+                      lat: entry.originLat,
+                      lon: entry.originLon,
+                    },
+                    {
+                      label: destinationLabel,
+                      lat: entry.destinationLat,
+                      lon: entry.destinationLon,
+                    },
+                  )
+                }
+              >
+                <HistoryIcon />
+                <span>
+                  {originLabel} → {destinationLabel}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * Ecran de recherche d'itineraire (F2, issue #35) - aussi la page d'accueil
  * de l'application ("/" redirige ici, voir App.tsx).
@@ -327,6 +404,11 @@ function RecherchePage() {
     'collapsed' | 'expanded'
   >('expanded');
   const formTouchStartY = useRef<number | null>(null);
+  // Raccourcis de recherche rapide (issue #112) - trajets recents charges
+  // une seule fois au montage, voir l'effet ci-dessous.
+  const [historyEntries, setHistoryEntries] = useState<TripHistoryEntry[]>(
+    [],
+  );
 
   // Pre-remplissage des modes preferes depuis le profil (F1), uniquement si
   // connecte. Echec silencieux (pas de profil, session expiree...) : la
@@ -340,6 +422,23 @@ function RecherchePage() {
           setSelectedModes(profile.preferredTransportModes);
           setAccessibilityPreferences(profile.accessibilityPreferences);
         }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  // Chargement des raccourcis de recherche rapide (issue #112), meme garde
+  // et meme echec silencieux que le pre-remplissage des modes ci-dessus : un
+  // utilisateur non connecte ou sans historique voit simplement le
+  // formulaire sans raccourcis, jamais d'erreur bloquante.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    getTripHistory()
+      .then((entries) => {
+        if (!cancelled) setHistoryEntries(entries);
       })
       .catch(() => {});
     return () => {
@@ -395,6 +494,68 @@ function RecherchePage() {
     setFormSheetState(delta > 0 ? 'collapsed' : 'expanded');
   }
 
+  /**
+   * Effectue la recherche proprement dite une fois origine/destination
+   * resolues (adresses valides et distinctes) : transition vers l'etat
+   * "recherche" (issue #73), appel a searchTrips, puis vers "resultats" ou
+   * retour au formulaire avec message d'erreur. Partagee par handleSubmit
+   * (apres validation du formulaire) et handleQuickSearch (issue #112,
+   * raccourcis de recherche rapide) qui n'a pas besoin de cette validation -
+   * une entree d'historique est deja une recherche valide passee.
+   */
+  async function performSearch(
+    originPlace: PlaceSuggestion,
+    destinationPlace: PlaceSuggestion,
+  ) {
+    // Transition vers l'etat "recherche" (issue #73) : la disposition
+    // resultats s'affiche immediatement, en chargement (carte
+    // origine/destination sans trace + squelette, voir
+    // RecherchePageResults) - remplace l'ancien bouton "Recherche…"/
+    // isSearching, la page entiere devient l'indicateur de chargement.
+    setScreen({ kind: 'recherche', origin: originPlace, destination: destinationPlace });
+
+    try {
+      const itineraries = await searchTrips({
+        originLat: originPlace.lat,
+        originLon: originPlace.lon,
+        destinationLat: destinationPlace.lat,
+        destinationLon: destinationPlace.lon,
+        // datetime-local n'a pas de fuseau : new Date() l'interprete en
+        // heure locale du navigateur, ce qui correspond a l'intention de
+        // l'utilisateur (voir MDN, chaine de date-heure sans offset).
+        ...(departureTime
+          ? { departureTime: new Date(departureTime).toISOString() }
+          : {}),
+        // Libelles d'adresse (issue #11) : envoyes uniquement si connecte -
+        // seule une recherche authentifiee est historisee cote backend
+        // (TripsService#search -> TripHistoryService#record), inutile
+        // sinon.
+        ...(isAuthenticated
+          ? {
+              originLabel: originPlace.label,
+              destinationLabel: destinationPlace.label,
+            }
+          : {}),
+      });
+
+      setScreen({
+        kind: 'resultats',
+        origin: originPlace,
+        destination: destinationPlace,
+        itineraries,
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'Connexion indisponible, réessayez.';
+      // Retour au formulaire (pas de route a quitter, juste un changement
+      // d'etat) - les valeurs saisies restent intactes, rien n'est perdu.
+      setScreen({ kind: 'formulaire' });
+      showError(message);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAlert(null);
@@ -432,53 +593,25 @@ function RecherchePage() {
       return;
     }
 
-    // Transition vers l'etat "recherche" (issue #73) : la disposition
-    // resultats s'affiche immediatement, en chargement (carte
-    // origine/destination sans trace + squelette, voir
-    // RecherchePageResults) - remplace l'ancien bouton "Recherche…"/
-    // isSearching, la page entiere devient l'indicateur de chargement.
-    setScreen({ kind: 'recherche', origin: origin.selected, destination: destination.selected });
+    await performSearch(origin.selected, destination.selected);
+  }
 
-    try {
-      const itineraries = await searchTrips({
-        originLat: origin.selected.lat,
-        originLon: origin.selected.lon,
-        destinationLat: destination.selected.lat,
-        destinationLon: destination.selected.lon,
-        // datetime-local n'a pas de fuseau : new Date() l'interprete en
-        // heure locale du navigateur, ce qui correspond a l'intention de
-        // l'utilisateur (voir MDN, chaine de date-heure sans offset).
-        ...(departureTime
-          ? { departureTime: new Date(departureTime).toISOString() }
-          : {}),
-        // Libelles d'adresse (issue #11) : envoyes uniquement si connecte -
-        // seule une recherche authentifiee est historisee cote backend
-        // (TripsService#search -> TripHistoryService#record), inutile
-        // sinon.
-        ...(isAuthenticated
-          ? {
-              originLabel: origin.selected.label,
-              destinationLabel: destination.selected.label,
-            }
-          : {}),
-      });
-
-      setScreen({
-        kind: 'resultats',
-        origin: origin.selected,
-        destination: destination.selected,
-        itineraries,
-      });
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : 'Connexion indisponible, réessayez.';
-      // Retour au formulaire (pas de route a quitter, juste un changement
-      // d'etat) - les valeurs saisies restent intactes, rien n'est perdu.
-      setScreen({ kind: 'formulaire' });
-      showError(message);
-    }
+  /**
+   * Clic sur un raccourci de recherche rapide (issue #112) : met a jour les
+   * champs origine/destination affiches (coherent avec "Modifier la
+   * recherche", voir RecherchePageResults - l'utilisateur doit retrouver ces
+   * valeurs s'il revient au formulaire) puis relance directement la
+   * recherche, sans passer par la validation de handleSubmit.
+   */
+  function handleQuickSearch(
+    originPlace: PlaceSuggestion,
+    destinationPlace: PlaceSuggestion,
+  ) {
+    setAlert(null);
+    setFieldErrors({});
+    setOrigin({ query: originPlace.label, selected: originPlace });
+    setDestination({ query: destinationPlace.label, selected: destinationPlace });
+    void performSearch(originPlace, destinationPlace);
   }
 
   // Etats "recherche" (chargement) et "resultats" (issue #73) : delegue a
@@ -623,6 +756,14 @@ function RecherchePage() {
               Rechercher
             </Button>
           </form>
+
+          {/* Sous les champs de recherche et le bouton "Rechercher" (issue
+              #112) - hors du <form> : ne represente pas une soumission du
+              formulaire mais une relance directe (voir handleQuickSearch). */}
+          <RechercheQuickShortcuts
+            entries={historyEntries}
+            onSelect={handleQuickSearch}
+          />
         </div>
       </div>
     </div>

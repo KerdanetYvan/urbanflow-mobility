@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import { HistoryIcon } from '../../components/icons';
 import { ApiError } from '../../lib/api';
+import { formatCoordinates } from '../../lib/format';
 import { getTripHistory, type TripHistoryEntry } from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
 import './HistoriquePage.css';
@@ -47,11 +48,6 @@ function HistoryEntryCard({ entry }: { entry: TripHistoryEntry }) {
       </p>
     </li>
   );
-}
-
-/** Repli d'affichage quand aucun libelle n'est disponible (ex. position geolocalisee sans reverse geocoding). */
-function formatCoordinates(lat: number, lon: number): string {
-  return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 }
 
 /**

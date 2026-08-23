@@ -1,4 +1,4 @@
-import { apiGet, authGet } from './api';
+import { apiGetWithOptionalAuth, authGet } from './api';
 
 /** Voir backend/src/trips/dto/trip-itinerary.dto.ts (issue #7) - un point (origine/destination/correspondance) d'un segment d'itineraire. */
 export interface TripPlace {
@@ -73,16 +73,19 @@ export interface SearchTripsParams {
 }
 
 /**
- * Recherche d'itineraires multimodaux (GET /trips, issue #7). Non
- * authentifie : utilisable sans compte (voir issue #64). Renvoie les
- * itineraires deja tries par le backend (ordre natif OTP en Sprint 2, voir
+ * Recherche d'itineraires multimodaux (GET /trips, issue #7). Utilisable
+ * sans compte (issue #64) : apiGetWithOptionalAuth n'attache un jeton que
+ * s'il existe, ne bloque jamais sinon (voir lib/api.ts,
+ * OptionalJwtAuthGuard cote backend). Renvoie les itineraires deja tries
+ * par le backend (ordre natif OTP en Sprint 2, voir
  * docs/specs/f2-ecrans-planification.md section 3.4) - l'appelant ne doit
  * pas re-trier.
  *
- * Si un utilisateur authentifie est connu cote backend (jeton fourni, voir
- * lib/api.ts - cette fonction elle-meme n'attache jamais de jeton), la
- * recherche est enregistree automatiquement dans l'historique (issue #11,
- * TripsService#search) - aucun appel reseau supplementaire necessaire ici.
+ * Si un utilisateur authentifie est reconnu cote backend (jeton attache par
+ * apiGetWithOptionalAuth), le scoring tient compte du profil de mobilite
+ * (issue #16) et la recherche est enregistree automatiquement dans
+ * l'historique (issue #11, TripsService#search) - aucun appel reseau
+ * supplementaire necessaire ici dans les deux cas.
  */
 export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]> {
   const query = new URLSearchParams({
@@ -96,7 +99,7 @@ export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]>
       ? { destinationLabel: params.destinationLabel }
       : {}),
   });
-  return apiGet<TripItinerary[]>(`/trips?${query.toString()}`);
+  return apiGetWithOptionalAuth<TripItinerary[]>(`/trips?${query.toString()}`);
 }
 
 /** Une entree dedupliquee de l'historique de recherche (voir backend/src/trips/dto/trip-history-entry.dto.ts, issue #11). */

@@ -223,6 +223,61 @@
   margin-top: var(--space-2);
 }
 
+/* Raccourcis de recherche rapide (issue #112) : liste de boutons pleine
+   largeur sous le formulaire, meme esprit visuel que .recherche-suggestions
+   (boutons empiles, cible tactile min) mais sans superposition - contenu
+   permanent du panneau, pas un popover ephemere. */
+.recherche-quick-shortcuts {
+  margin-top: var(--space-4);
+}
+
+.recherche-quick-shortcuts-title {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.recherche-quick-shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recherche-quick-shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.recherche-quick-shortcut svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.recherche-quick-shortcut:hover,
+.recherche-quick-shortcut:focus-visible {
+  background: var(--color-bg-subtle);
+}
+
+.recherche-quick-shortcut:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
 /* --- Panneau formulaire (issue #110/#111) : bandeau mobile a 2 etats par
    defaut (mobile-first) ; devient un panneau flottant en desktop, voir la
    media query plus bas. Reutilise le motif visuel de .resultats-sheet
