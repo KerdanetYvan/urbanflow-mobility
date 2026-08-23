@@ -69,12 +69,27 @@ export function apiPost<T>(path: string, data: unknown): Promise<T> {
 }
 
 /**
- * GET non authentifie. Utilise par les endpoints publics /places et /trips
- * (recherche d'itineraire utilisable sans compte, voir issue #64) : pas
- * d'en-tete Authorization, contrairement a authGet.
+ * GET non authentifie. Utilise par l'endpoint public /places : pas
+ * d'en-tete Authorization, contrairement a authGet/apiGetWithOptionalAuth.
  */
 export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path);
+}
+
+/**
+ * GET avec jeton optionnel : attache l'access token stocke s'il existe,
+ * sans jamais tenter de rafraichissement ni bloquer si absent/invalide
+ * (contrairement a authGet) - pour un endpoint protege par
+ * OptionalJwtAuthGuard cote backend (jamais de 401, voir
+ * optional-jwt-auth.guard.ts : un jeton absent ou invalide degrade
+ * simplement vers un comportement anonyme, ne rejette jamais la requete).
+ * Utilise par GET /trips (recherche d'itineraire utilisable sans compte,
+ * issue #64, mais personnalisee - scoring selon le profil, issue #16, et
+ * historique, issue #11/#112 - si un jeton valide est fourni).
+ */
+export function apiGetWithOptionalAuth<T>(path: string): Promise<T> {
+  const token = getAccessToken();
+  return request<T>(path, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
 }
 
 /**

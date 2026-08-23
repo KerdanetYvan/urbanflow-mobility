@@ -52,6 +52,9 @@ describe('RecherchePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(placesLib.searchPlaces).mockResolvedValue([]);
+    // Valeur par defaut sans raccourci (issue #112) - les tests qui verifient
+    // les raccourcis eux-memes ecrasent ce mock avec des entrees explicites.
+    vi.mocked(tripsLib.getTripHistory).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -365,6 +368,102 @@ describe('RecherchePage', () => {
     expect(
       (await screen.findAllByText('Le moins de correspondances')).length,
     ).toBeGreaterThan(0);
+  });
+
+  describe('raccourcis de recherche rapide (issue #112)', () => {
+    const HISTORY_ENTRY = {
+      id: 'history-1',
+      originLat: GARE.lat,
+      originLon: GARE.lon,
+      originLabel: GARE.label,
+      destinationLat: HOTEL_DE_VILLE.lat,
+      destinationLon: HOTEL_DE_VILLE.lon,
+      destinationLabel: HOTEL_DE_VILLE.label,
+      lastSearchedAt: '2026-08-20T18:00:00.000Z',
+    };
+
+    function mockAuthenticatedProfile() {
+      saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    it("n'affiche aucun raccourci pour un utilisateur non authentifie", () => {
+      renderPage();
+      expect(tripsLib.getTripHistory).not.toHaveBeenCalled();
+      expect(screen.queryByText('Trajets récents')).not.toBeInTheDocument();
+    });
+
+    it("n'affiche aucun raccourci quand l'historique est vide", async () => {
+      mockAuthenticatedProfile();
+      vi.mocked(tripsLib.getTripHistory).mockResolvedValue([]);
+      renderPage();
+
+      await waitFor(() => expect(tripsLib.getTripHistory).toHaveBeenCalled());
+      expect(screen.queryByText('Trajets récents')).not.toBeInTheDocument();
+    });
+
+    it('affiche les trajets recents sous forme de boutons pour un utilisateur authentifie', async () => {
+      mockAuthenticatedProfile();
+      vi.mocked(tripsLib.getTripHistory).mockResolvedValue([HISTORY_ENTRY]);
+      renderPage();
+
+      expect(
+        await screen.findByRole('button', {
+          name: 'Gare Part-Dieu → Hôtel de Ville',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it(
+      'relance directement la recherche au clic sur un raccourci, sans passer par la validation du formulaire',
+      async () => {
+        mockAuthenticatedProfile();
+        vi.mocked(tripsLib.getTripHistory).mockResolvedValue([HISTORY_ENTRY]);
+        const itineraries = [
+          {
+            startTime: 't0',
+            endTime: 't1',
+            durationSeconds: 600,
+            transfers: 0,
+            segments: [],
+          },
+        ];
+        vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+        const user = userEvent.setup();
+        renderPage();
+
+        const shortcut = await screen.findByRole('button', {
+          name: 'Gare Part-Dieu → Hôtel de Ville',
+        });
+        await user.click(shortcut);
+
+        await waitFor(() => {
+          expect(tripsLib.searchTrips).toHaveBeenCalledWith({
+            originLat: GARE.lat,
+            originLon: GARE.lon,
+            destinationLat: HOTEL_DE_VILLE.lat,
+            destinationLon: HOTEL_DE_VILLE.lon,
+            originLabel: GARE.label,
+            destinationLabel: HOTEL_DE_VILLE.label,
+          });
+        });
+        // Transition directe vers la disposition resultats (meme mecanique
+        // que la soumission du formulaire, issue #73) - aucun champ n'a eu
+        // besoin d'etre rempli/valide manuellement.
+        expect(
+          (
+            await screen.findAllByRole('button', { name: 'Modifier la recherche' })
+          )[0].closest('p'),
+        ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
+      },
+    );
   });
 
   describe('panneau formulaire (bandeau mobile, issue #110/#111)', () => {

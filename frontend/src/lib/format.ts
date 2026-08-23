@@ -22,3 +22,14 @@ export function formatTime(iso: string): string {
     minute: '2-digit',
   });
 }
+
+/**
+ * Repli d'affichage de coordonnees brutes ("45.7640, 4.8600") quand aucun
+ * libelle d'adresse n'est disponible - cas d'une entree d'historique dont la
+ * recherche d'origine n'etait pas authentifiee au moment ou le libelle
+ * aurait pu etre fourni (voir TripHistoryEntry, issue #11). Reutilise par
+ * l'ecran d'historique (#11) et les raccourcis de recherche rapide (#112).
+ */
+export function formatCoordinates(lat: number, lon: number): string {
+  return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+}
