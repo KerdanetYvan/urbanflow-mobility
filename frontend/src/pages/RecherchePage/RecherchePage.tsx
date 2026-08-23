@@ -11,7 +11,7 @@ import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { HistoryIcon, SwapIcon } from '../../components/icons';
+import { HistoryIcon, MapPinIcon, SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
 import { formatCoordinates } from '../../lib/format';
@@ -24,6 +24,7 @@ import {
   type TripItinerary,
 } from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
+import { useGeolocation } from '../../lib/useGeolocation';
 import RecherchePageResults from './RecherchePageResults';
 import './RecherchePage.css';
 // Classes .resultats-shell/.resultats-map-bg reutilisees telles quelles
@@ -244,6 +245,76 @@ function RechercheQuickShortcuts({
   );
 }
 
+interface OriginShortcutsProps {
+  onUseCurrentPosition: () => void;
+  isLocating: boolean;
+  positionError?: string;
+  home: PlaceSuggestion | null;
+  work: PlaceSuggestion | null;
+  onSelect: (place: PlaceSuggestion) => void;
+}
+
+/**
+ * Raccourcis pour pre-remplir l'origine (issue #93) : position GPS actuelle
+ * (toujours proposee, utilisable sans compte - issue #64) et domicile/
+ * travail (issues #113/#114, seulement si le profil connecte en a
+ * enregistre). Boutons "chips" en ligne, plus courts que les raccourcis de
+ * recherche rapide de #112 (RechercheQuickShortcuts, liste empilee pleine
+ * largeur) - un libelle court par bouton ici ("Domicile", pas un trajet
+ * complet).
+ *
+ * Ne pre-remplit QUE le champ Origine (voir onSelect) - contrairement aux
+ * raccourcis de #112, ne relance jamais la recherche automatiquement :
+ * l'utilisateur choisit toujours sa destination lui-meme.
+ */
+function OriginShortcuts({
+  onUseCurrentPosition,
+  isLocating,
+  positionError,
+  home,
+  work,
+  onSelect,
+}: OriginShortcutsProps) {
+  return (
+    <div className="recherche-origin-shortcuts-wrapper">
+      <div className="recherche-origin-shortcuts">
+        <button
+          type="button"
+          className="recherche-origin-shortcut"
+          onClick={onUseCurrentPosition}
+          disabled={isLocating}
+        >
+          <MapPinIcon />
+          {isLocating ? 'Localisation…' : 'Ma position actuelle'}
+        </button>
+        {home && (
+          <button
+            type="button"
+            className="recherche-origin-shortcut"
+            onClick={() => onSelect(home)}
+          >
+            <MapPinIcon />
+            Domicile
+          </button>
+        )}
+        {work && (
+          <button
+            type="button"
+            className="recherche-origin-shortcut"
+            onClick={() => onSelect(work)}
+          >
+            <MapPinIcon />
+            Travail
+          </button>
+        )}
+      </div>
+      {positionError && (
+        <p className="recherche-origin-shortcuts-error">{positionError}</p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Ecran de recherche d'itineraire (F2, issue #35) - aussi la page d'accueil
  * de l'application ("/" redirige ici, voir App.tsx).
@@ -312,6 +383,25 @@ function RecherchePage() {
   const [historyEntries, setHistoryEntries] = useState<TripHistoryEntry[]>(
     [],
   );
+  // Raccourcis d'origine domicile/travail (issue #93/#113/#114) - derives du
+  // meme profil que selectedModes/accessibilityPreferences ci-dessous, null
+  // tant que non enregistres (voir OriginShortcuts, qui masque le bouton
+  // correspondant dans ce cas).
+  const [homeShortcut, setHomeShortcut] = useState<PlaceSuggestion | null>(
+    null,
+  );
+  const [workShortcut, setWorkShortcut] = useState<PlaceSuggestion | null>(
+    null,
+  );
+  // Raccourci d'origine "Ma position actuelle" (issue #93) - abonnement a la
+  // demande (voir useGeolocation), jamais au chargement de la page : la
+  // permission navigateur n'est sollicitee qu'au clic sur le bouton
+  // correspondant (OriginShortcuts), pas avant.
+  const [wantsPosition, setWantsPosition] = useState(false);
+  const geolocation = useGeolocation(wantsPosition);
+  const [positionError, setPositionError] = useState<string | undefined>(
+    undefined,
+  );
 
   // Pre-remplissage des modes preferes depuis le profil (F1), uniquement si
   // connecte. Echec silencieux (pas de profil, session expiree...) : la
@@ -324,6 +414,27 @@ function RecherchePage() {
         if (!cancelled) {
           setSelectedModes(profile.preferredTransportModes);
           setAccessibilityPreferences(profile.accessibilityPreferences);
+          // Domicile/travail (issue #93) : PlaceSuggestion derive du profil,
+          // repli sur formatCoordinates si aucun libelle enregistre (voir
+          // ProfilPage.tsx, meme motif).
+          if (profile.homeLat != null && profile.homeLon != null) {
+            setHomeShortcut({
+              label:
+                profile.homeLabel ??
+                formatCoordinates(profile.homeLat, profile.homeLon),
+              lat: profile.homeLat,
+              lon: profile.homeLon,
+            });
+          }
+          if (profile.workLat != null && profile.workLon != null) {
+            setWorkShortcut({
+              label:
+                profile.workLabel ??
+                formatCoordinates(profile.workLat, profile.workLon),
+              lat: profile.workLat,
+              lon: profile.workLon,
+            });
+          }
         }
       })
       .catch(() => {});
@@ -331,6 +442,43 @@ function RecherchePage() {
       cancelled = true;
     };
   }, [isAuthenticated]);
+
+  // Position GPS actuelle comme origine (issue #93) : une seule lecture, pas
+  // un suivi continu (contrairement a RecherchePageResults, ou la carte
+  // affiche la position en temps reel tant qu'elle est visible) - des
+  // qu'une position est recue, on s'en sert et on se desabonne
+  // (setWantsPosition(false)), pas besoin de continuer a solliciter le
+  // capteur GPS pour un pre-remplissage ponctuel (eco-conception, CLAUDE.md).
+  // setState differe via queueMicrotask (voir react-hooks/set-state-in-effect) :
+  // meme motif que useAddressSuggestions.ts (setTimeout) - geolocation.status/
+  // position sont deja de l'etat React (renvoye par useGeolocation), pas le
+  // systeme externe brut ; l'appeler directement dans le corps synchrone de
+  // cet effet declenche des rendus en cascade que la regle signale.
+  useEffect(() => {
+    if (!wantsPosition) return;
+    const status = geolocation.status;
+    const position = geolocation.position;
+    queueMicrotask(() => {
+      if (status === 'watching' && position) {
+        const { lat, lon } = position;
+        const label = 'Ma position actuelle';
+        setOrigin({ query: label, selected: { label, lat, lon } });
+        setPositionError(undefined);
+        setWantsPosition(false);
+      } else if (
+        status === 'denied' ||
+        status === 'unsupported' ||
+        status === 'error'
+      ) {
+        setPositionError(
+          status === 'denied'
+            ? 'Géolocalisation refusée — impossible d\'utiliser votre position comme origine.'
+            : 'Votre position actuelle est indisponible pour le moment.',
+        );
+        setWantsPosition(false);
+      }
+    });
+  }, [wantsPosition, geolocation.status, geolocation.position]);
 
   // Chargement des raccourcis de recherche rapide (issue #112), meme garde
   // et meme echec silencieux que le pre-remplissage des modes ci-dessus : un
@@ -599,6 +747,17 @@ function RecherchePage() {
                 onChange={(value) =>
                   setOrigin({ query: value, selected: null })
                 }
+                onSelect={(place) =>
+                  setOrigin({ query: place.label, selected: place })
+                }
+              />
+
+              <OriginShortcuts
+                onUseCurrentPosition={() => setWantsPosition(true)}
+                isLocating={wantsPosition}
+                positionError={positionError}
+                home={homeShortcut}
+                work={workShortcut}
                 onSelect={(place) =>
                   setOrigin({ query: place.label, selected: place })
                 }
