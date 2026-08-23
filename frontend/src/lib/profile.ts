@@ -35,6 +35,22 @@ export interface MobilityProfile {
   userId: string;
   preferredTransportModes: string[];
   accessibilityPreferences: string[];
+  /**
+   * Adresses domicile/travail (issue #113/#114), utilisees comme raccourcis
+   * d'origine sur l'ecran de recherche (issue #93). `null` quand l'adresse
+   * n'a jamais ete renseignee - jamais une moitie seule (voir
+   * backend/src/profiles/profiles.service.ts#assertCompleteAddressPairs).
+   * Optionnelles ici (et non `| null` strictement requis) uniquement pour
+   * ne pas casser les mocks de profil deja ecrits par d'autres suites de
+   * tests (App.spec.tsx, ConnexionPage.spec.tsx...) qui predatent cette
+   * issue - l'API reelle les renvoie toujours (voir GET /profiles/me).
+   */
+  homeLabel?: string | null;
+  homeLat?: number | null;
+  homeLon?: number | null;
+  workLabel?: string | null;
+  workLat?: number | null;
+  workLon?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +58,18 @@ export interface MobilityProfile {
 export interface ProfileInput {
   preferredTransportModes: string[];
   accessibilityPreferences: string[];
+  /**
+   * Champs optionnels (issue #113/#114) : absents du payload envoye au
+   * backend quand une adresse n'est pas renseignee/modifiee - pas de
+   * semantique "effacer via null" a ce jour (voir docs/sprints/
+   * sprint-3-plan.md, PR #140), donc jamais `null` explicite ici.
+   */
+  homeLabel?: string;
+  homeLat?: number;
+  homeLon?: number;
+  workLabel?: string;
+  workLat?: number;
+  workLon?: number;
 }
 
 /** GET /profiles/me - leve une ApiError (404) si l'utilisateur n'a pas encore de profil. */

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { AuthProvider } from '../../lib/AuthProvider';
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from '../../lib/authStorage';
+import * as placesLib from '../../lib/places';
 import * as profileLib from '../../lib/profile';
 import ProfilPage from './ProfilPage';
 
@@ -28,6 +29,9 @@ vi.mock('../../lib/profile', async () => {
   };
 });
 
+// AddressField (domicile/travail, issue #113/#114) appelle GET /places.
+vi.mock('../../lib/places');
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -41,6 +45,7 @@ function renderPage() {
 describe('ProfilPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(placesLib.searchPlaces).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -287,5 +292,100 @@ describe('ProfilPage', () => {
     expect(
       await screen.findByText('Erreur interne du serveur'),
     ).toBeInTheDocument();
+  });
+
+  describe('domicile et travail (issue #113/#114)', () => {
+    const RUE_DE_LA_PAIX = { label: 'Rue de la Paix', lat: 48.1, lon: -1.2 };
+
+    function mockExistingProfile(
+      overrides: Partial<profileLib.MobilityProfile> = {},
+    ) {
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ...overrides,
+      });
+    }
+
+    it('pre-remplit le champ domicile avec une adresse deja enregistree', async () => {
+      mockExistingProfile({
+        homeLabel: 'Domicile test',
+        homeLat: 48.1,
+        homeLon: -1.2,
+      });
+
+      renderPage();
+
+      expect(await screen.findByLabelText('Domicile')).toHaveValue(
+        'Domicile test',
+      );
+    });
+
+    it('envoie la nouvelle adresse travail selectionnee, sans toucher au domicile (laisse vide)', async () => {
+      mockExistingProfile();
+      vi.mocked(placesLib.searchPlaces).mockResolvedValue([RUE_DE_LA_PAIX]);
+      vi.mocked(profileLib.updateProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.type(await screen.findByLabelText('Travail'), 'Rue');
+      const suggestion = await screen.findByRole('button', {
+        name: 'Rue de la Paix',
+      });
+      await user.click(suggestion);
+      await user.click(
+        await screen.findByRole('button', { name: 'Enregistrer' }),
+      );
+
+      await waitFor(() => {
+        expect(profileLib.updateProfile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            workLabel: 'Rue de la Paix',
+            workLat: 48.1,
+            workLon: -1.2,
+          }),
+        );
+      });
+      // Domicile jamais renseigne ni touche : aucune cle correspondante
+      // dans le payload (voir handleSubmit - un champ vide n'envoie rien,
+      // pas de semantique "effacer").
+      const [payload] = vi.mocked(profileLib.updateProfile).mock.calls[0];
+      expect(payload).not.toHaveProperty('homeLabel');
+      expect(payload).not.toHaveProperty('homeLat');
+      expect(payload).not.toHaveProperty('homeLon');
+    });
+
+    it(
+      "signale une adresse tapee mais non selectionnee comme non resolue, " +
+        'sans appeler updateProfile',
+      async () => {
+        mockExistingProfile();
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.type(await screen.findByLabelText('Domicile'), 'Rue');
+        await user.click(
+          await screen.findByRole('button', { name: 'Enregistrer' }),
+        );
+
+        expect(
+          await screen.findByText(
+            'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.',
+          ),
+        ).toBeInTheDocument();
+        expect(profileLib.updateProfile).not.toHaveBeenCalled();
+      },
+    );
   });
 });
