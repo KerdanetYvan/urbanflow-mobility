@@ -466,6 +466,134 @@ describe('RecherchePage', () => {
     );
   });
 
+  describe("raccourcis d'origine (issue #93)", () => {
+    // Meme motif de stub que useGeolocation.spec.ts (lib/useGeolocation.ts) -
+    // pas de mock du module useGeolocation lui-meme, on simule directement
+    // l'API navigateur qu'il enveloppe.
+    function mockGeolocation(overrides: Partial<Geolocation> = {}) {
+      const geolocation = {
+        watchPosition: vi.fn(),
+        clearWatch: vi.fn(),
+        getCurrentPosition: vi.fn(),
+        ...overrides,
+      };
+      vi.stubGlobal('navigator', { ...navigator, geolocation });
+      return geolocation;
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('remplit l\'origine avec la position GPS actuelle au clic sur le bouton dedie', async () => {
+      mockGeolocation({
+        watchPosition: vi.fn((success: PositionCallback) => {
+          success({
+            coords: { latitude: 45.76, longitude: 4.86 },
+          } as GeolocationPosition);
+          return 1;
+        }),
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Ma position actuelle' }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Origine')).toHaveValue(
+          'Ma position actuelle',
+        );
+      });
+    });
+
+    it('affiche un message si la geolocalisation est refusee, sans planter', async () => {
+      mockGeolocation({
+        watchPosition: vi.fn(
+          (_success: PositionCallback, error: PositionErrorCallback) => {
+            error({ code: 1, PERMISSION_DENIED: 1 } as GeolocationPositionError);
+            return 1;
+          },
+        ),
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Ma position actuelle' }),
+      );
+
+      expect(
+        await screen.findByText(
+          "Géolocalisation refusée — impossible d'utiliser votre position comme origine.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Origine')).toHaveValue('');
+    });
+
+    it("n'affiche aucun raccourci domicile/travail pour un utilisateur non authentifie", () => {
+      renderPage();
+
+      expect(
+        screen.queryByRole('button', { name: 'Domicile' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Travail' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it(
+      "n'affiche pas le raccourci domicile si le profil connecte n'en a pas " +
+        'enregistre',
+      async () => {
+        saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+        vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+          id: 'profile-1',
+          userId: 'user-1',
+          preferredTransportModes: [],
+          accessibilityPreferences: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        renderPage();
+
+        await waitFor(() => expect(profileLib.getMyProfile).toHaveBeenCalled());
+        expect(
+          screen.queryByRole('button', { name: 'Domicile' }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it(
+      'remplit l\'origine avec le domicile enregistre au clic sur son ' +
+        'raccourci (issue #113/#114)',
+      async () => {
+        saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+        vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+          id: 'profile-1',
+          userId: 'user-1',
+          preferredTransportModes: [],
+          accessibilityPreferences: [],
+          homeLabel: 'Domicile test',
+          homeLat: 48.1,
+          homeLon: -1.2,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        const homeButton = await screen.findByRole('button', {
+          name: 'Domicile',
+        });
+        await user.click(homeButton);
+
+        expect(screen.getByLabelText('Origine')).toHaveValue('Domicile test');
+      },
+    );
+  });
+
   describe('panneau formulaire (bandeau mobile, issue #110/#111)', () => {
     function panel(container: HTMLElement) {
       const el = container.querySelector('.recherche-panel-form');
