@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -33,6 +34,11 @@ import { UsersModule } from './users/users.module';
         synchronize: config.get<string>('TYPEORM_SYNC', 'false') === 'true',
       }),
     }),
+    // Enregistrement global du scheduler NestJS (necessaire une seule fois
+    // pour toute l'app) - utilise par TripHistoryService (issue #11) pour
+    // la purge quotidienne automatique de l'historique perime (RGPD, voir
+    // docs/specs/rgpd-geolocalisation.md section 3.1).
+    ScheduleModule.forRoot(),
     UsersModule,
     AuthModule,
     ProfilesModule,

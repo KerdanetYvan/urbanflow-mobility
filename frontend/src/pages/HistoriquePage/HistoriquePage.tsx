@@ -1,25 +1,142 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Alert from '../../components/Alert/Alert';
 import { HistoryIcon } from '../../components/icons';
+import { ApiError } from '../../lib/api';
+import { getTripHistory, type TripHistoryEntry } from '../../lib/trips';
+import { useAuth } from '../../lib/useAuth';
 import './HistoriquePage.css';
 
 /**
- * Ecran d'historique des trajets recents (F2, stretch).
+ * Formate une date ISO en date + heure courtes ("15 août, 14:05"), utilise
+ * pour afficher la derniere recherche d'une entree d'historique. Format
+ * different de formatTime (lib/format.ts, heure seule) : une entree
+ * d'historique peut dater de plusieurs jours, contrairement aux horaires de
+ * depart/arrivee d'un itineraire deja en cours d'affichage.
+ */
+function formatLastSearched(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Une entree de la liste d'historique - simple resume texte (pas de carte ni
+ * de trace), le detail complet de l'itineraire n'est plus disponible une
+ * fois la recherche passee (seuls origine/destination/date sont conserves,
+ * voir TripHistoryEntry). Pas de bouton "relancer" ici : l'integration avec
+ * le formulaire de recherche est portee par l'issue #112 (raccourcis de
+ * recherche rapide), hors perimetre de l'issue #11.
+ */
+function HistoryEntryCard({ entry }: { entry: TripHistoryEntry }) {
+  return (
+    <li className="historique-entry">
+      <div className="historique-entry-route">
+        <span>{entry.originLabel ?? formatCoordinates(entry.originLat, entry.originLon)}</span>
+        <span className="historique-entry-arrow" aria-hidden="true">→</span>
+        <span>
+          {entry.destinationLabel ??
+            formatCoordinates(entry.destinationLat, entry.destinationLon)}
+        </span>
+      </div>
+      <p className="historique-entry-date">
+        Recherché le {formatLastSearched(entry.lastSearchedAt)}
+      </p>
+    </li>
+  );
+}
+
+/** Repli d'affichage quand aucun libelle n'est disponible (ex. position geolocalisee sans reverse geocoding). */
+function formatCoordinates(lat: number, lon: number): string {
+  return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+}
+
+/**
+ * Ecran d'historique des trajets recents (F2, issue #11).
  *
- * Contenu reel a implementer par l'issue dediee "F2 - Historique des
- * trajets recents" (backlog Stretch) - hors perimetre de l'issue #73
- * (docs/specs/refonte-visuelle-mobile-desktop.md section 5.3), qui ne
- * cadre qu'un habillage minimal de coherence visuelle pour ce placeholder,
- * pas sa vraie disposition (encore inconnue).
+ * Charge GET /trips/history au montage - necessite un compte (route
+ * enveloppee dans RequireAuth, voir App.tsx). Chaque recherche authentifiee
+ * lancee depuis /recherche est enregistree automatiquement cote backend
+ * (TripsService#search), rien a declencher explicitement ici.
  */
 function HistoriquePage() {
+  const navigate = useNavigate();
+  const { setAuthenticated } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [entries, setEntries] = useState<TripHistoryEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const history = await getTripHistory();
+        if (cancelled) return;
+        setEntries(history);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.statusCode === 401) {
+          // authGet a deja nettoye les jetons invalides (voir lib/api.ts) :
+          // meme garde que ProfilPage - resynchronise le contexte pour que
+          // la nav (AppLayout) arrete immediatement de proposer Profil/
+          // Historique.
+          setAuthenticated(false);
+          navigate('/connexion');
+        } else {
+          setError("Impossible de charger l'historique pour le moment.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, setAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <section className="historique-page">
+        <h1>Historique</h1>
+        <p>Chargement…</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="historique-page">
+        <h1>Historique</h1>
+        <Alert variant="error" title="Erreur">
+          {error}
+        </Alert>
+      </section>
+    );
+  }
+
   return (
     <section className="historique-page">
       <h1>Historique</h1>
-      <div className="historique-empty">
-        <span className="historique-empty-icon" aria-hidden="true">
-          <HistoryIcon />
-        </span>
-        <p>L'historique des trajets récents sera affiché ici.</p>
-      </div>
+      {entries.length === 0 ? (
+        <div className="historique-empty">
+          <span className="historique-empty-icon" aria-hidden="true">
+            <HistoryIcon />
+          </span>
+          <p>L'historique des trajets récents sera affiché ici.</p>
+        </div>
+      ) : (
+        <ul className="historique-list">
+          {entries.map((entry) => (
+            <HistoryEntryCard key={entry.id} entry={entry} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

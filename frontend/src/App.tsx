@@ -56,7 +56,14 @@ function App() {
               direct/favori existant vers l'ancienne route est redirige,
               plutot que de casser silencieusement. */}
           <Route path="resultats" element={<Navigate to="/recherche" replace />} />
-          <Route path="historique" element={<HistoriquePage />} />
+          <Route
+            path="historique"
+            element={
+              <RequireAuth>
+                <HistoriquePage />
+              </RequireAuth>
+            }
+          />
           {/* Public : un utilisateur qui a oublie son mot de passe n'est
               justement pas connecte (issue #71). */}
           <Route

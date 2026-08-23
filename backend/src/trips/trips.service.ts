@@ -13,6 +13,7 @@ import { OtpClientService } from '../otp/otp-client.service';
 import { decodePolyline } from '../otp/polyline';
 import { ProfilesService } from '../profiles/profiles.service';
 import { ScoringService } from '../scoring/scoring.service';
+import { TripHistoryService } from './history/trip-history.service';
 
 @Injectable()
 export class TripsService {
@@ -20,6 +21,7 @@ export class TripsService {
     private readonly otpClient: OtpClientService,
     private readonly profilesService: ProfilesService,
     private readonly scoringService: ScoringService,
+    private readonly tripHistoryService: TripHistoryService,
   ) {}
 
   /**
@@ -38,6 +40,11 @@ export class TripsService {
    * correspondances), proche du tri natif d'OTP.
    */
   async search(dto: SearchTripsDto, userId?: string): Promise<TripItinerary[]> {
+    // L'enregistrement de l'historique (issue #11) est lance en parallele du
+    // reste - il n'a besoin ni du resultat OTP ni du profil, et
+    // TripHistoryService#record avale ses propres erreurs (ne peut jamais
+    // faire echouer la recherche). Absent (userId undefined) : recherche non
+    // authentifiee, rien a historiser (voir OptionalJwtAuthGuard).
     const [itineraries, profile] = await Promise.all([
       this.otpClient.planTrip({
         originLat: dto.originLat,
@@ -49,6 +56,7 @@ export class TripsService {
           : undefined,
       }),
       userId ? this.profilesService.findByUserIdOrNull(userId) : null,
+      userId ? this.tripHistoryService.record(userId, dto) : null,
     ]);
 
     const mapped = itineraries.map((itinerary) => this.mapItinerary(itinerary));

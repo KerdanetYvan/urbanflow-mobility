@@ -62,9 +62,9 @@ Critère d'acceptation de #22 : toute exploitation statistique future de donnée
 
 ## 4. Application à #11/#113 : obligations pour les futures colonnes
 
-Checklist à cocher par #11 et #113 au moment d'introduire leurs colonnes de géolocalisation :
+Checklist à cocher par #11 et #113 au moment d'introduire leurs colonnes de géolocalisation (chaque case couvre les deux issues — ne se coche que lorsque LES DEUX l'ont appliquée) :
 
-- [ ] Colonne typée `text`, `transformer: createEncryptedColumnTransformer<...>()` appliqué (section 2.2)
-- [ ] `GEOLOCATION_ENCRYPTION_KEY` renseignée dans l'environnement de déploiement concerné (dev, CI, prod) — absente en CI/tests, la valeur de test du fichier `.spec.ts` du transformer suffit, jamais une vraie clé de production dans un test
-- [ ] Politique de rétention/purge définie et implémentée selon le type de donnée (section 3.1 ou 3.2)
-- [ ] `onDelete: 'CASCADE'` sur toute relation vers `User` portant la donnée
+- [ ] Colonne typée `text`, `transformer: createEncryptedColumnTransformer<...>()` appliqué (section 2.2) — #11 fait (`TripHistoryEntry`, `backend/src/trips/history/trip-history-entry.entity.ts`, 6 colonnes chiffrées : coordonnées + libellés d'origine/destination), #113 restant
+- [ ] `GEOLOCATION_ENCRYPTION_KEY` renseignée dans l'environnement de déploiement concerné (dev, CI, prod) — absente en CI/tests, la valeur de test du fichier `.spec.ts` du transformer suffit, jamais une vraie clé de production dans un test — #11 vérifié en conditions réelles (round-trip chiffré/déchiffré contre la DB de dev), #113 restant
+- [ ] Politique de rétention/purge définie et implémentée selon le type de donnée (section 3.1 ou 3.2) — #11 fait (`TripHistoryService#purgeExpired`, purge quotidienne automatique via `@Cron`/`@nestjs/schedule`, 12 mois glissants), #113 restant (pas de purge temporelle attendue, section 3.2)
+- [ ] `onDelete: 'CASCADE'` sur toute relation vers `User` portant la donnée — #11 fait (`TripHistoryEntry.user`, `ManyToOne`, vérifié en conditions réelles : la suppression d'un compte de test entraîne bien la suppression de son historique), #113 restant

@@ -1,4 +1,4 @@
-import { apiGet } from './api';
+import { apiGet, authGet } from './api';
 
 /** Voir backend/src/trips/dto/trip-itinerary.dto.ts (issue #7) - un point (origine/destination/correspondance) d'un segment d'itineraire. */
 export interface TripPlace {
@@ -62,6 +62,14 @@ export interface SearchTripsParams {
   destinationLon: number;
   /** ISO 8601. Absent = maintenant (comportement par defaut du backend). */
   departureTime?: string;
+  /**
+   * Libelles d'adresse lisibles (issue #11), envoyes uniquement quand
+   * l'utilisateur est connecte (voir RecherchePage.tsx) - servent
+   * uniquement a l'historique des trajets cote backend
+   * (TripHistoryService#record), jamais transmis a OpenTripPlanner.
+   */
+  originLabel?: string;
+  destinationLabel?: string;
 }
 
 /**
@@ -70,6 +78,11 @@ export interface SearchTripsParams {
  * itineraires deja tries par le backend (ordre natif OTP en Sprint 2, voir
  * docs/specs/f2-ecrans-planification.md section 3.4) - l'appelant ne doit
  * pas re-trier.
+ *
+ * Si un utilisateur authentifie est connu cote backend (jeton fourni, voir
+ * lib/api.ts - cette fonction elle-meme n'attache jamais de jeton), la
+ * recherche est enregistree automatiquement dans l'historique (issue #11,
+ * TripsService#search) - aucun appel reseau supplementaire necessaire ici.
  */
 export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]> {
   const query = new URLSearchParams({
@@ -78,6 +91,32 @@ export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]>
     destinationLat: String(params.destinationLat),
     destinationLon: String(params.destinationLon),
     ...(params.departureTime ? { departureTime: params.departureTime } : {}),
+    ...(params.originLabel ? { originLabel: params.originLabel } : {}),
+    ...(params.destinationLabel
+      ? { destinationLabel: params.destinationLabel }
+      : {}),
   });
   return apiGet<TripItinerary[]>(`/trips?${query.toString()}`);
+}
+
+/** Une entree dedupliquee de l'historique de recherche (voir backend/src/trips/dto/trip-history-entry.dto.ts, issue #11). */
+export interface TripHistoryEntry {
+  id: string;
+  originLat: number;
+  originLon: number;
+  originLabel?: string;
+  destinationLat: number;
+  destinationLon: number;
+  destinationLabel?: string;
+  /** ISO 8601 - date/heure de la recherche la plus recente pour ce couple origine/destination. */
+  lastSearchedAt: string;
+}
+
+/**
+ * Historique des trajets recemment recherches (GET /trips/history, issue
+ * #11). Necessite un compte (contrairement a searchTrips) - authGet attache
+ * le jeton et gere le rafraichissement/401 (voir lib/api.ts).
+ */
+export function getTripHistory(): Promise<TripHistoryEntry[]> {
+  return authGet<TripHistoryEntry[]>('/trips/history');
 }
