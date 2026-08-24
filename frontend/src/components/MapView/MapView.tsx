@@ -249,13 +249,32 @@ function MapView({
             />
           );
         })}
+        {/* interactive={false} + keyboard={false} sur tous les marqueurs
+            (issue #20, audit WCAG) : Leaflet rend un marqueur cliquable
+            (interactive, classe leaflet-interactive) ET focusable au clavier
+            (keyboard, tabindex="0"/role="button") par defaut, meme sans
+            gestionnaire de clic - or aucun marqueur ici n'a de comportement
+            au clic, et le conteneur de la carte est deja aria-hidden (voir
+            plus haut). Un marqueur focusable mais aria-hidden serait
+            atteignable au Tab sans jamais etre annonce par un lecteur
+            d'ecran (violation axe-core button-name/4.1.2) - ces deux options
+            retirent le marqueur du parcours clavier plutot que de lui
+            ajouter un libelle qui contredirait la carte etant deliberement
+            decorative. */}
         {origin && (
-          <Marker position={[origin.lat, origin.lon]} icon={ORIGIN_ICON} />
+          <Marker
+            position={[origin.lat, origin.lon]}
+            icon={ORIGIN_ICON}
+            interactive={false}
+            keyboard={false}
+          />
         )}
         {destination && (
           <Marker
             position={[destination.lat, destination.lon]}
             icon={DESTINATION_ICON}
+            interactive={false}
+            keyboard={false}
           />
         )}
         {singlePoint && (
@@ -264,6 +283,8 @@ function MapView({
             // originProp fourni (destinationProp absent) -> c'est l'origine
             // qui manque de contrepartie, meme icone que le cas complet.
             icon={originProp ? ORIGIN_ICON : DESTINATION_ICON}
+            interactive={false}
+            keyboard={false}
           />
         )}
         {transferPoints.map((point, index) => (
@@ -271,6 +292,8 @@ function MapView({
             key={index}
             position={[point.lat, point.lon]}
             icon={TRANSFER_ICON}
+            interactive={false}
+            keyboard={false}
           />
         ))}
         {userPosition && (
@@ -282,6 +305,8 @@ function MapView({
           <Marker
             position={[userPosition.lat, userPosition.lon]}
             icon={USER_POSITION_ICON}
+            interactive={false}
+            keyboard={false}
           />
         )}
       </MapContainer>
