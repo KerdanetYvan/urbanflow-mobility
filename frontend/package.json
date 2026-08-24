@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "favicon": "node scripts/generate-favicon.mjs",
     "icons": "npm run favicon && node scripts/generate-pwa-icons.mjs"
   },
@@ -22,7 +23,9 @@
     "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
