@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -95,5 +95,10 @@ export default defineConfig({
     // Autorise describe/it/expect sans les importer explicitement dans
     // chaque fichier de test (comme le fait Jest cote backend).
     globals: true,
+    // e2e/ contient les specs Playwright (issue #20, audit WCAG) : un tout
+    // autre executeur de tests (vrai navigateur, pas jsdom), avec son propre
+    // test.describe() incompatible avec celui de Vitest - exclu explicitement
+    // pour que Vitest ne tente pas de les collecter en plus des siens.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

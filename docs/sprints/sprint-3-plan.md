@@ -57,7 +57,7 @@ Les 21 issues ouvertes du Sprint 3 (9 déjà planifiées F3/scoring/audits trans
 ### Phase E — Qualité transverse (passe de clôture)
 
 - [ ] [#32](https://github.com/KerdanetYvan/urbanflow-mobility/issues/32) (QA) — Plan de tests transverse (accessibilité, sécurité, RGPD)
-- [ ] [#20](https://github.com/KerdanetYvan/urbanflow-mobility/issues/20) (Dev FE) — Audit accessibilité WCAG 2.1 AA
+- [x] [#20](https://github.com/KerdanetYvan/urbanflow-mobility/issues/20) (Dev FE) — Audit accessibilité WCAG 2.1 AA — `docs/audits/wcag-audit.md` + `frontend/e2e/wcag-audit.spec.ts` (Playwright + axe-core, contre le vrai navigateur et les vraies données GTFS/OSM, seul moyen fiable de vérifier le contraste réel) : 9/9 tests verts sur les 7 écrans clés + 2 parcours clavier dédiés. Une anomalie détectée et corrigée : marqueurs `MapView` (Leaflet) focusables sans nom accessible malgré la carte déjà `aria-hidden` — `interactive={false}`/`keyboard={false}` ajoutés (aucun marqueur n'a de comportement au clic dans ce projet), plutôt que de leur ajouter un libellé qui aurait contredit la carte étant délibérément décorative pour les technologies d'assistance. `vite.config.ts` : dossier `e2e/` exclu de Vitest (conflit `test.describe` avec Playwright). Suite Vitest (170 tests) et build inchangés, toujours au vert.
 - [ ] [#21](https://github.com/KerdanetYvan/urbanflow-mobility/issues/21) (Dev BE) — Audit sécurité OWASP Top 10 sur l'API
 
 ### Phase F — Clôture soutenance

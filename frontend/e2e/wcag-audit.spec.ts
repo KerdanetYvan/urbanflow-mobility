@@ -1,0 +1,132 @@
+import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+/**
+ * Audit d'accessibilite WCAG 2.1 AA (issue #20).
+ *
+ * Verifie les 7 ecrans cles identifies dans docs/specs/plan-tests-transverse.md
+ * section 2.2, contre un vrai navigateur (Chromium) et de vraies donnees
+ * GTFS/OSM de Rennes Metropole - pas de mock, dans la continuite des
+ * verifications "en conditions reelles" deja pratiquees sur ce projet
+ * (issues #93, #107, #109, #112).
+ *
+ * Chaque test echoue si axe-core remonte une violation : le but n'est pas
+ * seulement de produire un rapport, mais de forcer la correction avant que
+ * l'audit soit considere termine (critere d'acceptation "rapport d'audit
+ * sans erreur bloquante").
+ */
+
+/** Compte de test dedie a l'audit, cree une seule fois avant les tests (voir README pour la procedure). */
+const AUDIT_EMAIL = 'audit-wcag@test.local';
+const AUDIT_PASSWORD = 'AuditWcag123!';
+
+/**
+ * Lance axe-core sur la page courante et echoue le test en listant les
+ * violations trouvees (regle, impact, nombre d'elements concernes) plutot
+ * qu'un message generique - necessaire pour corriger efficacement.
+ */
+async function expectNoAxeViolations(page: Page) {
+  const results = await new AxeBuilder({ page }).analyze();
+  const summary = results.violations
+    .map(
+      (v) =>
+        `- [${v.impact}] ${v.id}: ${v.description} (${v.nodes.length} element(s))\n` +
+        v.nodes.map((n) => `    ${n.target.join(' ')}`).join('\n'),
+    )
+    .join('\n');
+  expect(results.violations, summary).toEqual([]);
+}
+
+/** Connexion via le formulaire reel (pas d'injection de jeton en storage) - coherent avec le reste du parcours audite. */
+async function login(page: Page) {
+  await page.goto('/connexion');
+  await page.getByLabel('Adresse email').fill(AUDIT_EMAIL);
+  await page.getByLabel('Mot de passe').fill(AUDIT_PASSWORD);
+  await page.getByRole('button', { name: 'Se connecter' }).click();
+  await page.waitForURL(/\/(recherche|profil)/);
+}
+
+test.describe('Écrans publics', () => {
+  const publicPages: Array<[string, string]> = [
+    ['Connexion', '/connexion'],
+    ['Recherche (sans résultats)', '/recherche'],
+    ['Mot de passe oublié', '/mot-de-passe-oublie'],
+    ['Réinitialiser le mot de passe', '/reset-password?token=audit-dummy-token'],
+  ];
+
+  for (const [name, url] of publicPages) {
+    test(name, async ({ page }) => {
+      await page.goto(url);
+      await expectNoAxeViolations(page);
+    });
+  }
+});
+
+test.describe('Écrans authentifiés', () => {
+  test('Profil', async ({ page }) => {
+    await login(page);
+    await page.goto('/profil');
+    await expectNoAxeViolations(page);
+  });
+
+  test('Historique', async ({ page }) => {
+    await login(page);
+    await page.goto('/historique');
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe('Recherche avec résultats', () => {
+  test('Résultats de recherche affichés', async ({ page }) => {
+    await page.goto('/recherche');
+
+    await page.getByLabel('Origine', { exact: true }).fill('Gares');
+    await page.getByRole('button', { name: /Gares/ }).first().click();
+
+    await page.getByLabel('Destination', { exact: true }).fill('République');
+    await page.getByRole('button', { name: /République/ }).first().click();
+
+    await page.getByRole('button', { name: 'Rechercher' }).click();
+    // Un itineraire affiche confirme que les resultats sont bien rendus
+    // (pas seulement un etat de chargement) avant de lancer axe.
+    await page.locator('.resultats-card, .resultats-empty, .alert-error').first().waitFor({ timeout: 15_000 });
+
+    await expectNoAxeViolations(page);
+  });
+});
+
+test.describe('Navigation clavier', () => {
+  test('Popover "Modes de transport" : ouverture/fermeture au clavier', async ({ page }) => {
+    await page.goto('/recherche');
+
+    const trigger = page.getByRole('button', { name: /Modes de transport/ });
+    await trigger.focus();
+    await expect(trigger).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#recherche-modes-panel')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    // Le focus doit revenir explicitement au declencheur a la fermeture
+    // (spec docs/specs/filtre-modes-transport.md section 3).
+    await expect(trigger).toBeFocused();
+  });
+
+  test('Formulaire de recherche : parcours complet au clavier sans piège', async ({ page }) => {
+    await page.goto('/recherche');
+
+    // Tabule depuis le premier champ jusqu'au bouton "Rechercher" et verifie
+    // qu'aucune etape ne bloque (chaque Tab doit deplacer le focus vers un
+    // element different de celui d'avant).
+    await page.getByLabel('Origine', { exact: true }).focus();
+    let previous = await page.evaluate(() => document.activeElement?.outerHTML ?? '');
+    for (let i = 0; i < 15; i += 1) {
+      await page.keyboard.press('Tab');
+      const current = await page.evaluate(() => document.activeElement?.outerHTML ?? '');
+      expect(current, `Le focus n'a pas bouge a l'etape ${i}`).not.toEqual(previous);
+      previous = current;
+    }
+  });
+});
