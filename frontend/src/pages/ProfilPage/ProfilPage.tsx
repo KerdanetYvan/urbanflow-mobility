@@ -4,6 +4,7 @@ import Alert from '../../components/Alert/Alert';
 import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
+import Skeleton from '../../components/Skeleton/Skeleton';
 import { ApiError } from '../../lib/api';
 import { logout } from '../../lib/auth';
 import { formatCoordinates } from '../../lib/format';
@@ -413,7 +414,7 @@ function ProfilPage() {
     return (
       <section>
         <h1>Profil de mobilité</h1>
-        <p>Chargement…</p>
+        <Skeleton count={3} />
       </section>
     );
   }

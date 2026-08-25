@@ -3,6 +3,7 @@ import Badge from '../../components/Badge/Badge';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
+import Skeleton from '../../components/Skeleton/Skeleton';
 import { getTripModeIcon } from '../../components/tripModeIcon';
 import { toHexColor } from '../../lib/color';
 import {
@@ -306,23 +307,6 @@ function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
   );
 }
 
-/**
- * Squelette de chargement (issue #73, spec 2.4) affiche a la place des
- * cartes-itineraire tant que GET /trips n'a pas repondu - simple bloc
- * anime en pulsation (voir RecherchePageResults.css), respecte
- * prefers-reduced-motion comme l'anneau de position temps reel de
- * MapView.css.
- */
-function ResultsSkeleton() {
-  return (
-    <div className="resultats-skeleton" aria-hidden="true">
-      <div className="resultats-skeleton-card" />
-      <div className="resultats-skeleton-card" />
-      <div className="resultats-skeleton-card" />
-    </div>
-  );
-}
-
 interface RecherchePageResultsProps {
   origin: PlaceSuggestion;
   destination: PlaceSuggestion;
@@ -462,7 +446,7 @@ function RecherchePageResults({
         <div className="resultats-panels">
           <div className="resultats-panel resultats-panel-list">
             <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-            <ResultsSkeleton />
+            <Skeleton count={3} />
           </div>
         </div>
         <div className="resultats-sheet" data-sheet-state="list">
@@ -471,7 +455,7 @@ function RecherchePageResults({
           </div>
           <div className="resultats-sheet-body">
             <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-            <ResultsSkeleton />
+            <Skeleton count={3} />
           </div>
         </div>
       </div>
