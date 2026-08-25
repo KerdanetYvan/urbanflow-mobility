@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -13,6 +14,14 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
  */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // En-tetes de securite HTTP standards (issue #21, audit OWASP - A05
+  // Mauvaise configuration de securite) : helmet pose un ensemble d'en-tetes
+  // recommandes (Content-Security-Policy, X-Content-Type-Options,
+  // Strict-Transport-Security...) en une seule ligne plutot que de les
+  // gerer individuellement. Applique avant tout autre middleware pour
+  // couvrir l'ensemble des reponses, y compris les erreurs.
+  app.use(helmet());
 
   // CORS : le frontend (port 5173 en dev) et le backend (port 3000) sont
   // deux origines differentes du point de vue du navigateur. Sans ceci,

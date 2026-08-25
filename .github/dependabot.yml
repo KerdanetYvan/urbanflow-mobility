@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Dependances npm du backend (issue #21, audit OWASP - A06 Composants
+  # vulnerables ou obsoletes) : verifie chaque semaine les mises a jour
+  # disponibles et ouvre une PR par mise a jour, plutot que de decouvrir une
+  # vulnerabilite connue au hasard d'un `npm audit` manuel.
+  - package-ecosystem: 'npm'
+    directory: '/backend'
+    schedule:
+      interval: 'weekly'
+
+  - package-ecosystem: 'npm'
+    directory: '/frontend'
+    schedule:
+      interval: 'weekly'
+
+  # Actions utilisees par le pipeline CI/CD (.github/workflows/) - memes
+  # raisons que les dependances applicatives, une action obsolete peut aussi
+  # etre une source de vulnerabilite.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -39,6 +40,24 @@ import { UsersModule } from './users/users.module';
     // la purge quotidienne automatique de l'historique perime (RGPD, voir
     // docs/specs/rgpd-geolocalisation.md section 3.1).
     ScheduleModule.forRoot(),
+    // Limitation de debit (issue #21, audit OWASP - A04 Conception non
+    // securisee) : configuration disponible pour toute l'app, mais le garde
+    // ThrottlerGuard n'est applique qu'aux endpoints sensibles
+    // (AuthController) plutot qu'en garde global - inutile de limiter le
+    // debit d'une recherche d'itineraire publique (GET /trips) de la meme
+    // facon qu'une tentative de connexion, qui est la seule cible reelle
+    // d'une attaque par force brute sur cette API.
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          // 10 requetes / minute / IP : large marge pour un usage legitime
+          // (quelques essais de mot de passe, un rafraichissement de jeton),
+          // suffisamment bas pour freiner une attaque automatisee.
+          ttl: 60_000,
+          limit: 10,
+        },
+      ],
+    }),
     UsersModule,
     AuthModule,
     ProfilesModule,
