@@ -526,7 +526,7 @@ describe('RecherchePage', () => {
 
       expect(
         await screen.findByText(
-          "Géolocalisation refusée — impossible d'utiliser votre position comme origine.",
+          "Géolocalisation refusée. Impossible d'utiliser votre position comme origine.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByLabelText('Origine')).toHaveValue('');

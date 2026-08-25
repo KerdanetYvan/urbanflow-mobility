@@ -472,7 +472,7 @@ function RecherchePage() {
       ) {
         setPositionError(
           status === 'denied'
-            ? 'Géolocalisation refusée — impossible d\'utiliser votre position comme origine.'
+            ? 'Géolocalisation refusée. Impossible d\'utiliser votre position comme origine.'
             : 'Votre position actuelle est indisponible pour le moment.',
         );
         setWantsPosition(false);

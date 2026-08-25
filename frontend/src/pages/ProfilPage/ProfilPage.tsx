@@ -113,7 +113,7 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
           <h2>Modes de transport préférés</h2>
           <p>
             Quels modes de transport utilisez-vous le plus souvent ? Cela
-            nous aide à classer vos itinéraires — vous pourrez changer cela
+            nous aide à classer vos itinéraires. Vous pourrez changer cela
             à tout moment depuis votre profil.
           </p>
           <fieldset className="profil-fieldset">
