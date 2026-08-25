@@ -62,7 +62,7 @@ Les 21 issues ouvertes du Sprint 3 (9 déjà planifiées F3/scoring/audits trans
 
 ### Phase F — Clôture soutenance
 
-- [ ] [#41](https://github.com/KerdanetYvan/urbanflow-mobility/issues/41) (PO) — Préparer le support de démonstration pour la soutenance
+- [x] [#41](https://github.com/KerdanetYvan/urbanflow-mobility/issues/41) (PO) — Préparer le support de démonstration pour la soutenance — **reportée** au milestone "Stretch (post-MVP)" (décision utilisateur en session le 2026-08-25), Status board repassé en Backlog. Sprint 3 clôturé sans cette issue : toutes les phases obligatoires (A à E) sont terminées, seule la préparation du support de démo (non bloquante pour la certification elle-même) glisse.
 
 ## Pourquoi cet ordre (raisonnement complet en cas de doute)
 
