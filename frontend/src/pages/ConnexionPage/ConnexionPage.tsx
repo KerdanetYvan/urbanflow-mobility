@@ -59,6 +59,36 @@ function ConnexionPage() {
   }
 
   /**
+   * Met a jour le mot de passe et efface immediatement les erreurs qui lui
+   * sont liees (issue #175 : sans ca, "Les mots de passe ne correspondent
+   * pas" restait affiche a l'ecran meme apres correction, jusqu'au prochain
+   * submit - validate() ne les recalcule qu'a ce moment-la). Efface aussi
+   * confirmPassword en plus de password : la correspondance depend des DEUX
+   * champs, modifier l'un peut suffire a la corriger.
+   */
+  function handlePasswordChange(value: string) {
+    setPassword(value);
+    setFieldErrors((previous) => {
+      if (!previous.password && !previous.confirmPassword) return previous;
+      const next = { ...previous };
+      delete next.password;
+      delete next.confirmPassword;
+      return next;
+    });
+  }
+
+  /** Meme logique que handlePasswordChange, cote confirmation. */
+  function handleConfirmPasswordChange(value: string) {
+    setConfirmPassword(value);
+    setFieldErrors((previous) => {
+      if (!previous.confirmPassword) return previous;
+      const next = { ...previous };
+      delete next.confirmPassword;
+      return next;
+    });
+  }
+
+  /**
    * Validation cote client : donne un retour immediat sans aller-retour
    * reseau pour les cas evidents. Le backend revalide de toute facon tout
    * (jamais faire confiance uniquement a la validation cote client).
@@ -204,7 +234,7 @@ function ConnexionPage() {
                 autoComplete="current-password"
                 icon={<LockIcon />}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => handlePasswordChange(event.target.value)}
                 error={fieldErrors.password}
               />
               <Link to="/mot-de-passe-oublie" className="connexion-forgot-link">
@@ -222,7 +252,7 @@ function ConnexionPage() {
                 autoComplete="new-password"
                 icon={<LockIcon />}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => handlePasswordChange(event.target.value)}
                 error={fieldErrors.password}
                 helpText="8 caractères min., avec majuscule, minuscule, chiffre et caractère spécial"
               />
@@ -233,7 +263,7 @@ function ConnexionPage() {
                 autoComplete="new-password"
                 icon={<LockIcon />}
                 value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
+                onChange={(event) => handleConfirmPasswordChange(event.target.value)}
                 error={fieldErrors.confirmPassword}
               />
             </div>
