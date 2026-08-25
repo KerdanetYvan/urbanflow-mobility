@@ -1,5 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -7,6 +15,14 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { TokenPairDto } from './dto/token-pair.dto';
 
+/**
+ * ThrottlerGuard applique a l'ensemble du controleur (issue #21, audit
+ * OWASP - A04 Conception non securisee) : les 4 routes exposees ici sont
+ * les seules de l'API a etre directement exploitables pour une attaque par
+ * force brute (mot de passe, jeton de reinitialisation) - voir la
+ * configuration globale dans AppModule (10 requetes/minute/IP).
+ */
+@UseGuards(ThrottlerGuard)
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {

@@ -17,7 +17,9 @@ Ce document **formalise** trois checklists — il ne les déroule pas lui-même 
 
 **Hors périmètre** : le détail du chiffrement/rétention des données de géolocalisation (déjà spécifié et implémenté, [`rgpd-geolocalisation.md`](rgpd-geolocalisation.md) section 4) ; l'exécution des audits eux-mêmes (#20/#21).
 
-## 2. Checklist WCAG 2.1 AA (à dérouler par #20)
+## 2. Checklist WCAG 2.1 AA (déroulée par #20)
+
+> Audit réalisé et documenté le 2026-08-24 dans [`docs/audits/wcag-audit.md`](../audits/wcag-audit.md) — voir ce rapport pour le détail des vérifications et de la correction apportée (marqueurs `MapView`).
 
 ### 2.1 Critères transverses (à vérifier sur chaque écran clé)
 
@@ -43,60 +45,60 @@ Ce document **formalise** trois checklists — il ne les déroule pas lui-même 
 | `MotDePasseOubliePage` / `ReinitialiserMotDePassePage` | Formulaires courts : mêmes critères que 2.1, pas de point spécifique supplémentaire identifié |
 | `AppLayout` | Navigation principale utilisable sans les affordances du navigateur (PWA `standalone`, voir `CLAUDE.md` racine) : retour arrière et changement d'écran doivent avoir un équivalent explicite dans l'UI |
 
-## 3. Checklist OWASP Top 10 (à dérouler par #21)
+## 3. Checklist OWASP Top 10 (déroulée par #21)
 
-Édition 2021, une ligne par catégorie, avec l'état constaté à date (2026-08-24) sur les 5 contrôleurs (`auth`, `users`, `profiles`, `trips`, `places`) — sert de point de départ à #21, pas un audit déjà mené.
+Édition 2021, une ligne par catégorie. État initial constaté le 2026-08-24, audit complet réalisé et documenté le 2026-08-25 dans [`docs/audits/owasp-audit.md`](../audits/owasp-audit.md) (voir ce rapport pour le détail des vérifications et des corrections apportées).
 
 ### 3.1 A01 — Broken Access Control
 
-- [ ] Vérifier que chaque route protégée porte bien `JwtAuthGuard` (accès complet) ou `OptionalJwtAuthGuard` (accès public avec personnalisation optionnelle, ex. `GET /trips`) selon l'intention réelle — pas de route sensible sans guard par oubli
-- [ ] Vérifier l'absence d'IDOR : un utilisateur authentifié ne peut lire/modifier que ses propres ressources (`profiles`, `trips/history`) — pas de paramètre d'ID de ressource acceptant l'ID d'un autre utilisateur
+- [x] Vérifier que chaque route protégée porte bien `JwtAuthGuard` (accès complet) ou `OptionalJwtAuthGuard` (accès public avec personnalisation optionnelle, ex. `GET /trips`) selon l'intention réelle — pas de route sensible sans guard par oubli
+- [x] Vérifier l'absence d'IDOR : un utilisateur authentifié ne peut lire/modifier que ses propres ressources (`profiles`, `trips/history`) — pas de paramètre d'ID de ressource acceptant l'ID d'un autre utilisateur
 
 ### 3.2 A02 — Cryptographic Failures
 
 - [x] Mots de passe hachés bcrypt (`auth.service.ts`) — déjà en place
 - [x] Coordonnées/adresses de géolocalisation chiffrées au repos (AES-256-GCM) — déjà en place, voir [`rgpd-geolocalisation.md` §2](rgpd-geolocalisation.md#2-chiffrement-au-repos)
-- [ ] Vérifier que `JWT_SECRET`/`GEOLOCATION_ENCRYPTION_KEY` sont bien de vrais secrets forts en production (pas de valeur par défaut du `.env.example` réutilisée)
-- [ ] Vérifier que le trafic est bien servi en HTTPS une fois déployé (terminaison TLS côté hébergeur/reverse proxy)
+- [x] Vérifier que `JWT_SECRET`/`GEOLOCATION_ENCRYPTION_KEY` sont bien de vrais secrets forts en production (pas de valeur par défaut du `.env.example` réutilisée)
+- [x] Vérifier que le trafic est bien servi en HTTPS une fois déployé (terminaison TLS côté hébergeur/reverse proxy)
 
 ### 3.3 A03 — Injection
 
 - [x] Requêtes via TypeORM (repositories), pas de concaténation SQL brute constatée
 - [x] `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transform`, voir `main.ts`) — rejette les champs non déclarés plutôt que de les ignorer silencieusement
-- [ ] Vérifier l'absence de requête SQL brute (`query()`) introduite depuis cet état des lieux
+- [x] Vérifier l'absence de requête SQL brute (`query()`) introduite depuis cet état des lieux
 
 ### 3.4 A04 — Insecure Design
 
-- [ ] **Constat** : aucun mécanisme de limitation de débit (rate limiting) identifié sur l'API à date — `/auth/login` et `/auth/refresh-token` en particulier exposés sans protection contre le bruteforce ; à évaluer par #21 (ex. `@nestjs/throttler`)
+- [x] Limitation de débit (`@nestjs/throttler`, 10 requêtes/minute/IP) sur `AuthController` (`/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`) — corrigé par #21
 
 ### 3.5 A05 — Security Misconfiguration
 
 - [x] CORS restreint à une origine configurée (`CORS_ORIGIN`), pas de `origin: true` (voir `main.ts`)
 - [x] Documentation Swagger désactivée en production (`NODE_ENV !== 'production'`, voir `main.ts`)
-- [ ] **Constat** : aucun en-tête de sécurité HTTP (`helmet` ou équivalent) identifié — à évaluer par #21
+- [x] En-têtes de sécurité HTTP (`helmet`) ajoutés — corrigé par #21
 
 ### 3.6 A06 — Vulnerable and Outdated Components
 
-- [ ] Vérifier l'absence de vulnérabilité connue sur les dépendances (`npm audit` backend/frontend) et l'existence d'un mécanisme de mise à jour régulier (ex. Dependabot)
+- [x] Vérifier l'absence de vulnérabilité connue sur les dépendances (`npm audit` backend/frontend) et l'existence d'un mécanisme de mise à jour régulier (ex. Dependabot) — vulnérabilités corrigées (`npm audit fix`), `.github/dependabot.yml` ajouté
 
 ### 3.7 A07 — Identification and Authentication Failures
 
 - [x] JWT avec refresh tokens (voir `auth.service.ts`, `refresh-token.dto.ts`) — déjà en place selon `CLAUDE.md`
-- [ ] Vérifier la politique d'expiration/rotation du refresh token et sa révocation possible (déconnexion, compromission)
-- [ ] Vérifier que les messages d'erreur de connexion ne distinguent pas "email inconnu" de "mot de passe incorrect" (évite l'énumération de comptes)
+- [x] Vérifier la politique d'expiration/rotation du refresh token et sa révocation possible (déconnexion, compromission) — expiration confirmée (15 min / 7 jours) ; **limite identifiée** : `refresh()` émet une nouvelle paire de jetons sans invalider l'ancien refresh token (pas de rotation avec détection de réutilisation) — reporté en Stretch, voir le rapport d'audit
+- [x] Vérifier que les messages d'erreur de connexion ne distinguent pas "email inconnu" de "mot de passe incorrect" (évite l'énumération de comptes) — déjà en place (`AuthController`, message volontairement identique)
 
 ### 3.8 A08 — Software and Data Integrity Failures
 
-- [ ] Vérifier que le pipeline CI (GitHub Actions) exécute bien lint + tests avant tout déploiement, et que `package-lock.json`/`package.json` (backend et frontend) sont versionnés et cohérents
+- [x] Vérifier que le pipeline CI (GitHub Actions) exécute bien lint + tests avant tout déploiement, et que `package-lock.json`/`package.json` (backend et frontend) sont versionnés et cohérents — confirmé (`deploy` dépend de `[frontend, backend]` dans `.github/workflows/ci.yml`)
 
 ### 3.9 A09 — Security Logging and Monitoring Failures
 
 - [x] `LoggingInterceptor`/`AllExceptionsFilter` globaux (voir `main.ts`) — journalisation homogène déjà en place
-- [ ] Vérifier qu'aucune donnée sensible (mot de passe en clair, jeton JWT complet, coordonnées de géolocalisation déchiffrées) n'apparaît dans les logs
+- [x] Vérifier qu'aucune donnée sensible (mot de passe en clair, jeton JWT complet, coordonnées de géolocalisation déchiffrées) n'apparaît dans les logs — confirmé (`LoggingInterceptor` ne journalise que méthode/route/code/durée)
 
 ### 3.10 A10 — Server-Side Request Forgery (SSRF)
 
-- [ ] Vérifier que les appels sortants du backend vers OpenTripPlanner (`places`/`trips`) et l'API météo (`WeatherService`, [#17](https://github.com/KerdanetYvan/urbanflow-mobility/issues/17)) utilisent des URLs de configuration fixes, jamais une URL construite à partir d'une entrée utilisateur
+- [x] Vérifier que les appels sortants du backend vers OpenTripPlanner (`places`/`trips`) et l'API météo (`WeatherService`, [#17](https://github.com/KerdanetYvan/urbanflow-mobility/issues/17)) utilisent des URLs de configuration fixes, jamais une URL construite à partir d'une entrée utilisateur — confirmé (`OTP_URL` en configuration, coordonnées fixes pour la météo)
 
 ## 4. Checklist RGPD (données de géolocalisation)
 
