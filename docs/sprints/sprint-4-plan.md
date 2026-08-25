@@ -21,7 +21,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 
 ### Phase A — Corrections rapides, indépendantes de tout le reste
 
-- [*] [#175](https://github.com/KerdanetYvan/urbanflow-mobility/issues/175) (Dev FE) — Corriger l'erreur de correspondance des mots de passe qui ne se réinitialise pas
+- [x] [#175](https://github.com/KerdanetYvan/urbanflow-mobility/issues/175) (Dev FE) — Corriger l'erreur de correspondance des mots de passe qui ne se réinitialise pas — `handlePasswordChange`/`handleConfirmPasswordChange` (`ConnexionPage.tsx`) effacent `fieldErrors.password`/`confirmPassword` dès qu'un des deux champs change, plutôt que d'attendre le prochain submit. Test de régression ajouté.
 - [ ] [#177](https://github.com/KerdanetYvan/urbanflow-mobility/issues/177) (Dev FE) — Reformuler les textes UI utilisant des tirets cadratiques
 - [ ] [#162](https://github.com/KerdanetYvan/urbanflow-mobility/issues/162) (Dev FE) — Uniformiser le vocabulaire visuel de chargement
 - [ ] [#174](https://github.com/KerdanetYvan/urbanflow-mobility/issues/174) (Dev FE) — Rendre la page Historique interactive
