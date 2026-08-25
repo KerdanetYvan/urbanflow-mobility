@@ -36,6 +36,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 
 - [ ] [#171](https://github.com/KerdanetYvan/urbanflow-mobility/issues/171) (PO) — Specs : fusionner la card de recherche et la card de résultats
 - [ ] [#172](https://github.com/KerdanetYvan/urbanflow-mobility/issues/172) (Dev FE) — Implémentation — dépend de #171
+- [ ] [#181](https://github.com/KerdanetYvan/urbanflow-mobility/issues/181) (Dev FE) — Remplacer les transitions sur `height` par `transform`/`grid-template-rows` (finding détecteur Impeccable, bandeau formulaire + panneau résultats) — juste après #172, sur les mêmes fichiers
 - [ ] [#165](https://github.com/KerdanetYvan/urbanflow-mobility/issues/165) (PO) — Specs : fusionner position/domicile/travail/historique dans le champ d'autocomplétion
 - [ ] [#166](https://github.com/KerdanetYvan/urbanflow-mobility/issues/166) (Dev FE) — Implémentation — dépend de #165
 - [ ] [#161](https://github.com/KerdanetYvan/urbanflow-mobility/issues/161) (Dev FE) — Protection anti-débordement sur les libellés d'adresse
