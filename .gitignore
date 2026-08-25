@@ -12,3 +12,7 @@ routing-engine/data/*
 
 # Donnes superpowers (Claude Skill)
 superpowers/
+
+# Cache local du hook de detection Impeccable (chemins de fichiers absolus
+# specifiques a la machine, pas d'interet en dehors de la session en cours)
+.impeccable/hook.cache.json
