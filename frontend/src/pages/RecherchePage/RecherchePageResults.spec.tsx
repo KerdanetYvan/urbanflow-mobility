@@ -149,7 +149,7 @@ describe('RecherchePageResults', () => {
         .getAllByRole('button', { name: 'Modifier la recherche' })[0]
         .closest('p'),
     ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
-    expect(container.querySelector('.resultats-skeleton')).toBeInTheDocument();
+    expect(container.querySelector('.skeleton')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /min/ })).not.toBeInTheDocument();
   });
 

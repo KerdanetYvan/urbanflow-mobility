@@ -53,9 +53,9 @@ describe('HistoriquePage', () => {
       },
     ]);
 
-    renderPage();
+    const { container } = renderPage();
 
-    expect(screen.getByText('Chargement…')).toBeInTheDocument();
+    expect(container.querySelector('.skeleton')).toBeInTheDocument();
 
     expect(await screen.findByText('Part-Dieu')).toBeInTheDocument();
     expect(screen.getByText('Bellecour')).toBeInTheDocument();

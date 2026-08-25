@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import { HistoryIcon } from '../../components/icons';
+import Skeleton from '../../components/Skeleton/Skeleton';
 import { ApiError } from '../../lib/api';
 import { formatCoordinates } from '../../lib/format';
 import { getTripHistory, type TripHistoryEntry } from '../../lib/trips';
@@ -100,7 +101,7 @@ function HistoriquePage() {
     return (
       <section className="historique-page">
         <h1>Historique</h1>
-        <p>Chargement…</p>
+        <Skeleton count={3} />
       </section>
     );
   }
