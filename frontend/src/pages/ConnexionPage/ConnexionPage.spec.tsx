@@ -108,6 +108,32 @@ describe('ConnexionPage', () => {
     expect(authLib.register).not.toHaveBeenCalled();
   });
 
+  it('efface l\'erreur de correspondance des mots de passe des que l\'un des deux champs change (issue #175)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('tab', { name: 'Créer un compte' }));
+    await user.type(screen.getByLabelText('Adresse email'), 'alice@example.com');
+    await user.type(screen.getByLabelText('Mot de passe'), 'MotDePasse123!');
+    await user.type(
+      screen.getByLabelText('Confirmer le mot de passe'),
+      'AutreChose123!',
+    );
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(
+      screen.getByText('Les mots de passe ne correspondent pas'),
+    ).toBeInTheDocument();
+
+    // Corriger la confirmation doit faire disparaitre l'erreur immediatement,
+    // sans attendre un nouveau submit.
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), '!');
+
+    expect(
+      screen.queryByText('Les mots de passe ne correspondent pas'),
+    ).not.toBeInTheDocument();
+  });
+
   it(
     "connecte puis redirige vers /profil (onboarding) quand l'utilisateur " +
       "n'a pas encore de profil (issue #106/#107)",
