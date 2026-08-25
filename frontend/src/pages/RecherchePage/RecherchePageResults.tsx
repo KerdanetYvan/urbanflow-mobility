@@ -44,7 +44,7 @@ const SWIPE_THRESHOLD_PX = 40;
  */
 function geolocationMessage(status: GeolocationStatus): string | undefined {
   if (status === 'denied') {
-    return 'Géolocalisation refusée — activez-la dans les réglages de votre navigateur pour voir votre position sur la carte.';
+    return 'Géolocalisation refusée. Activez-la dans les réglages de votre navigateur pour voir votre position sur la carte.';
   }
   if (status === 'unsupported' || status === 'error') {
     return 'Votre position en temps réel est indisponible pour le moment.';
@@ -70,7 +70,7 @@ function SearchContext({ origin, destination, onEditSearch }: SearchContextProps
   return (
     <p className="resultats-context">
       De {origin.label} à {destination.label}
-      {' — '}
+      {' · '}
       <button
         type="button"
         className="resultats-link-button"
