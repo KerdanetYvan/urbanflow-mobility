@@ -5,7 +5,7 @@ import {
   type FormEvent,
   type TouchEvent,
 } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
@@ -18,6 +18,7 @@ import { formatCoordinates } from '../../lib/format';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import type { PlaceSuggestion } from '../../lib/places';
 import {
+  entryToPlaces,
   getTripHistory,
   searchTrips,
   type TripHistoryEntry,
@@ -206,35 +207,17 @@ function RechercheQuickShortcuts({
       <p className="recherche-quick-shortcuts-title">Trajets récents</p>
       <ul className="recherche-quick-shortcuts-list">
         {entries.slice(0, MAX_QUICK_SHORTCUTS).map((entry) => {
-          const originLabel =
-            entry.originLabel ??
-            formatCoordinates(entry.originLat, entry.originLon);
-          const destinationLabel =
-            entry.destinationLabel ??
-            formatCoordinates(entry.destinationLat, entry.destinationLon);
+          const { origin, destination } = entryToPlaces(entry);
           return (
             <li key={entry.id}>
               <button
                 type="button"
                 className="recherche-quick-shortcut"
-                onClick={() =>
-                  onSelect(
-                    {
-                      label: originLabel,
-                      lat: entry.originLat,
-                      lon: entry.originLon,
-                    },
-                    {
-                      label: destinationLabel,
-                      lat: entry.destinationLat,
-                      lon: entry.destinationLon,
-                    },
-                  )
-                }
+                onClick={() => onSelect(origin, destination)}
               >
                 <HistoryIcon />
                 <span>
-                  {originLabel} → {destinationLabel}
+                  {origin.label} → {destination.label}
                 </span>
               </button>
             </li>
@@ -342,6 +325,8 @@ function OriginShortcuts({
  */
 function RecherchePage() {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [screen, setScreen] = useState<Screen>({ kind: 'formulaire' });
 
   const [origin, setOrigin] = useState<AddressFieldState>(EMPTY_ADDRESS);
@@ -496,6 +481,30 @@ function RecherchePage() {
       cancelled = true;
     };
   }, [isAuthenticated]);
+
+  // Relance automatique depuis l'ecran Historique complet (issue #174,
+  // bouton "Relancer cette recherche" de HistoriquePage) : origine/
+  // destination transmises via l'etat de navigation React Router plutot
+  // qu'un parametre d'URL, coherent avec l'absence de route /resultats
+  // dediee (voir le type Screen en tete de fichier). Meme relance que les
+  // raccourcis de recherche rapide (issue #112, handleQuickSearch) - pas de
+  // logique dupliquee. navigate(..., { replace: true, state: null })
+  // nettoie l'etat aussitot lu : sans ca, un retour arriere ou un
+  // rafraichissement de la page relancerait la meme recherche en boucle.
+  // handleQuickSearch/navigate volontairement absents des dependances (memes
+  // motifs qu'ailleurs dans ce fichier, ex. l'effet de chargement du profil
+  // ci-dessus) : ce sont des fonctions recreees a chaque rendu, les inclure
+  // ferait tourner cet effet a chaque rendu au lieu de seulement quand
+  // location.state change.
+  useEffect(() => {
+    const incoming = location.state as
+      | { origin: PlaceSuggestion; destination: PlaceSuggestion }
+      | null
+      | undefined;
+    if (!incoming?.origin || !incoming.destination) return;
+    navigate(location.pathname, { replace: true, state: null });
+    handleQuickSearch(incoming.origin, incoming.destination);
+  }, [location.state]);
 
   function toggleMode(mode: string) {
     setSelectedModes((current) =>

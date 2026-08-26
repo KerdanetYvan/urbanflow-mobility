@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
+import Button from '../../components/Button/Button';
 import { HistoryIcon } from '../../components/icons';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import { ApiError } from '../../lib/api';
 import { formatCoordinates } from '../../lib/format';
-import { getTripHistory, type TripHistoryEntry } from '../../lib/trips';
+import {
+  entryToPlaces,
+  getTripHistory,
+  type TripHistoryEntry,
+} from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
 import './HistoriquePage.css';
 
@@ -29,11 +34,20 @@ function formatLastSearched(iso: string): string {
  * Une entree de la liste d'historique - simple resume texte (pas de carte ni
  * de trace), le detail complet de l'itineraire n'est plus disponible une
  * fois la recherche passee (seuls origine/destination/date sont conserves,
- * voir TripHistoryEntry). Pas de bouton "relancer" ici : l'integration avec
- * le formulaire de recherche est portee par l'issue #112 (raccourcis de
- * recherche rapide), hors perimetre de l'issue #11.
+ * voir TripHistoryEntry). Bouton "Relancer cette recherche" (issue #174) :
+ * navigue vers /recherche en transmettant origine/destination via l'etat de
+ * navigation React Router - RecherchePage se charge ensuite de relancer la
+ * recherche elle-meme (meme logique que les raccourcis de recherche rapide,
+ * issue #112), rien n'est duplique ici.
  */
 function HistoryEntryCard({ entry }: { entry: TripHistoryEntry }) {
+  const navigate = useNavigate();
+
+  function handleRelaunch() {
+    const { origin, destination } = entryToPlaces(entry);
+    navigate('/recherche', { state: { origin, destination } });
+  }
+
   return (
     <li className="historique-entry">
       <div className="historique-entry-route">
@@ -47,6 +61,14 @@ function HistoryEntryCard({ entry }: { entry: TripHistoryEntry }) {
       <p className="historique-entry-date">
         Recherché le {formatLastSearched(entry.lastSearchedAt)}
       </p>
+      <Button
+        type="button"
+        variant="secondary"
+        className="historique-entry-relaunch"
+        onClick={handleRelaunch}
+      >
+        Relancer cette recherche
+      </Button>
     </li>
   );
 }
