@@ -413,6 +413,52 @@ describe('RecherchePageResults', () => {
     });
   });
 
+  describe('vue Edition (issue #171/#172)', () => {
+    it("affiche le contenu de renderEditForm et masque la liste/le detail quand isEditingSearch est vrai", () => {
+      const { container } = render(
+        <RecherchePageResults
+          origin={ORIGIN}
+          destination={DESTINATION}
+          itineraries={[FAST_ITINERARY]}
+          onEditSearch={vi.fn()}
+          isEditingSearch
+          renderEditForm={() => <input aria-label="Origine (test)" />}
+        />,
+      );
+
+      expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
+      expect(container.querySelector('.resultats-panels')).not.toBeInTheDocument();
+      expect(container.querySelector('.resultats-sheet')).not.toBeInTheDocument();
+      expect(container.querySelector('.recherche-panel-form')).toBeInTheDocument();
+    });
+
+    it('la touche Echap appelle onCancelEdit pendant l\'edition', async () => {
+      const user = userEvent.setup();
+      const onCancelEdit = vi.fn();
+      render(
+        <RecherchePageResults
+          origin={ORIGIN}
+          destination={DESTINATION}
+          itineraries={[FAST_ITINERARY]}
+          onEditSearch={vi.fn()}
+          isEditingSearch
+          onCancelEdit={onCancelEdit}
+          renderEditForm={() => <input aria-label="Origine (test)" />}
+        />,
+      );
+
+      await user.keyboard('{Escape}');
+
+      expect(onCancelEdit).toHaveBeenCalledTimes(1);
+    });
+
+    it("sans isEditingSearch, la liste reste affichee meme si renderEditForm est fourni", () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+      expect(container.querySelector('.recherche-panel-form')).not.toBeInTheDocument();
+      expect(desktopCards(container)).toHaveLength(1);
+    });
+  });
+
   describe('bandeau mobile (bottom sheet)', () => {
     function sheet(container: HTMLElement) {
       const el = container.querySelector('.resultats-sheet');

@@ -3,6 +3,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
   type TouchEvent,
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -31,7 +32,11 @@ import './RecherchePage.css';
 // Classes .resultats-shell/.resultats-map-bg reutilisees telles quelles
 // (issue #111) : deja pensees generiques par leur propre commentaire d'en-
 // tete dans ce fichier, pas besoin de les dupliquer/renommer pour l'etat
-// "formulaire".
+// "formulaire". Depuis la fusion des panneaux (issue #171/#172, voir
+// docs/specs/fusion-recherche-resultats.md), .recherche-panel-form vit
+// aussi dans ce fichier - c'est desormais LE panneau du formulaire, que ce
+// soit au tout premier chargement (ci-dessous) ou en edition en place
+// depuis l'ecran resultats (RecherchePageResults.tsx).
 import './RecherchePageResults.css';
 
 /** Meme seuil que RecherchePageResults (poignee du bandeau resultats) - voir le commentaire associe la-bas. */
@@ -43,8 +48,10 @@ const SWIPE_THRESHOLD_PX = 40;
  * seule route (/recherche), plutot que deux routes reliees par une
  * navigation avec etat React Router (ancien comportement, issue #35/#36).
  * Machine a etats a 3 valeurs : le formulaire (etat initial et retour
- * depuis les 2 autres), la recherche en cours (reponse pas encore recue),
- * les resultats (itineraires recus, eventuellement une liste vide).
+ * uniquement si aucune recherche n'a encore abouti - voir isEditingSearch
+ * ci-dessous pour la modification d'une recherche existante), la recherche
+ * en cours (reponse pas encore recue), les resultats (itineraires recus,
+ * eventuellement une liste vide).
  */
 type Screen =
   | { kind: 'formulaire' }
@@ -311,6 +318,14 @@ function OriginShortcuts({
  * gratuitement au retour depuis les resultats ("Modifier la recherche",
  * voir RecherchePageResults).
  *
+ * Panneau formulaire fusionne avec le panneau resultats (issue #171/#172,
+ * docs/specs/fusion-recherche-resultats.md) : "Modifier la recherche" ne
+ * fait plus revenir a l'etat Screen "formulaire" (qui demonterait toute la
+ * disposition resultats) - isEditingSearch bascule seulement le contenu du
+ * MEME panneau (RecherchePageResults) vers la vue Edition, sans perdre la
+ * liste ni la selection en cours. Screen reste "formulaire" uniquement pour
+ * le tout premier chargement, avant la toute premiere recherche reussie.
+ *
  * Utilisable sans compte (issue #64) : un usager de passage doit pouvoir
  * lancer une recherche sans etre bloque par un mur de connexion. Les modes
  * de transport preferes ne sont pre-remplis depuis le profil (F1) que si
@@ -328,6 +343,12 @@ function RecherchePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [screen, setScreen] = useState<Screen>({ kind: 'formulaire' });
+  // Bascule Edition/Resume du panneau fusionne (issue #171/#172) : n'a de
+  // sens que lorsque screen.kind !== 'formulaire' (transmis a
+  // RecherchePageResults ci-dessous) - au tout premier chargement, la vue
+  // Edition est deja affichee via la branche formulaire, pas besoin de ce
+  // drapeau.
+  const [isEditingSearch, setIsEditingSearch] = useState(false);
 
   const [origin, setOrigin] = useState<AddressFieldState>(EMPTY_ADDRESS);
   const [destination, setDestination] =
@@ -358,7 +379,9 @@ function RecherchePage() {
   // Bandeau mobile du panneau formulaire (issue #110/#111, carte permanente)
   // - 2 etats seulement (contrairement au bandeau resultats a 3 etats,
   // RecherchePageResults) : "deplie" par defaut, le formulaire est ce que
-  // l'utilisateur doit remplir en premier en arrivant sur l'ecran.
+  // l'utilisateur doit remplir en premier en arrivant sur l'ecran. Pilote a
+  // la fois le formulaire du tout premier chargement (ci-dessous) et la vue
+  // Edition en place depuis les resultats (transmis a RecherchePageResults).
   const [formSheetState, setFormSheetState] = useState<
     'collapsed' | 'expanded'
   >('expanded');
@@ -561,7 +584,10 @@ function RecherchePage() {
    * retour au formulaire avec message d'erreur. Partagee par handleSubmit
    * (apres validation du formulaire) et handleQuickSearch (issue #112,
    * raccourcis de recherche rapide) qui n'a pas besoin de cette validation -
-   * une entree d'historique est deja une recherche valide passee.
+   * une entree d'historique est deja une recherche valide passee. Sort
+   * aussi de la vue Edition (issue #171/#172) : une recherche - qu'elle
+   * vienne d'une premiere soumission ou d'une modification en place -
+   * affiche toujours la vue Resume + liste une fois terminee.
    */
   async function performSearch(
     originPlace: PlaceSuggestion,
@@ -573,6 +599,7 @@ function RecherchePage() {
     // RecherchePageResults) - remplace l'ancien bouton "Recherche…"/
     // isSearching, la page entiere devient l'indicateur de chargement.
     setScreen({ kind: 'recherche', origin: originPlace, destination: destinationPlace });
+    setIsEditingSearch(false);
 
     try {
       const itineraries = await searchTrips({
@@ -611,6 +638,9 @@ function RecherchePage() {
           : 'Connexion indisponible, réessayez.';
       // Retour au formulaire (pas de route a quitter, juste un changement
       // d'etat) - les valeurs saisies restent intactes, rien n'est perdu.
+      // Ecart volontaire : un echec repart sur l'ecran formulaire "plein"
+      // plutot que de rester en vue Edition sur l'ancien ecran resultats -
+      // il n'y a alors plus de resultats valides a resumer en dessous.
       setScreen({ kind: 'formulaire' });
       showError(message);
     }
@@ -674,17 +704,170 @@ function RecherchePage() {
     void performSearch(originPlace, destinationPlace);
   }
 
+  /**
+   * Contenu du panneau formulaire (issue #171/#172) : factorise en une
+   * seule fonction plutot que duplique, puisqu'il est desormais rendu a
+   * deux endroits distincts - la branche "formulaire" ci-dessous (tout
+   * premier chargement, screen.kind === 'formulaire') ET, via
+   * renderEditForm passe a RecherchePageResults, la vue Edition en place
+   * une fois des resultats obtenus. `showCancel` n'affiche le bouton
+   * "Annuler" que dans ce second cas : revenir au formulaire "plein" n'a
+   * rien a annuler (rien n'existait avant).
+   */
+  function renderRechercheForm(showCancel: boolean): ReactNode {
+    return (
+      <div className="recherche-panel-form-body">
+        {!isAuthenticated && (
+          <p className="recherche-guest-hint">
+            <Link to="/connexion">Connectez-vous</Link> pour retrouver
+            votre profil de mobilité et des trajets personnalisés.
+          </p>
+        )}
+
+        {alert && (
+          <Alert variant={alert.variant} title="Erreur">
+            {alert.message}
+          </Alert>
+        )}
+
+        <form
+          onSubmit={(event) => void handleSubmit(event)}
+          className="recherche-form"
+        >
+          <div className="recherche-addresses">
+            <AddressField
+              id="origin-address"
+              label="Origine"
+              value={origin.query}
+              suggestions={originSuggestions}
+              error={fieldErrors.origin}
+              onChange={(value) =>
+                setOrigin({ query: value, selected: null })
+              }
+              onSelect={(place) =>
+                setOrigin({ query: place.label, selected: place })
+              }
+            />
+
+            <OriginShortcuts
+              onUseCurrentPosition={() => setWantsPosition(true)}
+              isLocating={wantsPosition}
+              positionError={positionError}
+              home={homeShortcut}
+              work={workShortcut}
+              onSelect={(place) =>
+                setOrigin({ query: place.label, selected: place })
+              }
+            />
+
+            <button
+              type="button"
+              className="recherche-swap"
+              onClick={handleSwap}
+              aria-label="Inverser l'origine et la destination"
+            >
+              <SwapIcon />
+            </button>
+
+            <AddressField
+              id="destination-address"
+              label="Destination"
+              value={destination.query}
+              suggestions={destinationSuggestions}
+              error={fieldErrors.destination}
+              onChange={(value) =>
+                setDestination({ query: value, selected: null })
+              }
+              onSelect={(place) =>
+                setDestination({ query: place.label, selected: place })
+              }
+            />
+          </div>
+
+          {/* Bouton dedie toujours visible (issue #108/#109, voir
+              docs/specs/filtre-modes-transport.md section 2) - extrait de
+              "Plus d'options" ci-dessous, qui ne conserve donc plus que la
+              date/heure de depart. */}
+          <TransportModesFilter
+            selectedModes={selectedModes}
+            onToggleMode={toggleMode}
+          />
+
+          {/* Champ secondaire replie par defaut (issue #110/#111) : deja
+              optionnel aujourd'hui (heure vide = "maintenant"), reduit
+              l'emprise verticale du panneau flottant/bandeau. <details>
+              natif - pas de machinerie ARIA custom, le role/l'etat sont
+              deja corrects nativement. */}
+          <details className="recherche-more-options">
+            <summary>Plus d'options</summary>
+
+            <FormField
+              id="departure-time"
+              label="Partir à"
+              type="datetime-local"
+              value={departureTime}
+              onChange={(event) => setDepartureTime(event.target.value)}
+              helpText="Laisser vide pour partir maintenant."
+            />
+          </details>
+
+          <div className="recherche-form-actions">
+            <Button type="submit" className="recherche-submit">
+              Rechercher
+            </Button>
+            {/* "Annuler" (issue #171/#172) : ne revient PAS a une recherche
+                anterieure ni ne reinitialise les champs - referme
+                simplement la vue Edition sur la liste/le resume deja
+                affiches en dessous (isEditingSearch), sans reappeler
+                /trips. N'a de sens que si des resultats existent deja. */}
+            {showCancel && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="recherche-cancel"
+                onClick={() => setIsEditingSearch(false)}
+              >
+                Annuler
+              </Button>
+            )}
+          </div>
+        </form>
+
+        {/* Sous les champs de recherche et le bouton "Rechercher" (issue
+            #112) - hors du <form> : ne represente pas une soumission du
+            formulaire mais une relance directe (voir handleQuickSearch). */}
+        <RechercheQuickShortcuts
+          entries={historyEntries}
+          onSelect={handleQuickSearch}
+        />
+      </div>
+    );
+  }
+
   // Etats "recherche" (chargement) et "resultats" (issue #73) : delegue a
   // RecherchePageResults, qui reprend l'ancienne disposition de
-  // ResultatsPage/#36 - voir le type Screen en tete de fichier.
+  // ResultatsPage/#36 - voir le type Screen en tete de fichier. Le panneau
+  // formulaire (isEditingSearch/renderEditForm) est transmis pour que
+  // "Modifier la recherche" bascule en place plutot que de demonter tout
+  // cet ecran (issue #171/#172).
   if (screen.kind !== 'formulaire') {
     return (
       <RecherchePageResults
         origin={screen.origin}
         destination={screen.destination}
         itineraries={screen.kind === 'resultats' ? screen.itineraries : null}
-        onEditSearch={() => setScreen({ kind: 'formulaire' })}
+        onEditSearch={() => {
+          setIsEditingSearch(true);
+          setFormSheetState('expanded');
+        }}
         accessibilityPreferences={accessibilityPreferences}
+        isEditingSearch={isEditingSearch}
+        onCancelEdit={() => setIsEditingSearch(false)}
+        editSheetState={formSheetState}
+        onEditSheetToggle={handleFormHandleClick}
+        onEditSheetTouchStart={handleFormHandleTouchStart}
+        onEditSheetTouchEnd={handleFormHandleTouchEnd}
+        renderEditForm={() => renderRechercheForm(true)}
       />
     );
   }
@@ -728,114 +911,7 @@ function RecherchePage() {
           )}
         </button>
 
-        <div className="recherche-panel-form-body">
-          {!isAuthenticated && (
-            <p className="recherche-guest-hint">
-              <Link to="/connexion">Connectez-vous</Link> pour retrouver
-              votre profil de mobilité et des trajets personnalisés.
-            </p>
-          )}
-
-          {alert && (
-            <Alert variant={alert.variant} title="Erreur">
-              {alert.message}
-            </Alert>
-          )}
-
-          <form
-            onSubmit={(event) => void handleSubmit(event)}
-            className="recherche-form"
-          >
-            <div className="recherche-addresses">
-              <AddressField
-                id="origin-address"
-                label="Origine"
-                value={origin.query}
-                suggestions={originSuggestions}
-                error={fieldErrors.origin}
-                onChange={(value) =>
-                  setOrigin({ query: value, selected: null })
-                }
-                onSelect={(place) =>
-                  setOrigin({ query: place.label, selected: place })
-                }
-              />
-
-              <OriginShortcuts
-                onUseCurrentPosition={() => setWantsPosition(true)}
-                isLocating={wantsPosition}
-                positionError={positionError}
-                home={homeShortcut}
-                work={workShortcut}
-                onSelect={(place) =>
-                  setOrigin({ query: place.label, selected: place })
-                }
-              />
-
-              <button
-                type="button"
-                className="recherche-swap"
-                onClick={handleSwap}
-                aria-label="Inverser l'origine et la destination"
-              >
-                <SwapIcon />
-              </button>
-
-              <AddressField
-                id="destination-address"
-                label="Destination"
-                value={destination.query}
-                suggestions={destinationSuggestions}
-                error={fieldErrors.destination}
-                onChange={(value) =>
-                  setDestination({ query: value, selected: null })
-                }
-                onSelect={(place) =>
-                  setDestination({ query: place.label, selected: place })
-                }
-              />
-            </div>
-
-            {/* Bouton dedie toujours visible (issue #108/#109, voir
-                docs/specs/filtre-modes-transport.md section 2) - extrait de
-                "Plus d'options" ci-dessous, qui ne conserve donc plus que la
-                date/heure de depart. */}
-            <TransportModesFilter
-              selectedModes={selectedModes}
-              onToggleMode={toggleMode}
-            />
-
-            {/* Champ secondaire replie par defaut (issue #110/#111) : deja
-                optionnel aujourd'hui (heure vide = "maintenant"), reduit
-                l'emprise verticale du panneau flottant/bandeau. <details>
-                natif - pas de machinerie ARIA custom, le role/l'etat sont
-                deja corrects nativement. */}
-            <details className="recherche-more-options">
-              <summary>Plus d'options</summary>
-
-              <FormField
-                id="departure-time"
-                label="Partir à"
-                type="datetime-local"
-                value={departureTime}
-                onChange={(event) => setDepartureTime(event.target.value)}
-                helpText="Laisser vide pour partir maintenant."
-              />
-            </details>
-
-            <Button type="submit" className="recherche-submit">
-              Rechercher
-            </Button>
-          </form>
-
-          {/* Sous les champs de recherche et le bouton "Rechercher" (issue
-              #112) - hors du <form> : ne represente pas une soumission du
-              formulaire mais une relance directe (voir handleQuickSearch). */}
-          <RechercheQuickShortcuts
-            entries={historyEntries}
-            onSelect={handleQuickSearch}
-          />
-        </div>
+        {renderRechercheForm(false)}
       </div>
     </div>
   );
