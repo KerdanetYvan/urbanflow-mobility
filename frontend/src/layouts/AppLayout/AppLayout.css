@@ -30,8 +30,16 @@
   position: absolute;
   top: -3rem;
   left: var(--space-2);
-  background: var(--color-secondary);
-  color: #fff;
+  /* --color-primary + --color-on-primary (issue #158), pas
+     --color-primary-emphasis : ce lien est une SURFACE PLEINE (fond colore +
+     texte au-dessus), le meme cas d'usage que .btn-primary, pas du texte/
+     bordure directement sur le fond de page (voir le commentaire sur les 3
+     variantes du primaire dans tokens.css). --color-primary-emphasis y
+     echouerait le contraste en theme sombre (~1.65:1, verifie manuellement) :
+     concu pour contraster avec le fond de PAGE, pas pour servir lui-meme de
+     fond avec du texte blanc dessus. */
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   padding: var(--space-2) var(--space-4);
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   z-index: 100;

@@ -42,8 +42,12 @@
 
 .field input:focus-visible {
   outline: none;
-  border-color: var(--color-secondary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 25%, transparent);
+  /* --color-primary-emphasis (issue #158) : anneau de focus directement sur
+     le fond de page, jamais --color-primary (echoue le contraste WCAG utilise
+     ainsi, voir tokens.css). Fait gagner l'ambre deja engage (manifest/
+     favicon) sur le bleu --color-secondary qui dominait ici a tort. */
+  border-color: var(--color-primary-emphasis);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-emphasis) 25%, transparent);
 }
 
 .field.has-error input {

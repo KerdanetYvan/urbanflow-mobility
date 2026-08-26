@@ -12,14 +12,21 @@ import './MapView.css';
 /**
  * Icones de marqueur en SVG inline (chaine HTML, pas JSX) : L.divIcon
  * attend une chaine, pas un composant React - on ne peut donc pas reutiliser
- * directement components/icons.tsx ici. Couleurs dupliquees depuis
- * styles/tokens.css volontairement (voir le commentaire de modeStyles.ts) :
- * une chaine HTML brute injectee par Leaflet est hors de portee normale de
- * la cascade CSS des variables du composant.
+ * directement components/icons.tsx ici. Couleurs de DESTINATION_ICON/
+ * TRANSFER_ICON dupliquees en dur depuis styles/tokens.css (voir le
+ * commentaire de modeStyles.ts) - une chaine HTML brute injectee par
+ * Leaflet est bien inseree dans le document reel, mais on evite ici de
+ * dependre d'une variable pour des teintes fixes (rouge destination, gris
+ * correspondance) qui n'ont pas de contrepartie theme clair/sombre a suivre.
+ * ORIGIN_ICON fait exception (issue #158) : var(--color-primary-emphasis)
+ * fonctionne normalement ici, les proprietes CSS personnalisees du :root
+ * s'appliquent a tout noeud du document quelle que soit sa methode
+ * d'insertion (innerHTML compris) - necessaire cette fois pour suivre les
+ * deux valeurs distinctes du token entre themes clair et sombre.
  */
 const ORIGIN_ICON = L.divIcon({
   className: 'mapview-marker',
-  html: '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="#2f6fed" stroke="#fff" stroke-width="2.5"/></svg>',
+  html: '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="var(--color-primary-emphasis)" stroke="#fff" stroke-width="2.5"/></svg>',
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });

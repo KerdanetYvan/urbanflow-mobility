@@ -58,9 +58,12 @@
 
 /* Marqueur "ma position" (issue #9) - point plein + anneau pulsant, pour se
    distinguer du marqueur "origine" (un disque statique de meme taille).
-   Couleur dupliquee depuis tokens.css volontairement, meme raisonnement que
-   les autres icones de ce fichier (chaine HTML brute injectee par Leaflet,
-   hors de portee de la cascade CSS des variables du composant). */
+   var(--color-primary-emphasis) (issue #158, meme raisonnement que
+   ORIGIN_ICON dans MapView.tsx) : ces classes sont referencees par leur nom
+   depuis la chaine HTML brute de USER_POSITION_ICON, mais restent definies
+   dans cette feuille de style normale - la variable s'applique donc comme
+   n'importe quelle autre regle CSS de ce fichier, theme clair/sombre
+   compris. */
 .mapview-user-marker {
   position: relative;
 }
@@ -73,7 +76,7 @@
   width: 0.75rem;
   height: 0.75rem;
   border-radius: 50%;
-  background: #2f6fed;
+  background: var(--color-primary-emphasis);
 }
 
 .mapview-user-marker-dot {
