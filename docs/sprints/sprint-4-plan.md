@@ -24,7 +24,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 - [x] [#175](https://github.com/KerdanetYvan/urbanflow-mobility/issues/175) (Dev FE) — Corriger l'erreur de correspondance des mots de passe qui ne se réinitialise pas — `handlePasswordChange`/`handleConfirmPasswordChange` (`ConnexionPage.tsx`) effacent `fieldErrors.password`/`confirmPassword` dès qu'un des deux champs change, plutôt que d'attendre le prochain submit. Test de régression ajouté.
 - [x] [#177](https://github.com/KerdanetYvan/urbanflow-mobility/issues/177) (Dev FE) — Reformuler les textes UI utilisant des tirets cadratiques — 4 occurrences reformulées (`RecherchePageResults.tsx`, `RecherchePage.tsx`, `ProfilPage.tsx`) : ponctuation naturelle (point) pour les messages d'erreur, séparateur `·` déjà utilisé ailleurs dans le projet (`RecherchePage.tsx:144`, `RecherchePageResults.tsx:302`) pour le contexte de recherche. Tests mis à jour en conséquence.
 - [x] [#162](https://github.com/KerdanetYvan/urbanflow-mobility/issues/162) (Dev FE) — Uniformiser le vocabulaire visuel de chargement — nouveau composant partagé `components/Skeleton/Skeleton.tsx` (extrait de l'ancien `ResultsSkeleton` de `RecherchePageResults.tsx`), utilisé sur Recherche/Résultats, Profil et Historique à la place du texte "Chargement…". Tests mis à jour en conséquence.
-- [ ] [#174](https://github.com/KerdanetYvan/urbanflow-mobility/issues/174) (Dev FE) — Rendre la page Historique interactive
+- [*] [#174](https://github.com/KerdanetYvan/urbanflow-mobility/issues/174) (Dev FE) — Rendre la page Historique interactive
 - [ ] [#176](https://github.com/KerdanetYvan/urbanflow-mobility/issues/176) (Dev FE) — Ajouter un `robots.txt` valide
 
 ### Phase B — Identité visuelle (audit Impeccable)
