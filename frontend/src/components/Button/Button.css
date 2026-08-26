@@ -36,13 +36,19 @@
   outline-color: var(--color-primary-emphasis);
 }
 
+/* --color-primary-emphasis (issue #158) : texte/bordure directement sur le
+   fond de page (pas --color-primary, voir le commentaire en tete de
+   fichier) - currentColor sur .btn:focus-visible reprend automatiquement
+   cette meme teinte pour l'anneau de focus. Fait gagner l'ambre deja engage
+   (manifest/favicon) sur le bleu --color-secondary qui occupait ce bouton
+   entier a tort. */
 .btn-secondary {
   background: transparent;
-  color: var(--color-secondary);
-  border-color: var(--color-secondary);
+  color: var(--color-primary-emphasis);
+  border-color: var(--color-primary-emphasis);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+  background: color-mix(in srgb, var(--color-primary-emphasis) 10%, transparent);
 }
 
 .btn:disabled {

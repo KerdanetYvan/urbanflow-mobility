@@ -29,7 +29,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 
 ### Phase B — Identité visuelle (audit Impeccable)
 
-- [ ] [#158](https://github.com/KerdanetYvan/urbanflow-mobility/issues/158) (Dev FE) — Faire gagner l'ambre déjà engagé (manifest/favicon) sur le bleu qui déborde
+- [x] [#158](https://github.com/KerdanetYvan/urbanflow-mobility/issues/158) (Dev FE) — Faire gagner l'ambre déjà engagé (manifest/favicon) sur le bleu qui déborde — `--color-primary-emphasis` sur anneau de focus (`FormField.css`), bouton secondaire (`Button.css`), marqueurs origine/position carte (`MapView.tsx`/`.css`) ; skip-link passé à `--color-primary` + `--color-on-primary` (surface pleine, cas distinct de l'anneau/bordure). `--color-secondary` conservé en usage restreint (`--color-info`). Vérifié en thème clair et sombre, suite `test:e2e` WCAG toujours à 9/9.
 - [ ] [#159](https://github.com/KerdanetYvan/urbanflow-mobility/issues/159) (Dev FE) — Traitement visuel du nom UrbanFlow Mobility (`AppLayout`) — dépend de #158
 
 ### Phase C — Refonte complète de l'écran `/recherche`
