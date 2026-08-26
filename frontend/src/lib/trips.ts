@@ -1,4 +1,6 @@
 import { apiGetWithOptionalAuth, authGet } from './api';
+import { formatCoordinates } from './format';
+import type { PlaceSuggestion } from './places';
 
 /** Voir backend/src/trips/dto/trip-itinerary.dto.ts (issue #7) - un point (origine/destination/correspondance) d'un segment d'itineraire. */
 export interface TripPlace {
@@ -122,4 +124,34 @@ export interface TripHistoryEntry {
  */
 export function getTripHistory(): Promise<TripHistoryEntry[]> {
   return authGet<TripHistoryEntry[]>('/trips/history');
+}
+
+/**
+ * Convertit une entree d'historique en couple origine/destination directement
+ * exploitable par performSearch/handleQuickSearch (RecherchePage.tsx, issue
+ * #112) - repli sur formatCoordinates si l'entree n'a pas de libelle
+ * enregistre, meme convention que RechercheQuickShortcuts. Factorise ici
+ * (issue #174) pour que HistoriquePage (bouton "Relancer cette recherche")
+ * et RechercheQuickShortcuts partagent la meme conversion plutot que de la
+ * dupliquer.
+ */
+export function entryToPlaces(entry: TripHistoryEntry): {
+  origin: PlaceSuggestion;
+  destination: PlaceSuggestion;
+} {
+  return {
+    origin: {
+      label:
+        entry.originLabel ?? formatCoordinates(entry.originLat, entry.originLon),
+      lat: entry.originLat,
+      lon: entry.originLon,
+    },
+    destination: {
+      label:
+        entry.destinationLabel ??
+        formatCoordinates(entry.destinationLat, entry.destinationLon),
+      lat: entry.destinationLat,
+      lon: entry.destinationLon,
+    },
+  };
 }

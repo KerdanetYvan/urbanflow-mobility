@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { AuthProvider } from '../../lib/AuthProvider';
@@ -110,6 +111,35 @@ describe('HistoriquePage', () => {
 
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith('/connexion');
+    });
+  });
+
+  it('relance la recherche vers /recherche avec origine/destination en etat de navigation (issue #174)', async () => {
+    vi.mocked(tripsLib.getTripHistory).mockResolvedValue([
+      {
+        id: 'entry-1',
+        originLat: 48.111,
+        originLon: -1.682,
+        originLabel: 'Part-Dieu',
+        destinationLat: 48.127,
+        destinationLon: -1.682,
+        destinationLabel: 'Bellecour',
+        lastSearchedAt: '2026-08-15T14:05:00.000Z',
+      },
+    ]);
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Relancer cette recherche' }),
+    );
+
+    expect(navigateMock).toHaveBeenCalledWith('/recherche', {
+      state: {
+        origin: { label: 'Part-Dieu', lat: 48.111, lon: -1.682 },
+        destination: { label: 'Bellecour', lat: 48.127, lon: -1.682 },
+      },
     });
   });
 });

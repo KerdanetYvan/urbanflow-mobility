@@ -10,7 +10,15 @@ import * as tripsLib from '../../lib/trips';
 import RecherchePage from './RecherchePage';
 
 vi.mock('../../lib/places');
-vi.mock('../../lib/trips');
+// Mock partiel (meme motif que lib/profile ci-dessous et HistoriquePage.spec.tsx) :
+// entryToPlaces est une fonction pure reutilisee par RechercheQuickShortcuts,
+// un automock complet la remplacerait par un vi.fn() sans valeur de retour et
+// ferait echouer le rendu des raccourcis (destructuring d'un retour undefined).
+vi.mock('../../lib/trips', async () => {
+  const actual =
+    await vi.importActual<typeof import('../../lib/trips')>('../../lib/trips');
+  return { ...actual, getTripHistory: vi.fn(), searchTrips: vi.fn() };
+});
 
 // Auto-mock complet remplacerait aussi TRANSPORT_MODES (un tableau, pas une
 // fonction) par une valeur vide : on garde l'export reel de tout sauf
@@ -28,6 +36,17 @@ const HOTEL_DE_VILLE = { label: 'Hôtel de Ville', lat: 45.77, lon: 4.83 };
 function renderPage() {
   return render(
     <MemoryRouter>
+      <AuthProvider>
+        <RecherchePage />
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
+/** Meme rendu que renderPage, avec un etat de navigation entrant (issue #174, relance depuis /historique). */
+function renderPageWithLocationState(state: unknown) {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname: '/recherche', state }]}>
       <AuthProvider>
         <RecherchePage />
       </AuthProvider>
@@ -464,6 +483,42 @@ describe('RecherchePage', () => {
         ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
       },
     );
+  });
+
+  describe('relance depuis /historique (issue #174)', () => {
+    it('relance automatiquement la recherche quand origine/destination arrivent via l\'etat de navigation', async () => {
+      const itineraries = [
+        {
+          startTime: 't0',
+          endTime: 't1',
+          durationSeconds: 600,
+          transfers: 0,
+          segments: [],
+        },
+      ];
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+
+      renderPageWithLocationState({ origin: GARE, destination: HOTEL_DE_VILLE });
+
+      await waitFor(() => {
+        expect(tripsLib.searchTrips).toHaveBeenCalledWith({
+          originLat: GARE.lat,
+          originLon: GARE.lon,
+          destinationLat: HOTEL_DE_VILLE.lat,
+          destinationLon: HOTEL_DE_VILLE.lon,
+        });
+      });
+      expect(
+        (
+          await screen.findAllByRole('button', { name: 'Modifier la recherche' })
+        )[0].closest('p'),
+      ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
+    });
+
+    it("ne relance rien quand la page est ouverte sans etat de navigation", () => {
+      renderPage();
+      expect(tripsLib.searchTrips).not.toHaveBeenCalled();
+    });
   });
 
   describe("raccourcis d'origine (issue #93)", () => {
