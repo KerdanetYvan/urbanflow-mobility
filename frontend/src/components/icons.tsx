@@ -180,3 +180,21 @@ export function HistoryIcon() {
     </svg>
   );
 }
+
+/**
+ * Mark du wordmark "UrbanFlow" dans l'entete (AppLayout, issue #159) - une
+ * ligne sinueuse reliant deux points, sur le meme vocabulaire visuel que
+ * MapPinIcon/TransferIcon (des points = des arrets/lieux), pour evoquer le
+ * "flux" entre deux points sans recourir a un logo externe a charger (voir
+ * la contrainte eco-conception sur --font-sans dans tokens.css, meme logique
+ * appliquee ici : pas d'asset image, tout en SVG inline monoline).
+ */
+export function BrandMarkIcon() {
+  return (
+    <svg {...iconProps(20)}>
+      <path d="M3.5 15.5c2.5 0 2.5-9 5-9s2.5 9 5 9 2.5-6.5 4.5-6.5" />
+      <circle cx="3.5" cy="15.5" r="1.3" />
+      <circle cx="18" cy="9" r="1.3" />
+    </svg>
+  );
+}

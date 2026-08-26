@@ -53,15 +53,15 @@ h3 {
   font-size: var(--text-lg);
 }
 
+/* La bordure d'accent ajoutee ici en #73 (issue #159) a ete retiree : le
+   detecteur Impeccable l'a identifiee comme le pattern "side-tab", le tell
+   le plus reconnaissable d'une UI generee par IA. Le saut de taille
+   text-2xl -> text-3xl porte deja la hierarchie desktop a lui seul ;
+   l'accent de marque a ete deplace vers un traitement plus specifique et
+   intentionnel : le wordmark "UrbanFlow" dans l'entete (AppLayout.css). */
 @media (min-width: 768px) {
   h1 {
     font-size: var(--text-3xl);
-    /* Touche de couleur (issue #73, spec 4.3) : accent discret plutot
-       qu'un h1 identique au reste du texte - contribue, avec la bordure
-       d'accent de .app-header (AppLayout.css), a corriger l'impression de
-       rendu "sans vie" repere sur desktop. */
-    border-left: 3px solid var(--color-primary-emphasis);
-    padding-left: var(--space-3);
   }
 }
 
