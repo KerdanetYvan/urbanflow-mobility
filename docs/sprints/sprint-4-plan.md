@@ -44,7 +44,8 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 - [ ] [#170](https://github.com/KerdanetYvan/urbanflow-mobility/issues/170) (Dev FE) — Retirer le texte "Voir le détail" en desktop (garder en mobile)
 - [ ] [#173](https://github.com/KerdanetYvan/urbanflow-mobility/issues/173) (Dev FE) — Déplacer l'affichage du prochain passage vers le détail de l'itinéraire
 - [ ] [#87](https://github.com/KerdanetYvan/urbanflow-mobility/issues/87) (Dev BE/FE) — Filtrer `GET /trips` par modes de transport préférés
-- [ ] [#91](https://github.com/KerdanetYvan/urbanflow-mobility/issues/91) (Dev BE/FE) — Suggérer le prochain créneau disponible si aucun itinéraire trouvé
+- [ ] [#190](https://github.com/KerdanetYvan/urbanflow-mobility/issues/190) (Dev BE/FE) — Intégrer l'état vide au panneau fusionné + proposer un trajet à pied de repli — ajoutée en session le 2026-08-26 suite au constat que l'état vide casse encore la disposition carte+panneau après #171/#172. Traitée avant #91 : sert de fondation (état vide intégré au panneau) sur laquelle #91 vient ensuite ajouter son propre repli (bouton "prochain créneau"), plutôt que l'inverse. Vélo (GBFS) explicitement hors périmètre : `mode` figé à `TRANSIT,WALK` dans `OtpClientService`, pas encore de source de données vélo chargée dans OTP — backlog séparé, pas encore d'issue dédiée.
+- [ ] [#91](https://github.com/KerdanetYvan/urbanflow-mobility/issues/91) (Dev BE/FE) — Suggérer le prochain créneau disponible si aucun itinéraire trouvé — dépend maintenant de #190 (voir ci-dessus) : s'ajoute a l'etat vide integre au panneau plutot que de le construire lui-meme.
 
 ### Phase D — Géocodage réel (Nominatim)
 
