@@ -56,11 +56,47 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+/* Wordmark "UrbanFlow Mobility" (issue #159) - icone + texte alignes sur une
+   seule ligne, centres comme le reste de l'entete. */
 .app-title {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
+  /* Leger resserrement (dans la limite -0.04em, voir la reference typo du
+     projet) pour donner au nom une allure de wordmark plutot que de titre
+     de paragraphe ordinaire. */
+  letter-spacing: -0.01em;
   color: var(--color-text);
+}
+
+/* Le mark SVG suit --color-primary-emphasis via currentColor : c'est du
+   texte/icone directement sur le fond de page (meme raisonnement que le
+   lien de nav actif juste en dessous), jamais --color-primary qui echoue
+   le contraste utilise ainsi (voir tokens.css). */
+.app-title svg {
+  flex-shrink: 0;
+  color: var(--color-primary-emphasis);
+}
+
+/* "Flow" en ambre : avec le mark, c'est ce qui rend l'app identifiable sur
+   une simple capture d'ecran sans avoir a lire "UrbanFlow Mobility" en
+   entier (objectif explicite de l'issue #159). */
+.app-title-accent {
+  color: var(--color-primary-emphasis);
+}
+
+/* "Mobility" traite comme un descriptif en retrait plutot qu'une 3e partie
+   du wordmark - meme registre que "Google Maps", "GitHub Copilot" etc. :
+   un nom court et marquant (UrbanFlow) porte l'identite, le complement
+   (Mobility) apporte juste le contexte produit. */
+.app-title-suffix {
+  margin-left: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  color: var(--color-text-muted);
 }
 
 /* Mobile (par defaut) : barre de navigation fixee en bas de l'ecran, comme
@@ -137,15 +173,6 @@
 @media (min-width: 768px) {
   .app-layout {
     padding-bottom: 0;
-  }
-
-  /* Touche de couleur (issue #73, spec 4.3) : bordure d'accent plutot que
-     neutre, pour eviter l'impression de rendu "sans vie" repere sur
-     desktop - reste discret (une bordure, pas un fond plein), coherent
-     avec la direction minimale actee en #33/#52. */
-  .app-header {
-    border-bottom-color: var(--color-primary-emphasis);
-    border-bottom-width: 2px;
   }
 
   .app-nav {

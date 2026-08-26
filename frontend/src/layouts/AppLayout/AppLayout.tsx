@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../lib/useAuth';
-import { HistoryIcon, LockIcon, SearchIcon, UserIcon } from '../../components/icons';
+import { BrandMarkIcon, HistoryIcon, LockIcon, SearchIcon, UserIcon } from '../../components/icons';
 import './AppLayout.css';
 
 /**
@@ -72,7 +72,23 @@ function AppLayout() {
       </a>
 
       <header className="app-header">
-        <p className="app-title">UrbanFlow Mobility</p>
+        {/*
+          Traitement typographique du nom du produit (issue #159) : "Urban"
+          en couleur de texte normale + "Flow" en ambre (--color-primary-
+          emphasis, meme token que le reste de l'identite chromatique #158)
+          forment ensemble le wordmark "UrbanFlow", visuellement distinct de
+          "Mobility" qui reste un simple descriptif en retrait. Objectif de
+          l'issue : rendre l'app identifiable sur une capture d'ecran sans
+          lire le nom en entier - le mark SVG + la rupture de couleur au
+          milieu du mot suffisent, pas besoin d'un logo image a charger.
+        */}
+        <p className="app-title">
+          <BrandMarkIcon />
+          <span className="app-title-wordmark">
+            Urban<span className="app-title-accent">Flow</span>
+          </span>
+          <span className="app-title-suffix">Mobility</span>
+        </p>
       </header>
 
       <nav className="app-nav" aria-label="Navigation principale">
