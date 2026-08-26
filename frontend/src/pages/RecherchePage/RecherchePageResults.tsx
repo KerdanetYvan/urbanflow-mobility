@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import Badge from '../../components/Badge/Badge';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
@@ -23,7 +23,9 @@ import './RecherchePageResults.css';
  * panneau flottant", decidee en session le 2026-08-03) :
  * - collapsed : juste la poignee + un apercu du trajet selectionne, carte
  *   entierement visible.
- * - list : la liste complete des itineraires, carte partiellement visible.
+ * - list : la liste complete des itineraires (ou le formulaire en vue
+ *   Edition, voir isEditingSearch plus bas - issue #171/#172), carte
+ *   partiellement visible.
  * - detail : le detail segment par segment du trajet selectionne, carte
  *   presque entierement masquee.
  * Non pertinent en desktop (voir RecherchePageResults.css) : liste et
@@ -60,12 +62,12 @@ interface SearchContextProps {
 }
 
 /**
- * Contexte de la recherche ("De X à Y") + action de retour au formulaire.
- * Ne navigue plus vers une route separee (issue #73) : change simplement
- * l'etat interne de RecherchePage vers 'formulaire', en preremplissant les
- * criteres (voir docs/specs/refonte-visuelle-mobile-desktop.md section 2.6).
- * Un <button> stylise en lien plutot qu'un <Link> - il n'y a plus de route
- * a atteindre.
+ * Contexte de la recherche ("De X à Y") + action d'edition. Depuis la
+ * fusion des panneaux (issue #171/#172, docs/specs/
+ * fusion-recherche-resultats.md), "Modifier la recherche" ne navigue plus
+ * vers un autre ecran : onEditSearch bascule isEditingSearch a true chez
+ * RecherchePage, qui rebascule ce meme panneau vers sa vue Edition, sans
+ * perdre la liste/le detail affiches juste avant (voir plus bas).
  */
 function SearchContext({ origin, destination, onEditSearch }: SearchContextProps) {
   return (
@@ -307,15 +309,73 @@ function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
   );
 }
 
+interface EditPanelProps {
+  sheetState: 'collapsed' | 'expanded';
+  onToggle: () => void;
+  onTouchStart: (event: TouchEvent<HTMLButtonElement>) => void;
+  onTouchEnd: (event: TouchEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+}
+
+/**
+ * Panneau/bandeau de la vue Edition (issue #171/#172) : meme classe
+ * (.recherche-panel-form, voir RecherchePageResults.css) et meme mecanique
+ * a 2 etats que le formulaire du tout premier chargement
+ * (RecherchePage.tsx, screen.kind === 'formulaire') - au lieu de dupliquer
+ * cette poignee/ce conteneur ici avec un state local independant, l'etat
+ * (sheetState) et les gestionnaires de glissement sont recus en props,
+ * portes par RecherchePage (formSheetState) : un seul et meme bandeau,
+ * qu'il s'agisse du premier chargement ou d'une edition en place.
+ */
+function EditPanel({ sheetState, onToggle, onTouchStart, onTouchEnd, children }: EditPanelProps) {
+  return (
+    <div className="recherche-panel-form" data-sheet-state={sheetState}>
+      <button
+        type="button"
+        className="recherche-panel-form-handle"
+        onClick={onToggle}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        aria-expanded={sheetState === 'expanded'}
+      >
+        <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+        {sheetState === 'collapsed' && (
+          <span className="recherche-panel-form-handle-label">
+            Modifier la recherche
+          </span>
+        )}
+      </button>
+      {children}
+    </div>
+  );
+}
+
 interface RecherchePageResultsProps {
   origin: PlaceSuggestion;
   destination: PlaceSuggestion;
   /** null = recherche en cours, reponse de GET /trips pas encore recue (issue #73, spec 2.4). */
   itineraries: TripItinerary[] | null;
-  /** Retour au formulaire (etat 'formulaire' de RecherchePage), preremplissant les criteres. */
+  /** Bascule vers la vue Edition du panneau fusionne (issue #171/#172) - ne demonte plus cet ecran. */
   onEditSearch: () => void;
   /** Preferences d'accessibilite du profil connecte (issue #126), voir frontend/src/lib/profile.ts. Absent/vide = profil incomplet ou recherche anonyme (issue #64) - seul le badge "meilleur choix global" s'affiche alors. */
   accessibilityPreferences?: string[];
+  /**
+   * Vue Edition active (issue #171/#172, docs/specs/
+   * fusion-recherche-resultats.md section 2) : remplace la liste/le detail
+   * par le formulaire (renderEditForm) dans le MEME panneau, sans demonter
+   * ce composant - selectedIndex/sheetState (liste/detail) ci-dessous
+   * restent donc intacts au retour ("Annuler").
+   */
+  isEditingSearch?: boolean;
+  /** Referme la vue Edition sans relancer de recherche (bouton "Annuler" du formulaire, ou touche Echap). */
+  onCancelEdit?: () => void;
+  /** Etat du bandeau/panneau d'edition (2 etats, voir EditPanel) - porte par RecherchePage (formSheetState), partage avec le formulaire du tout premier chargement. */
+  editSheetState?: 'collapsed' | 'expanded';
+  onEditSheetToggle?: () => void;
+  onEditSheetTouchStart?: (event: TouchEvent<HTMLButtonElement>) => void;
+  onEditSheetTouchEnd?: (event: TouchEvent<HTMLButtonElement>) => void;
+  /** Contenu du formulaire (RecherchePage.tsx, renderRechercheForm) - fonction plutot que noeud direct : evite de construire deux fois le meme element React pour rien si jamais ce composant se re-rendait sans que isEditingSearch ne change. */
+  renderEditForm?: () => ReactNode;
 }
 
 /**
@@ -337,6 +397,20 @@ interface RecherchePageResultsProps {
  * bandeau en mobile (ecran de tache immersif) - voir les z-index dans
  * AppLayout.css et RecherchePageResults.css.
  *
+ * Vue Edition (issue #171/#172, docs/specs/fusion-recherche-resultats.md) :
+ * quand isEditingSearch est vrai, les panneaux liste+detail (desktop) et le
+ * bandeau resultats (mobile) laissent place a un unique panneau formulaire
+ * (EditPanel, classe .recherche-panel-form partagee avec RecherchePage.tsx).
+ * Ce composant (RecherchePageResults) reste lui-meme monte pendant toute
+ * l'edition - selectedIndex/sheetState (donc l'itineraire selectionne et
+ * l'etat liste/detail du bandeau mobile) sont conserves en memoire, "Annuler"
+ * les retrouve donc sans re-appel a /trips. Le DOM de la liste/du detail
+ * n'est en revanche pas conserve a l'identique (retire du rendu plutot que
+ * seulement masque en CSS, pour eviter d'avoir a la fois la liste ET le
+ * formulaire montes avec des id de champ potentiellement dupliques) : un
+ * defilement en cours dans la liste ne survit donc pas a un aller-retour
+ * Modifier/Annuler, seule la selection elle-meme (aria-current) survit.
+ *
  * L'etat vide (aucun itineraire) et l'etat "recherche en cours" (itineraries
  * null) n'utilisent pas la disposition immersive plein ecran pour le
  * premier (pas de trajet a tracer), mais la reprennent en chargement pour
@@ -353,6 +427,13 @@ function RecherchePageResults({
   itineraries,
   onEditSearch,
   accessibilityPreferences,
+  isEditingSearch = false,
+  onCancelEdit,
+  editSheetState = 'expanded',
+  onEditSheetToggle,
+  onEditSheetTouchStart,
+  onEditSheetTouchEnd,
+  renderEditForm,
 }: RecherchePageResultsProps) {
   // Itineraire selectionne par defaut : le premier de la liste (deja en tete
   // du tri backend).
@@ -379,6 +460,18 @@ function RecherchePageResults({
     () => computeItineraryBadges(itineraries ?? [], accessibilityPreferences ?? []),
     [itineraries, accessibilityPreferences],
   );
+
+  // Touche Echap referme la vue Edition (issue #171/#172), meme motif que
+  // TransportModesFilter (RecherchePage.tsx) - ecouteur pose uniquement
+  // pendant l'edition, retire des qu'elle se referme.
+  useEffect(() => {
+    if (!isEditingSearch || !onCancelEdit) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancelEdit?.();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isEditingSearch, onCancelEdit]);
 
   function selectItinerary(index: number) {
     setSelectedIndex(index);
@@ -429,6 +522,29 @@ function RecherchePageResults({
     }
   }
 
+  /**
+   * Panneau/bandeau d'edition (issue #171/#172) : rendu une seule fois (pas
+   * une copie desktop + une copie mobile comme ResultsList/ItinerarySegments
+   * ci-dessous) - EditPanel se repositionne lui-meme en bandeau bas ou en
+   * panneau flottant haut-gauche via CSS (meme mecanique que le formulaire
+   * du tout premier chargement). Dupliquer le formulaire cote a cote (comme
+   * la liste) creerait des id de champ en double dans le DOM (AddressField
+   * `id="origin-address"`, deja cible par document.getElementById dans
+   * RecherchePage.tsx) - a eviter, contrairement a la liste/au detail qui
+   * n'ont pas cette contrainte.
+   */
+  const editPanel =
+    isEditingSearch && renderEditForm ? (
+      <EditPanel
+        sheetState={editSheetState}
+        onToggle={onEditSheetToggle ?? (() => {})}
+        onTouchStart={onEditSheetTouchStart ?? (() => {})}
+        onTouchEnd={onEditSheetTouchEnd ?? (() => {})}
+      >
+        {renderEditForm()}
+      </EditPanel>
+    ) : null;
+
   // --- Recherche en cours (issue #73, spec 2.4) : aucun itineraire recu
   // pour l'instant, carte avec origine/destination seules + squelette. ---
   if (itineraries === null) {
@@ -443,28 +559,35 @@ function RecherchePageResults({
             userPosition={geolocation.position}
           />
         </div>
-        <div className="resultats-panels">
-          <div className="resultats-panel resultats-panel-list">
-            <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-            <Skeleton count={3} />
-          </div>
-        </div>
-        <div className="resultats-sheet" data-sheet-state="list">
-          <div className="resultats-sheet-handle">
-            <span className="resultats-sheet-handle-bar" aria-hidden="true" />
-          </div>
-          <div className="resultats-sheet-body">
-            <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-            <Skeleton count={3} />
-          </div>
-        </div>
+        {editPanel ?? (
+          <>
+            <div className="resultats-panels">
+              <div className="resultats-panel resultats-panel-list">
+                <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
+                <Skeleton count={3} />
+              </div>
+            </div>
+            <div className="resultats-sheet" data-sheet-state="list">
+              <div className="resultats-sheet-handle">
+                <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+              </div>
+              <div className="resultats-sheet-body">
+                <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
+                <Skeleton count={3} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }
 
   // --- Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
   // une erreur, pas d'Alert ici - un message clair et une action de recours
-  // suffisent. Pas de carte plein ecran : rien a y tracer. ---
+  // suffisent. Pas de carte plein ecran : rien a y tracer. Hors perimetre
+  // de la fusion (issue #171/#172, docs/specs/fusion-recherche-resultats.md
+  // section 5) : cet etat n'a jamais ete une disposition carte + panneau
+  // flottant, "Nouvelle recherche" reste un retour complet au formulaire. */
   if (itineraries.length === 0) {
     return (
       <section className="resultats-page">
@@ -503,68 +626,72 @@ function RecherchePageResults({
         />
       </div>
 
-      {/* Panneaux flottants (desktop uniquement, voir la media query dans
-          RecherchePageResults.css - masques en dessous de 768px). */}
-      <div className="resultats-panels">
-        <div className="resultats-panel resultats-panel-list">
-          <ResultsList
-            itineraries={itineraries}
-            origin={origin}
-            destination={destination}
-            selectedIndex={selectedIndex}
-            onSelect={selectItinerary}
-            onEditSearch={onEditSearch}
-            geolocationMessage={geolocationMessage(geolocation.status)}
-            itineraryBadges={itineraryBadges}
-          />
-        </div>
-        <div className="resultats-panel resultats-panel-detail">
-          <ItinerarySegments itinerary={selectedItinerary} />
-        </div>
-      </div>
-
-      {/* Bandeau mobile a 3 etats (masque a partir de 768px). */}
-      <div className="resultats-sheet" data-sheet-state={sheetState}>
-        <button
-          type="button"
-          className="resultats-sheet-handle"
-          onClick={handleHandleClick}
-          onTouchStart={handleHandleTouchStart}
-          onTouchEnd={handleHandleTouchEnd}
-          aria-expanded={sheetState !== 'collapsed'}
-        >
-          <span className="resultats-sheet-handle-bar" aria-hidden="true" />
-          {sheetState === 'collapsed' && (
-            <CompactPreview itinerary={selectedItinerary} />
-          )}
-        </button>
-
-        <div className="resultats-sheet-body">
-          {sheetState === 'detail' ? (
-            <div className="resultats-sheet-detail">
-              <button
-                type="button"
-                className="resultats-sheet-back"
-                onClick={() => setSheetState('list')}
-              >
-                ← Tous les trajets
-              </button>
+      {editPanel ?? (
+        <>
+          {/* Panneaux flottants (desktop uniquement, voir la media query dans
+              RecherchePageResults.css - masques en dessous de 768px). */}
+          <div className="resultats-panels">
+            <div className="resultats-panel resultats-panel-list">
+              <ResultsList
+                itineraries={itineraries}
+                origin={origin}
+                destination={destination}
+                selectedIndex={selectedIndex}
+                onSelect={selectItinerary}
+                onEditSearch={onEditSearch}
+                geolocationMessage={geolocationMessage(geolocation.status)}
+                itineraryBadges={itineraryBadges}
+              />
+            </div>
+            <div className="resultats-panel resultats-panel-detail">
               <ItinerarySegments itinerary={selectedItinerary} />
             </div>
-          ) : (
-            <ResultsList
-              itineraries={itineraries}
-              origin={origin}
-              destination={destination}
-              selectedIndex={selectedIndex}
-              onSelect={selectItinerary}
-              onEditSearch={onEditSearch}
-              geolocationMessage={geolocationMessage(geolocation.status)}
-              itineraryBadges={itineraryBadges}
-            />
-          )}
-        </div>
-      </div>
+          </div>
+
+          {/* Bandeau mobile a 3 etats (masque a partir de 768px). */}
+          <div className="resultats-sheet" data-sheet-state={sheetState}>
+            <button
+              type="button"
+              className="resultats-sheet-handle"
+              onClick={handleHandleClick}
+              onTouchStart={handleHandleTouchStart}
+              onTouchEnd={handleHandleTouchEnd}
+              aria-expanded={sheetState !== 'collapsed'}
+            >
+              <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+              {sheetState === 'collapsed' && (
+                <CompactPreview itinerary={selectedItinerary} />
+              )}
+            </button>
+
+            <div className="resultats-sheet-body">
+              {sheetState === 'detail' ? (
+                <div className="resultats-sheet-detail">
+                  <button
+                    type="button"
+                    className="resultats-sheet-back"
+                    onClick={() => setSheetState('list')}
+                  >
+                    ← Tous les trajets
+                  </button>
+                  <ItinerarySegments itinerary={selectedItinerary} />
+                </div>
+              ) : (
+                <ResultsList
+                  itineraries={itineraries}
+                  origin={origin}
+                  destination={destination}
+                  selectedIndex={selectedIndex}
+                  onSelect={selectItinerary}
+                  onEditSearch={onEditSearch}
+                  geolocationMessage={geolocationMessage(geolocation.status)}
+                  itineraryBadges={itineraryBadges}
+                />
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

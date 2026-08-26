@@ -248,6 +248,80 @@ describe('RecherchePage', () => {
     expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
   });
 
+  describe('vue Edition en place depuis les resultats (issue #171/#172)', () => {
+    async function searchAndReachResults(user: ReturnType<typeof userEvent.setup>) {
+      vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+        Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+      );
+      const itineraries = [
+        { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
+      ];
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+      renderPage();
+
+      await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+      await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+      await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+      await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+    }
+
+    it("'Annuler' referme la vue Edition sans relancer /trips, la liste des resultats est retrouvee telle quelle", async () => {
+      const user = userEvent.setup();
+      await searchAndReachResults(user);
+      expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1);
+
+      await user.click(
+        screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
+      );
+      // La vue Edition affiche bien les champs, mais la liste de resultats
+      // n'est plus dans le document tant qu'on est en edition (voir
+      // RecherchePageResults.tsx) - pas de disparition silencieuse d'un
+      // resultat existant, juste un panneau qui remplace l'autre.
+      expect(screen.getByLabelText('Origine')).toBeInTheDocument();
+      expect(
+        screen.queryAllByRole('button', { name: /min/ }),
+      ).toHaveLength(0);
+
+      await user.click(screen.getByRole('button', { name: 'Annuler' }));
+
+      // Retour a la liste sans nouvel appel reseau : "Annuler" ne
+      // resoumet jamais la recherche.
+      expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1);
+      expect(screen.queryByLabelText('Origine')).not.toBeInTheDocument();
+      expect(
+        (await screen.findAllByRole('button', { name: /min/ })).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("le bouton 'Annuler' n'apparait pas au tout premier chargement (rien a annuler)", () => {
+      renderPage();
+      expect(
+        screen.queryByRole('button', { name: 'Annuler' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('soumettre le formulaire depuis la vue Edition relance la recherche et revient a la vue Resume', async () => {
+      const user = userEvent.setup();
+      await searchAndReachResults(user);
+
+      await user.click(
+        screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
+      );
+      await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+      await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => {
+        expect(tripsLib.searchTrips).toHaveBeenCalledTimes(2);
+      });
+      // Retour automatique a la vue Resume + liste, sans clic supplementaire.
+      expect(screen.queryByLabelText('Origine')).not.toBeInTheDocument();
+      expect(
+        (await screen.findAllByRole('button', { name: 'Modifier la recherche' }))
+          .length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
   it('ne pre-remplit pas les modes de transport pour un utilisateur non connecte', async () => {
     const user = userEvent.setup();
     renderPage();

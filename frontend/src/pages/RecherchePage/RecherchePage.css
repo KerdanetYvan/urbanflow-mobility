@@ -7,6 +7,14 @@
  * le formulaire est un panneau flottant (desktop) / bandeau (mobile) - les
  * champs restent donc empiles dans tous les cas, jamais la grille 2 colonnes
  * d'une page pleine largeur qui existait avant #111.
+ *
+ * Le panneau lui-meme (.recherche-panel-form) vit desormais dans
+ * RecherchePageResults.css (issue #171/#172, docs/specs/
+ * fusion-recherche-resultats.md) : ce n'est plus un panneau propre a
+ * l'etat "formulaire" de cet ecran, il est reutilise tel quel par
+ * RecherchePageResults.tsx pour la vue Edition en place depuis les
+ * resultats - une seule feuille de style pour un seul panneau, peu importe
+ * lequel des deux fichiers le monte.
  */
 
 /*
@@ -231,6 +239,23 @@
   margin-top: var(--space-2);
 }
 
+/* Conteneur "Rechercher" + "Annuler" (issue #171/#172) : "Annuler" n'existe
+   que dans la vue Edition depuis un ecran resultats deja peuple (voir
+   RecherchePage.tsx, renderRechercheForm) - absent au tout premier
+   chargement, .recherche-submit garde alors sa pleine largeur seule. */
+.recherche-form-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.recherche-form-actions .recherche-submit {
+  flex: 1;
+}
+
+.recherche-cancel {
+  flex-shrink: 0;
+}
+
 /* Raccourcis de recherche rapide (issue #112) : liste de boutons pleine
    largeur sous le formulaire, meme esprit visuel que .recherche-suggestions
    (boutons empiles, cible tactile min) mais sans superposition - contenu
@@ -286,125 +311,8 @@
   outline-offset: 2px;
 }
 
-/* --- Panneau formulaire (issue #110/#111) : bandeau mobile a 2 etats par
-   defaut (mobile-first) ; devient un panneau flottant en desktop, voir la
-   media query plus bas. Reutilise le motif visuel de .resultats-sheet
-   (RecherchePageResults.css, poignee + glissement) sans en dependre en JS -
-   mecanique locale a RecherchePage.tsx (2 etats, pas 3). --- */
-
-.recherche-panel-form {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg);
-  border-top-left-radius: var(--radius-md);
-  border-top-right-radius: var(--radius-md);
-  box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
-  transition: height 0.22s ease-out;
-  overflow: hidden;
-}
-
-.recherche-panel-form[data-sheet-state='collapsed'] {
-  height: 4.5rem;
-}
-
-/* Sans ca, flex:1 laisse quand meme quelques pixels visibles du corps
-   (debut du message invite/de l'Alert) sous la poignee repliee - masque
-   entierement le corps replie plutot qu'un fragment de texte tronque. */
-.recherche-panel-form[data-sheet-state='collapsed']
-  .recherche-panel-form-body {
-  display: none;
-}
-
-.recherche-panel-form[data-sheet-state='expanded'] {
-  height: 70vh;
-}
-
-.recherche-panel-form-handle {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--touch-target-min);
-  padding: var(--space-2) var(--space-4);
-  background: none;
-  border: none;
-  color: var(--color-text);
-  cursor: pointer;
-  /* Empeche le glissement (voir onTouchStart/onTouchEnd, RecherchePage.tsx)
-     de declencher en plus un defilement/zoom du navigateur sur cette zone -
-     meme motif que .resultats-sheet-handle. */
-  touch-action: none;
-}
-
-.recherche-panel-form-handle:focus-visible {
-  outline: 2px solid var(--color-primary-emphasis);
-  outline-offset: -2px;
-}
-
-.recherche-panel-form-handle-label {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
-.recherche-panel-form-body {
-  flex: 1;
-  min-height: 0; /* necessaire pour qu'overflow-y fonctionne dans un flex item */
-  overflow-y: auto;
-  padding: 0 var(--space-4) var(--space-4);
-}
-
 @media (min-width: 768px) {
   .recherche-addresses {
     gap: var(--space-3);
-  }
-
-  /* Panneau flottant plutot que bandeau du bas (issue #110/#111) : coin
-     haut-gauche, largeur alignee sur .resultats-panel-list (meme fichier,
-     RecherchePageResults.css) pour une coherence visuelle entre les deux
-     ecrans - le panneau resultats occupe le bas-gauche, les deux ne se
-     chevauchent jamais. */
-  .recherche-panel-form {
-    left: var(--space-5);
-    right: auto;
-    top: var(--space-5);
-    bottom: auto;
-    width: 22rem;
-    max-height: calc(100% - var(--space-8));
-    border-radius: var(--radius-md);
-    box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
-  }
-
-  /* Meme specificite que les regles [data-sheet-state='collapsed'/'expanded']
-     ci-dessus (attribut + classe) : gagne par ordre de cascade (declaree
-     apres) sans avoir besoin de !important - toujours hauteur naturelle en
-     desktop, quel que soit l'etat (non pertinent, pas de repli possible). */
-  .recherche-panel-form[data-sheet-state] {
-    height: auto;
-  }
-
-  /* Pas de repli en desktop (assez de place pour le panneau entier) - la
-     poignee/le geste de glissement n'ont de sens qu'en bandeau mobile. */
-  .recherche-panel-form-handle {
-    display: none;
-  }
-
-  /* Contrepartie du masquage mobile du corps replie (regle de base ci-dessus,
-     meme specificite - attribut + 2 classes) : toujours visible en desktop,
-     l'etat "collapsed" ne peut survivre a un redimensionnement mobile ->
-     desktop sans que ce corps ne reste cache. */
-  .recherche-panel-form[data-sheet-state='collapsed']
-    .recherche-panel-form-body {
-    display: block;
-  }
-
-  .recherche-panel-form-body {
-    padding: var(--space-4);
   }
 }
