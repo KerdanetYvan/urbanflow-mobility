@@ -34,7 +34,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 
 ### Phase C — Refonte complète de l'écran `/recherche`
 
-- [ ] [#171](https://github.com/KerdanetYvan/urbanflow-mobility/issues/171) (PO) — Specs : fusionner la card de recherche et la card de résultats
+- [x] [#171](https://github.com/KerdanetYvan/urbanflow-mobility/issues/171) (PO) — Specs : fusionner la card de recherche et la card de résultats — `docs/specs/fusion-recherche-resultats.md` : panneau unique persistant (Vue Édition / Vue Résumé + liste) à la place des deux panneaux mutuellement exclusifs actuels, reprend la position du panneau résultats en desktop, bandeau mobile unifié à 3 états. Ferme aussi #160 (hauteur d'ouverture par défaut).
 - [ ] [#172](https://github.com/KerdanetYvan/urbanflow-mobility/issues/172) (Dev FE) — Implémentation — dépend de #171
 - [ ] [#181](https://github.com/KerdanetYvan/urbanflow-mobility/issues/181) (Dev FE) — Remplacer les transitions sur `height` par `transform`/`grid-template-rows` (finding détecteur Impeccable, bandeau formulaire + panneau résultats) — juste après #172, sur les mêmes fichiers
 - [ ] [#165](https://github.com/KerdanetYvan/urbanflow-mobility/issues/165) (PO) — Specs : fusionner position/domicile/travail/historique dans le champ d'autocomplétion
