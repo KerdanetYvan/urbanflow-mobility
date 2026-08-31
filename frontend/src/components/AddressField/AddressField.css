@@ -46,6 +46,17 @@
   cursor: pointer;
 }
 
+/* Anti-débordement (issue #161) : une adresse géocodée longue (immeuble +
+   résidence + code postal) reste sur une seule ligne tronquée plutôt que
+   d'allonger le dropdown de plusieurs lignes. Ne s'applique pas aux entrées
+   rapides (`.address-quick-entry`, display: flex) : leurs deux lignes gèrent
+   déjà leur propre ellipsis (voir plus bas). */
+.address-suggestions button:not(.address-quick-entry) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .address-suggestions button:hover,
 .address-suggestions button:focus-visible {
   background: var(--color-bg-subtle);

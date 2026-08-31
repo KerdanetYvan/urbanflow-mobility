@@ -53,7 +53,23 @@
   font-weight: 600;
 }
 
+/* Anti-débordement des libellés d'adresse (issue #161) : une adresse réelle
+   longue (immeuble + résidence + code postal, fréquent en zone urbaine
+   dense) doit être tronquée avec ellipsis plutôt que d'élargir la carte ou
+   de pousser la flèche/la destination hors du cadre. `flex: 1` + `min-width:
+   0` : les deux extrémités se partagent la largeur à parts égales, `min-width:
+   0` lève le minimum implicite d'un flex item sans quoi `text-overflow`
+   n'opère jamais. */
+.historique-entry-endpoint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .historique-entry-arrow {
+  flex-shrink: 0;
   color: var(--color-text-muted);
 }
 
