@@ -233,13 +233,6 @@
   font-size: var(--text-sm);
 }
 
-/* Prochains departs d'un resultat regroupe (issue #127) - meme traitement
-   discret que la duree/les correspondances ci-dessus. */
-.resultats-card-next-departures {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
 .resultats-card-transfers {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -253,6 +246,15 @@
 }
 
 /* --- Detail segment par segment (partage panneau desktop + bandeau mobile) --- */
+
+/* Prochains passages d'un resultat regroupe (issue #127) - deplace ici
+   depuis la carte compacte de la liste (issue #173) : traitement discret,
+   au-dessus de la liste des segments. */
+.resultats-detail-next-departures {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
 
 .resultats-segments {
   display: flex;

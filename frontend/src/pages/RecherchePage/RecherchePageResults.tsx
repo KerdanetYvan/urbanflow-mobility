@@ -151,18 +151,10 @@ function ItineraryCard({ itinerary, isSelected, onSelect, badge }: ItineraryCard
         <span className="resultats-card-duration">
           {formatDuration(itinerary.durationSeconds)}
         </span>
-        {itinerary.nextDepartures && itinerary.nextDepartures.length > 1 && (
-          // Itineraires identiques regroupes sous ce resultat (issue #127) -
-          // affiche les prochains departs en plus du premier deja visible
-          // ci-dessus (resultats-card-time), sans dupliquer ce dernier.
-          <span className="resultats-card-next-departures">
-            Prochain passage à {formatTime(itinerary.nextDepartures[0])}, puis{' '}
-            {itinerary.nextDepartures
-              .slice(1)
-              .map((departure) => formatTime(departure))
-              .join(', ')}
-          </span>
-        )}
+        {/* Les prochains passages d'un resultat regroupe (issue #127) ne
+            s'affichent plus sur la carte compacte : deplaces dans le detail
+            de l'itineraire selectionne (issue #173, voir ItinerarySegments)
+            pour alleger la liste. */}
       </span>
       <span className="resultats-card-transfers">
         {formatTransfers(itinerary.transfers)}
@@ -238,40 +230,55 @@ interface ItinerarySegmentsProps {
  */
 function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
   return (
-    <ol
-      className="resultats-segments"
-      aria-label="Détail du trajet sélectionné, segment par segment"
-    >
-      {itinerary.segments.map((segment, index) => (
-        <li key={index} className="resultats-segment">
-          <span className="resultats-segment-icon" aria-hidden="true">
-            {isLineMode(segment.mode) ? (
-              <LineBadge
-                mode={segment.mode}
-                label={segment.routeName ?? getModeStyle(segment.mode).label}
-                color={toHexColor(segment.routeColor)}
-                textColor={toHexColor(segment.routeTextColor)}
-              />
-            ) : (
-              getTripModeIcon(segment.mode)
-            )}
-          </span>
-          <span className="resultats-segment-body">
-            <span className="resultats-segment-label">
-              {getModeStyle(segment.mode).label}
-              {segment.routeName ? ` ${segment.routeName}` : ''}
+    <>
+      {itinerary.nextDepartures && itinerary.nextDepartures.length > 1 && (
+        // Itineraires identiques regroupes sous ce resultat (issue #127) :
+        // les prochains departs (au-dela du premier, deja visible dans le
+        // resume/la carte) vivent ici depuis #173, plus sur la carte
+        // compacte de la liste - pour l'alleger.
+        <p className="resultats-detail-next-departures">
+          Prochain passage à {formatTime(itinerary.nextDepartures[0])}, puis{' '}
+          {itinerary.nextDepartures
+            .slice(1)
+            .map((departure) => formatTime(departure))
+            .join(', ')}
+        </p>
+      )}
+      <ol
+        className="resultats-segments"
+        aria-label="Détail du trajet sélectionné, segment par segment"
+      >
+        {itinerary.segments.map((segment, index) => (
+          <li key={index} className="resultats-segment">
+            <span className="resultats-segment-icon" aria-hidden="true">
+              {isLineMode(segment.mode) ? (
+                <LineBadge
+                  mode={segment.mode}
+                  label={segment.routeName ?? getModeStyle(segment.mode).label}
+                  color={toHexColor(segment.routeColor)}
+                  textColor={toHexColor(segment.routeTextColor)}
+                />
+              ) : (
+                getTripModeIcon(segment.mode)
+              )}
             </span>
-            <span className="resultats-segment-time">
-              {formatTime(segment.startTime)} – {formatTime(segment.endTime)}{' '}
-              ({formatDuration(segment.durationSeconds)})
+            <span className="resultats-segment-body">
+              <span className="resultats-segment-label">
+                {getModeStyle(segment.mode).label}
+                {segment.routeName ? ` ${segment.routeName}` : ''}
+              </span>
+              <span className="resultats-segment-time">
+                {formatTime(segment.startTime)} – {formatTime(segment.endTime)}{' '}
+                ({formatDuration(segment.durationSeconds)})
+              </span>
+              <span className="resultats-segment-stop">
+                {segment.from.name} → {segment.to.name}
+              </span>
             </span>
-            <span className="resultats-segment-stop">
-              {segment.from.name} → {segment.to.name}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ol>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }
 
