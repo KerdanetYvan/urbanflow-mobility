@@ -173,7 +173,7 @@ describe('RecherchePage', () => {
     const itineraries = [
       { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
     ];
-    vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+    vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries });
     const user = userEvent.setup();
     renderPage();
 
@@ -231,7 +231,7 @@ describe('RecherchePage', () => {
     const itineraries = [
       { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
     ];
-    vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+    vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries });
     const user = userEvent.setup();
     renderPage();
 
@@ -256,7 +256,7 @@ describe('RecherchePage', () => {
       const itineraries = [
         { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
       ];
-      vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries });
       renderPage();
 
       await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
@@ -429,7 +429,7 @@ describe('RecherchePage', () => {
       vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
         Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
       );
-      vi.mocked(tripsLib.searchTrips).mockResolvedValue([]);
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries: [] });
       const user = userEvent.setup();
       renderPage();
 
@@ -452,7 +452,7 @@ describe('RecherchePage', () => {
       vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
         Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
       );
-      vi.mocked(tripsLib.searchTrips).mockResolvedValue([]);
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries: [] });
       const user = userEvent.setup();
       renderPage();
 
@@ -485,7 +485,7 @@ describe('RecherchePage', () => {
       { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 2, segments: [] },
       { startTime: 't2', endTime: 't3', durationSeconds: 900, transfers: 0, segments: [] },
     ];
-    vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+    vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries });
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => expect(profileLib.getMyProfile).toHaveBeenCalled());
@@ -625,7 +625,7 @@ describe('RecherchePage', () => {
           segments: [],
         },
       ];
-      vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries });
 
       renderPageWithLocationState({ origin: GARE, destination: HOTEL_DE_VILLE });
 

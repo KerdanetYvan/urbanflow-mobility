@@ -14,14 +14,6 @@
  * ("disposition resultats", que ce soit en chargement ou peuplee).
  */
 
-/* --- Etat vide (aucun itineraire) : reste en flux normal, pas de carte
-   plein ecran (voir RecherchePageResults.tsx, retour anticipe). --- */
-
-.resultats-page {
-  max-width: 32rem;
-  margin-inline: auto;
-}
-
 .resultats-context {
   margin: var(--space-2) 0 var(--space-4);
   color: var(--color-text-muted);
@@ -56,11 +48,26 @@
   font-size: var(--text-sm);
 }
 
+/* Etat vide (aucun itineraire, pas meme a pied) - contenu du panneau
+   fusionne depuis #190 (plus une page a part) : le panneau/bandeau porte
+   deja le fond, le cadre et le defilement, ce bloc n'a qu'a espacer son
+   texte. */
 .resultats-empty {
   color: var(--color-text);
 }
 
-.resultats-empty .resultats-link-button {
+.resultats-empty p {
+  margin: 0 0 var(--space-2);
+}
+
+/* Bandeau du repli a pied (issue #190) : la "liste" affichee en dessous
+   n'est pas un resultat en transport en commun mais l'itineraire a pied
+   propose faute de mieux - on l'annonce clairement, registre "information"
+   (meme couleur d'accent que .resultats-link-button). */
+.resultats-fallback-note {
+  margin: 0 0 var(--space-3);
+  color: var(--color-primary-emphasis);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 

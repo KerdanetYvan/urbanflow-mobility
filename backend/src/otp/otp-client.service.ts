@@ -26,6 +26,13 @@ export interface PlanTripParams {
    * en paramètre `mode` d'OTP par toOtpModeParam.
    */
   transportModes?: TransportMode[];
+  /**
+   * Force une recherche `mode=WALK` seul, en ignorant `transportModes`
+   * (issue #190) - utilisé par TripsService comme repli quand aucun trajet
+   * en transport en commun n'a été trouvé, pour proposer un trajet à pied
+   * plutôt qu'un état vide sec.
+   */
+  walkOnly?: boolean;
 }
 
 /**
@@ -147,12 +154,16 @@ export class OtpClientService {
     );
     url.searchParams.set('date', this.formatDate(departure, timeZone));
     url.searchParams.set('time', this.formatTime(departure, timeZone));
-    // Modes préférés (issue #87) traduits en paramètre `mode` d'OTP :
-    // `TRANSIT,WALK` par défaut (aucun filtre), sinon `WALK` + les
-    // transports en commun retenus. Vélo/trottinette (GBFS, F3) et
-    // covoiturage ne sont pas encore intégrés à OTP - ignorés au routage
-    // même si cochés (voir otp-modes.ts).
-    url.searchParams.set('mode', toOtpModeParam(params.transportModes));
+    // Repli à pied (issue #190) : `mode=WALK` seul, en ignorant tout filtre
+    // de modes préférés. Sinon, modes préférés (issue #87) traduits en
+    // paramètre `mode` d'OTP : `TRANSIT,WALK` par défaut (aucun filtre),
+    // sinon `WALK` + les transports en commun retenus. Vélo/trottinette
+    // (GBFS, F3) et covoiturage ne sont pas encore intégrés à OTP - ignorés
+    // au routage même si cochés (voir otp-modes.ts).
+    url.searchParams.set(
+      'mode',
+      params.walkOnly ? 'WALK' : toOtpModeParam(params.transportModes),
+    );
     url.searchParams.set('numItineraries', '5');
 
     return url.toString();

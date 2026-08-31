@@ -45,6 +45,28 @@ export interface TripItinerary {
 }
 
 /**
+ * Nature du repli quand la recherche normale ne renvoie aucun itineraire
+ * (issue #190). `walk-only` : aucun trajet en transport en commun, mais un
+ * trajet a pied a ete trouve - il est dans `TripSearchResult.itineraries`.
+ * (Issue #91 ajoutera `later-departure`.)
+ */
+export interface TripFallback {
+  kind: 'walk-only';
+}
+
+/**
+ * Reponse de GET /trips (issue #7). Enveloppe plutot qu'un tableau nu depuis
+ * l'issue #190 : `fallback` est une metadonnee sur la recherche (repli a
+ * pied), qu'un tableau ne peut pas porter proprement.
+ */
+export interface TripSearchResult {
+  /** Itineraires trouves, deja tries par le backend. Vide = aucun (voir `fallback`). */
+  itineraries: TripItinerary[];
+  /** Present uniquement quand la recherche normale n'a rien donne ET qu'un repli a ete tente. */
+  fallback?: TripFallback;
+}
+
+/**
  * Parametres de recherche transmis a GET /trips (issue #7).
  */
 export interface SearchTripsParams {
@@ -88,7 +110,9 @@ export interface SearchTripsParams {
  * l'historique (issue #11, TripsService#search) - aucun appel reseau
  * supplementaire necessaire ici dans les deux cas.
  */
-export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]> {
+export function searchTrips(
+  params: SearchTripsParams,
+): Promise<TripSearchResult> {
   const query = new URLSearchParams({
     originLat: String(params.originLat),
     originLon: String(params.originLon),
@@ -106,7 +130,7 @@ export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]>
   for (const mode of params.transportModes ?? []) {
     query.append('transportModes', mode);
   }
-  return apiGetWithOptionalAuth<TripItinerary[]>(`/trips?${query.toString()}`);
+  return apiGetWithOptionalAuth<TripSearchResult>(`/trips?${query.toString()}`);
 }
 
 /** Une entree dedupliquee de l'historique de recherche (voir backend/src/trips/dto/trip-history-entry.dto.ts, issue #11). */

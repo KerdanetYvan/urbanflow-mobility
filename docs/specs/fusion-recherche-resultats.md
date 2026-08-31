@@ -19,7 +19,7 @@ Constat de la revue fonctionnelle de fin de Sprint 3 (retour utilisateur, 2026-0
 - Le contenu des champs eux-mêmes (autocomplétion, validation, filtre des modes de transport) est déjà cadré par `docs/specs/f2-ecrans-planification.md` section 2.1 et `docs/specs/filtre-modes-transport.md` — repris tel quel, seul son emplacement change.
 - Le panneau détail segment par segment (`.resultats-panel-detail`, `ItinerarySegments`) n'est pas concerné par la fusion : il reste un panneau à part, inchangé.
 - La technique d'animation d'ouverture/fermeture du bandeau (`transition: height`) est traitée par l'issue [#181](https://github.com/KerdanetYvan/urbanflow-mobility/issues/181), qui intervient juste après l'implémentation de cette spec sur les mêmes fichiers — cette spec ne prescrit aucune technique CSS d'animation, seulement la disposition et les états.
-- L'état vide (aucun itinéraire trouvé, `.resultats-page`) et l'état "recherche en cours" (squelette) ne sont pas des panneaux flottants aujourd'hui et le restent — voir section 5.
+- L'état "recherche en cours" (squelette) et, à l'origine, l'état vide n'étaient pas des panneaux flottants — voir section 5. **Mis à jour par l'issue [#190](https://github.com/KerdanetYvan/urbanflow-mobility/issues/190)** : maintenant que le panneau fusionné existe, l'état vide y est intégré (carte plein écran conservée en fond), et un repli à pied est proposé quand aucun trajet en transport en commun n'est trouvé. L'état "recherche en cours" reste tel quel.
 
 ## 2. Disposition cible : un panneau unique, deux vues internes
 
@@ -58,7 +58,7 @@ Aucun changement par rapport à la règle déjà actée dans `docs/specs/recherc
 
 Restent inchangés, hors périmètre de cette spec :
 - **Recherche en cours** (`itineraries === null`) : squelette de chargement affiché dans le panneau (déjà le cas aujourd'hui via `.resultats-panel-list`/`.resultats-sheet`) — devient naturellement le contenu du panneau fusionné pendant le chargement, sans changement de comportement.
-- **Résultat vide** (`itineraries.length === 0`) : reste une page classique (`.resultats-page`, pas de carte plein écran) — ce cas n'affiche déjà pas la disposition carte + panneau flottant aujourd'hui (aucun trajet à tracer), la fusion ne le concerne donc pas. Le bouton "Nouvelle recherche" y reste un retour complet à l'état `formulaire`.
+- **Résultat vide** (`itineraries.length === 0`) : à l'origine une page classique (`.resultats-page`), hors périmètre de *cette* spec. **Repris par l'issue [#190](https://github.com/KerdanetYvan/urbanflow-mobility/issues/190)** une fois le panneau fusionné livré : l'état vide est désormais rendu dans le panneau (même coquille que "recherche en cours", carte plein écran en fond avec origine/destination), `.resultats-page` supprimée, et l'action de recours est le "Modifier la recherche" de `SearchContext` (édition en place). Si un trajet à pied existe faute de transport en commun, il est proposé comme un résultat normal précédé d'un bandeau explicatif (`fallback: 'walk-only'` renvoyé par `GET /trips`).
 
 ## 6. Exemple (persona du dossier, partie 2.3)
 

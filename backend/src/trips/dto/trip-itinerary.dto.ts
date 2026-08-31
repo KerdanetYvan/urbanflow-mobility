@@ -97,3 +97,42 @@ export class TripItinerary {
   })
   nextDepartures?: string[];
 }
+
+/**
+ * Nature du repli quand la recherche "normale" (transports en commun + modes
+ * demandes) ne renvoie aucun itineraire (issue #190).
+ *
+ * - `walk-only` : aucun trajet en transport en commun a cette heure, mais un
+ *   trajet a pied a ete trouve en re-interrogeant OTP en `mode=WALK` seul ;
+ *   `TripSearchResult.itineraries` contient alors cet itineraire a pied.
+ *
+ * (Issue #91, tache suivante, ajoutera `later-departure` + des champs
+ * `requestedDepartureTime` / `actualDepartureTime` pour le cas "prochain
+ * creneau disponible plus tard".)
+ */
+export class TripFallback {
+  @ApiProperty({ enum: ['walk-only'], example: 'walk-only' })
+  kind: 'walk-only';
+}
+
+/**
+ * Reponse de GET /trips (issue #7). Enveloppe plutot qu'un tableau nu
+ * (issue #190) : le repli eventuel est une metadonnee sur la recherche, pas
+ * un itineraire - un tableau ne peut pas la porter proprement.
+ */
+export class TripSearchResult {
+  @ApiProperty({
+    type: TripItinerary,
+    isArray: true,
+    description:
+      'Itineraires trouves, deja tries par le backend. Vide = aucun itineraire (voir `fallback` pour savoir si un repli a ete tente).',
+  })
+  itineraries: TripItinerary[];
+
+  @ApiPropertyOptional({
+    type: TripFallback,
+    description:
+      "Present uniquement quand la recherche normale n'a rien renvoye ET qu'un repli a ete tente. Absent = resultats normaux, ou aucun repli disponible.",
+  })
+  fallback?: TripFallback;
+}

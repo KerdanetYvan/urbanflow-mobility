@@ -129,7 +129,11 @@ describe('TripsService', () => {
       destinationLon: 2.36,
     });
 
-    expect(result).toEqual([
+    // Des itineraires normaux ont ete trouves : pas de second appel OTP
+    // (repli a pied), pas de fallback dans la reponse (issue #190).
+    expect(otpClient.planTrip).toHaveBeenCalledTimes(1);
+    expect(result.fallback).toBeUndefined();
+    expect(result.itineraries).toEqual([
       {
         startTime: new Date(1000).toISOString(),
         endTime: new Date(601000).toISOString(),
@@ -175,7 +179,9 @@ describe('TripsService', () => {
     ]);
   });
 
-  it("renvoie un tableau vide quand OtpClientService n'a trouve aucun itineraire", async () => {
+  it('renvoie itineraries vide (sans fallback) quand ni le transport en commun ni la marche ne donnent de trajet', async () => {
+    // mockResolvedValue s'applique aux DEUX appels (recherche normale + repli
+    // a pied) : les deux renvoient une liste vide.
     otpClient.planTrip.mockResolvedValue([]);
 
     const result = await service.search({
@@ -185,7 +191,66 @@ describe('TripsService', () => {
       destinationLon: 2.36,
     });
 
-    expect(result).toEqual([]);
+    // Repli a pied tente (2e appel), sans succes -> etat vide "sec".
+    expect(otpClient.planTrip).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ itineraries: [] });
+  });
+
+  describe('repli a pied quand aucun trajet en transport en commun (issue #190)', () => {
+    const WALK_OTP_ITINERARY = {
+      startTime: 0,
+      endTime: 900_000,
+      duration: 900,
+      transfers: 0,
+      legs: [
+        {
+          mode: 'WALK',
+          startTime: 0,
+          endTime: 900_000,
+          distance: 1100,
+          from: { name: 'Place Centrale', lat: 48.85, lon: 2.35 },
+          to: { name: 'Université', lat: 48.86, lon: 2.36 },
+        },
+      ],
+    };
+
+    it('retente en WALK seul et renvoie le trajet a pied avec fallback: walk-only', async () => {
+      otpClient.planTrip
+        .mockResolvedValueOnce([]) // recherche normale : rien
+        .mockResolvedValueOnce([WALK_OTP_ITINERARY]); // repli a pied : trouve
+
+      const result = await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+      });
+
+      expect(otpClient.planTrip).toHaveBeenCalledTimes(2);
+      // Le 2e appel force mode=WALK (walkOnly), sans filtre de modes.
+      expect(otpClient.planTrip).toHaveBeenLastCalledWith(
+        expect.objectContaining({ walkOnly: true }),
+      );
+      expect(result.fallback).toEqual({ kind: 'walk-only' });
+      expect(result.itineraries).toHaveLength(1);
+      expect(result.itineraries[0].segments.map((s) => s.mode)).toEqual([
+        'WALK',
+      ]);
+    });
+
+    it('ne tente pas le repli a pied quand la recherche normale a deja des resultats', async () => {
+      otpClient.planTrip.mockResolvedValueOnce([WALK_OTP_ITINERARY]);
+
+      const result = await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+      });
+
+      expect(otpClient.planTrip).toHaveBeenCalledTimes(1);
+      expect(result.fallback).toBeUndefined();
+    });
   });
 
   it(
@@ -311,9 +376,11 @@ describe('TripsService', () => {
         destinationLon: 2.36,
       });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].startTime).toEqual(new Date(0).toISOString());
-      expect(result[0].nextDepartures).toEqual([
+      expect(result.itineraries).toHaveLength(1);
+      expect(result.itineraries[0].startTime).toEqual(
+        new Date(0).toISOString(),
+      );
+      expect(result.itineraries[0].nextDepartures).toEqual([
         new Date(0).toISOString(),
         new Date(600_000).toISOString(),
         new Date(1_200_000).toISOString(),
@@ -340,9 +407,9 @@ describe('TripsService', () => {
         destinationLon: 2.36,
       });
 
-      expect(result).toHaveLength(2);
-      expect(result[0].nextDepartures).toBeUndefined();
-      expect(result[1].nextDepartures).toBeUndefined();
+      expect(result.itineraries).toHaveLength(2);
+      expect(result.itineraries[0].nextDepartures).toBeUndefined();
+      expect(result.itineraries[1].nextDepartures).toBeUndefined();
     },
   );
 });

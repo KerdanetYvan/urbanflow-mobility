@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { formatTime } from '../../lib/format';
-import type { TripItinerary, TripSegment } from '../../lib/trips';
+import type {
+  TripFallback,
+  TripItinerary,
+  TripSegment,
+} from '../../lib/trips';
 import RecherchePageResults from './RecherchePageResults';
 
 const ORIGIN = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
@@ -109,6 +113,7 @@ function renderResults(
   itineraries: TripItinerary[] | null,
   onEditSearch = vi.fn(),
   accessibilityPreferences?: string[],
+  fallback?: TripFallback,
 ) {
   return {
     onEditSearch,
@@ -117,6 +122,7 @@ function renderResults(
         origin={ORIGIN}
         destination={DESTINATION}
         itineraries={itineraries}
+        fallback={fallback}
         onEditSearch={onEditSearch}
         accessibilityPreferences={accessibilityPreferences}
       />,
@@ -327,17 +333,75 @@ describe('RecherchePageResults', () => {
     expect(screen.queryByText('Bus C1')).not.toBeInTheDocument();
   });
 
-  it("affiche un etat vide dedie (pas une erreur) quand aucun itineraire n'est trouve", async () => {
+  it("rend l'etat vide DANS le panneau fusionne, plus de page separee (issue #190)", async () => {
     const user = userEvent.setup();
-    const { onEditSearch } = renderResults([]);
+    const { container, onEditSearch } = renderResults([]);
 
+    // Plus de `.resultats-page` : meme coquille carte + panneau que
+    // "recherche en cours".
+    expect(container.querySelector('.resultats-page')).not.toBeInTheDocument();
+    expect(container.querySelector('.resultats-shell')).toBeInTheDocument();
+    expect(container.querySelector('.resultats-map-bg')).toBeInTheDocument();
+
+    const listPanel = container.querySelector(
+      '.resultats-panel-list',
+    ) as HTMLElement;
     expect(
-      screen.getByText('Aucun itinéraire trouvé pour ce trajet.'),
+      within(listPanel).getByText(
+        'Aucun itinéraire trouvé pour ce trajet, même à pied.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Nouvelle recherche' }));
+    // Action de recours = "Modifier la recherche" de SearchContext (edition
+    // en place, decision #190).
+    await user.click(
+      within(listPanel).getByRole('button', { name: 'Modifier la recherche' }),
+    );
     expect(onEditSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('affiche le trajet a pied de repli comme un resultat normal, avec un bandeau explicatif (issue #190)', () => {
+    const walkItinerary: TripItinerary = {
+      startTime: '2026-08-02T08:00:00.000Z',
+      endTime: '2026-08-02T08:18:00.000Z',
+      durationSeconds: 1080,
+      transfers: 0,
+      segments: [
+        {
+          mode: 'WALK',
+          startTime: '2026-08-02T08:00:00.000Z',
+          endTime: '2026-08-02T08:18:00.000Z',
+          durationSeconds: 1080,
+          distanceMeters: 1400,
+          from: { name: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 },
+          to: { name: 'Hôtel de Ville', lat: 45.77, lon: 4.83 },
+          geometry: [
+            { lat: 45.76, lon: 4.86 },
+            { lat: 45.77, lon: 4.83 },
+          ],
+        },
+      ],
+    };
+
+    const { container } = renderResults([walkItinerary], undefined, undefined, {
+      kind: 'walk-only',
+    });
+
+    const listPanel = container.querySelector(
+      '.resultats-panel-list',
+    ) as HTMLElement;
+    // Bandeau explicatif ...
+    expect(
+      within(listPanel).getByText(/Aucun trajet en transport en commun/),
+    ).toBeInTheDocument();
+    // ... au-dessus d'un vrai resultat (carte-itineraire cliquable + detail).
+    expect(
+      within(listPanel).getByRole('button', { name: /min/ }),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('.resultats-panel-detail'),
+    ).toBeInTheDocument();
   });
 
   describe('badges de ligne par mode de transport (issue #129)', () => {
