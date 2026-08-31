@@ -523,6 +523,15 @@
     display: none;
   }
 
+  /* "Voir le détail" (issue #170) : masqué en desktop - cliquer la carte
+     ouvre déjà le détail dans le panneau de droite en permanence visible,
+     ce texte suggérait à tort une action séparée. Conservé en mobile, où
+     aucun panneau latéral n'est visible en continu. Déjà aria-hidden : ce
+     masquage est purement visuel, sans impact lecteur d'écran. */
+  .resultats-card-action {
+    display: none;
+  }
+
   .resultats-panels {
     display: flex;
     align-items: flex-end;
