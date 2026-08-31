@@ -463,7 +463,7 @@ describe('RecherchePage', () => {
     ).toBeGreaterThan(0);
   });
 
-  describe('raccourcis de recherche rapide (issue #112)', () => {
+  describe('adresses recentes dans le dropdown (issue #166)', () => {
     const HISTORY_ENTRY = {
       id: 'history-1',
       originLat: GARE.lat,
@@ -487,76 +487,89 @@ describe('RecherchePage', () => {
       });
     }
 
-    it("n'affiche aucun raccourci pour un utilisateur non authentifie", () => {
+    it("ne charge pas l'historique pour un utilisateur non authentifie", async () => {
+      const user = userEvent.setup();
       renderPage();
+      await user.click(screen.getByLabelText('Origine'));
+
       expect(tripsLib.getTripHistory).not.toHaveBeenCalled();
-      expect(screen.queryByText('Trajets récents')).not.toBeInTheDocument();
+      expect(screen.queryByText('Recherché récemment')).not.toBeInTheDocument();
     });
 
-    it("n'affiche aucun raccourci quand l'historique est vide", async () => {
+    it("ne propose aucune adresse recente quand l'historique est vide", async () => {
       mockAuthenticatedProfile();
       vi.mocked(tripsLib.getTripHistory).mockResolvedValue([]);
+      const user = userEvent.setup();
       renderPage();
 
       await waitFor(() => expect(tripsLib.getTripHistory).toHaveBeenCalled());
-      expect(screen.queryByText('Trajets récents')).not.toBeInTheDocument();
+      await user.click(screen.getByLabelText('Origine'));
+      expect(screen.queryByText('Recherché récemment')).not.toBeInTheDocument();
     });
 
-    it('affiche les trajets recents sous forme de boutons pour un utilisateur authentifie', async () => {
+    it("propose chaque extremite de l'historique comme entree d'adresse au focus du champ", async () => {
       mockAuthenticatedProfile();
       vi.mocked(tripsLib.getTripHistory).mockResolvedValue([HISTORY_ENTRY]);
+      const user = userEvent.setup();
       renderPage();
 
+      await waitFor(() => expect(tripsLib.getTripHistory).toHaveBeenCalled());
+      await user.click(screen.getByLabelText('Origine'));
+
+      // Une entree par adresse (origine ET destination du trajet passe), avec
+      // le sous-titre "Recherché récemment" - plus de bouton "trajet complet".
       expect(
-        await screen.findByRole('button', {
+        screen.getByRole('button', { name: /Gare Part-Dieu/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Hôtel de Ville/ }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByText('Recherché récemment')).toHaveLength(2);
+      expect(
+        screen.queryByRole('button', {
           name: 'Gare Part-Dieu → Hôtel de Ville',
         }),
-      ).toBeInTheDocument();
+      ).not.toBeInTheDocument();
     });
 
-    it(
-      'relance directement la recherche au clic sur un raccourci, sans passer par la validation du formulaire',
-      async () => {
-        mockAuthenticatedProfile();
-        vi.mocked(tripsLib.getTripHistory).mockResolvedValue([HISTORY_ENTRY]);
-        const itineraries = [
-          {
-            startTime: 't0',
-            endTime: 't1',
-            durationSeconds: 600,
-            transfers: 0,
-            segments: [],
-          },
-        ];
-        vi.mocked(tripsLib.searchTrips).mockResolvedValue(itineraries);
-        const user = userEvent.setup();
-        renderPage();
+    it('remplit le champ sans relancer la recherche au clic sur une adresse recente', async () => {
+      mockAuthenticatedProfile();
+      vi.mocked(tripsLib.getTripHistory).mockResolvedValue([HISTORY_ENTRY]);
+      const user = userEvent.setup();
+      renderPage();
 
-        const shortcut = await screen.findByRole('button', {
-          name: 'Gare Part-Dieu → Hôtel de Ville',
-        });
-        await user.click(shortcut);
+      await waitFor(() => expect(tripsLib.getTripHistory).toHaveBeenCalled());
+      await user.click(screen.getByLabelText('Destination'));
+      await user.click(
+        await screen.findByRole('button', { name: /Hôtel de Ville/ }),
+      );
 
-        await waitFor(() => {
-          expect(tripsLib.searchTrips).toHaveBeenCalledWith({
-            originLat: GARE.lat,
-            originLon: GARE.lon,
-            destinationLat: HOTEL_DE_VILLE.lat,
-            destinationLon: HOTEL_DE_VILLE.lon,
-            originLabel: GARE.label,
-            destinationLabel: HOTEL_DE_VILLE.label,
-          });
-        });
-        // Transition directe vers la disposition resultats (meme mecanique
-        // que la soumission du formulaire, issue #73) - aucun champ n'a eu
-        // besoin d'etre rempli/valide manuellement.
-        expect(
-          (
-            await screen.findAllByRole('button', { name: 'Modifier la recherche' })
-          )[0].closest('p'),
-        ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
-      },
-    );
+      expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
+      // Le dropdown ne fait que pre-remplir : aucune recherche declenchee
+      // (contrairement a l'ancien raccourci "relancer le trajet", #112).
+      expect(tripsLib.searchTrips).not.toHaveBeenCalled();
+    });
+
+    it("ne propose pas dans un champ l'adresse deja choisie dans l'autre", async () => {
+      mockAuthenticatedProfile();
+      vi.mocked(tripsLib.getTripHistory).mockResolvedValue([HISTORY_ENTRY]);
+      const user = userEvent.setup();
+      renderPage();
+
+      await waitFor(() => expect(tripsLib.getTripHistory).toHaveBeenCalled());
+      await user.click(screen.getByLabelText('Origine'));
+      await user.click(
+        await screen.findByRole('button', { name: /Gare Part-Dieu/ }),
+      );
+
+      await user.click(screen.getByLabelText('Destination'));
+      expect(
+        screen.queryByRole('button', { name: /Gare Part-Dieu/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Hôtel de Ville/ }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('relance depuis /historique (issue #174)', () => {
@@ -614,7 +627,12 @@ describe('RecherchePage', () => {
       vi.unstubAllGlobals();
     });
 
-    it('remplit l\'origine avec la position GPS actuelle au clic sur le bouton dedie', async () => {
+    // Depuis #166, ces entrees vivent dans le dropdown du champ Origine : il
+    // faut d'abord donner le focus au champ (champ vide) pour les afficher.
+    // Leur nom accessible inclut le sous-titre ("Ma position actuelle Votre
+    // position GPS", "Domicile 8 place du Marché"...) - d'ou les matchers
+    // par expression reguliere.
+    it("remplit l'origine avec la position GPS actuelle au clic sur l'entree dediee", async () => {
       mockGeolocation({
         watchPosition: vi.fn((success: PositionCallback) => {
           success({
@@ -626,8 +644,9 @@ describe('RecherchePage', () => {
       const user = userEvent.setup();
       renderPage();
 
+      await user.click(screen.getByLabelText('Origine'));
       await user.click(
-        screen.getByRole('button', { name: 'Ma position actuelle' }),
+        screen.getByRole('button', { name: /Ma position actuelle/ }),
       );
 
       await waitFor(() => {
@@ -649,8 +668,9 @@ describe('RecherchePage', () => {
       const user = userEvent.setup();
       renderPage();
 
+      await user.click(screen.getByLabelText('Origine'));
       await user.click(
-        screen.getByRole('button', { name: 'Ma position actuelle' }),
+        screen.getByRole('button', { name: /Ma position actuelle/ }),
       );
 
       expect(
@@ -661,19 +681,21 @@ describe('RecherchePage', () => {
       expect(screen.getByLabelText('Origine')).toHaveValue('');
     });
 
-    it("n'affiche aucun raccourci domicile/travail pour un utilisateur non authentifie", () => {
+    it("ne propose ni domicile ni travail au focus pour un utilisateur non authentifie", async () => {
+      const user = userEvent.setup();
       renderPage();
 
+      await user.click(screen.getByLabelText('Origine'));
       expect(
-        screen.queryByRole('button', { name: 'Domicile' }),
+        screen.queryByRole('button', { name: /Domicile/ }),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Travail' }),
+        screen.queryByRole('button', { name: /Travail/ }),
       ).not.toBeInTheDocument();
     });
 
     it(
-      "n'affiche pas le raccourci domicile si le profil connecte n'en a pas " +
+      "ne propose pas l'entree domicile si le profil connecte n'en a pas " +
         'enregistre',
       async () => {
         saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
@@ -685,18 +707,20 @@ describe('RecherchePage', () => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
+        const user = userEvent.setup();
         renderPage();
 
         await waitFor(() => expect(profileLib.getMyProfile).toHaveBeenCalled());
+        await user.click(screen.getByLabelText('Origine'));
         expect(
-          screen.queryByRole('button', { name: 'Domicile' }),
+          screen.queryByRole('button', { name: /Domicile/ }),
         ).not.toBeInTheDocument();
       },
     );
 
     it(
-      'remplit l\'origine avec le domicile enregistre au clic sur son ' +
-        'raccourci (issue #113/#114)',
+      "remplit l'origine avec le domicile enregistre au clic sur son " +
+        'entree (issue #113/#114)',
       async () => {
         saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
         vi.mocked(profileLib.getMyProfile).mockResolvedValue({
@@ -713,8 +737,9 @@ describe('RecherchePage', () => {
         const user = userEvent.setup();
         renderPage();
 
+        await user.click(screen.getByLabelText('Origine'));
         const homeButton = await screen.findByRole('button', {
-          name: 'Domicile',
+          name: /Domicile/,
         });
         await user.click(homeButton);
 

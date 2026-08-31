@@ -8,11 +8,13 @@ import {
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
-import AddressField from '../../components/AddressField/AddressField';
+import AddressField, {
+  type AddressQuickEntry,
+} from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { HistoryIcon, MapPinIcon, SwapIcon } from '../../components/icons';
+import { SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
 import { formatCoordinates } from '../../lib/format';
@@ -182,127 +184,55 @@ function TransportModesFilter({
   );
 }
 
-/** Nombre max de raccourcis affiches - le backend en renvoie jusqu'a 10 (MAX_RECENT_ENTRIES, TripHistoryService#findRecent), on n'en montre qu'une partie pour ne pas allonger davantage le panneau/bandeau formulaire (issue #110/#111). */
-const MAX_QUICK_SHORTCUTS = 5;
-
-interface RechercheQuickShortcutsProps {
-  entries: TripHistoryEntry[];
-  onSelect: (origin: PlaceSuggestion, destination: PlaceSuggestion) => void;
-}
+/**
+ * Nombre max d'adresses issues de l'historique proposées dans le dropdown
+ * d'un champ (issue #166, docs/specs/fusion-autocomplete-raccourcis.md
+ * section 3.1). 4 plutôt que 3 : depuis le retrait de la liste de trajets
+ * récents (ancien RechercheQuickShortcuts, #112), ce dropdown est la seule
+ * surface d'accès à l'historique sur /recherche.
+ */
+const MAX_RECENT_ADDRESSES = 4;
 
 /**
- * Raccourcis de recherche rapide (issue #112) : reprend les trajets recents
- * de l'utilisateur connecte (GET /trips/history, issue #11) sous forme de
- * boutons juste sous le formulaire. Un clic relance directement la
- * recherche (voir handleQuickSearch dans RecherchePage) sans repasser par la
- * validation manuelle du formulaire - une entree d'historique est deja une
- * recherche valide passee (origine/destination resolues).
+ * Dérive une liste d'adresses individuelles récentes à partir de l'historique
+ * de trajets (issue #166, spec section 3.2). `historyEntries` est une liste
+ * de couples origine/destination dédupliqués et triés du plus récent au plus
+ * ancien (GET /trips/history) ; on l'aplatit en adresses, plus récentes
+ * d'abord.
  *
- * N'affiche rien tant qu'aucune entree n'est disponible (pas connecte,
- * historique vide, ou pas encore charge) - pas d'etat vide ici,
- * contrairement a l'ecran /historique complet (#11) : ce widget est une
- * commodite optionnelle, pas une destination en soi.
+ * @param entries   historique tel que renvoyé par getTripHistory()
+ * @param exclude   adresses à ne pas reproposer (domicile, travail, valeur
+ *                  déjà choisie dans l'autre champ) - les `null` sont ignorés
+ * @returns au plus MAX_RECENT_ADDRESSES `PlaceSuggestion`, dédupliquées par
+ *          coordonnées (même clé que les `key` React des suggestions)
  */
-function RechercheQuickShortcuts({
-  entries,
-  onSelect,
-}: RechercheQuickShortcutsProps) {
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="recherche-quick-shortcuts">
-      <p className="recherche-quick-shortcuts-title">Trajets récents</p>
-      <ul className="recherche-quick-shortcuts-list">
-        {entries.slice(0, MAX_QUICK_SHORTCUTS).map((entry) => {
-          const { origin, destination } = entryToPlaces(entry);
-          return (
-            <li key={entry.id}>
-              <button
-                type="button"
-                className="recherche-quick-shortcut"
-                onClick={() => onSelect(origin, destination)}
-              >
-                <HistoryIcon />
-                <span>
-                  {origin.label} → {destination.label}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+function deriveRecentAddresses(
+  entries: TripHistoryEntry[],
+  exclude: (PlaceSuggestion | null)[],
+): PlaceSuggestion[] {
+  const placeKey = (place: PlaceSuggestion) => `${place.lat}-${place.lon}`;
+  // Adresses déjà affichées ailleurs dans le même dropdown, ou incohérentes
+  // à proposer (l'origine qu'on vient de choisir comme destination).
+  const excluded = new Set(
+    exclude
+      .filter((place): place is PlaceSuggestion => place != null)
+      .map(placeKey),
   );
-}
+  const seen = new Set<string>();
+  const result: PlaceSuggestion[] = [];
 
-interface OriginShortcutsProps {
-  onUseCurrentPosition: () => void;
-  isLocating: boolean;
-  positionError?: string;
-  home: PlaceSuggestion | null;
-  work: PlaceSuggestion | null;
-  onSelect: (place: PlaceSuggestion) => void;
-}
+  for (const entry of entries) {
+    const { origin, destination } = entryToPlaces(entry);
+    for (const place of [origin, destination]) {
+      const key = placeKey(place);
+      if (excluded.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      result.push(place);
+      if (result.length === MAX_RECENT_ADDRESSES) return result;
+    }
+  }
 
-/**
- * Raccourcis pour pre-remplir l'origine (issue #93) : position GPS actuelle
- * (toujours proposee, utilisable sans compte - issue #64) et domicile/
- * travail (issues #113/#114, seulement si le profil connecte en a
- * enregistre). Boutons "chips" en ligne, plus courts que les raccourcis de
- * recherche rapide de #112 (RechercheQuickShortcuts, liste empilee pleine
- * largeur) - un libelle court par bouton ici ("Domicile", pas un trajet
- * complet).
- *
- * Ne pre-remplit QUE le champ Origine (voir onSelect) - contrairement aux
- * raccourcis de #112, ne relance jamais la recherche automatiquement :
- * l'utilisateur choisit toujours sa destination lui-meme.
- */
-function OriginShortcuts({
-  onUseCurrentPosition,
-  isLocating,
-  positionError,
-  home,
-  work,
-  onSelect,
-}: OriginShortcutsProps) {
-  return (
-    <div className="recherche-origin-shortcuts-wrapper">
-      <div className="recherche-origin-shortcuts">
-        <button
-          type="button"
-          className="recherche-origin-shortcut"
-          onClick={onUseCurrentPosition}
-          disabled={isLocating}
-        >
-          <MapPinIcon />
-          {isLocating ? 'Localisation…' : 'Ma position actuelle'}
-        </button>
-        {home && (
-          <button
-            type="button"
-            className="recherche-origin-shortcut"
-            onClick={() => onSelect(home)}
-          >
-            <MapPinIcon />
-            Domicile
-          </button>
-        )}
-        {work && (
-          <button
-            type="button"
-            className="recherche-origin-shortcut"
-            onClick={() => onSelect(work)}
-          >
-            <MapPinIcon />
-            Travail
-          </button>
-        )}
-      </div>
-      {positionError && (
-        <p className="recherche-origin-shortcuts-error">{positionError}</p>
-      )}
-    </div>
-  );
+  return result;
 }
 
 /**
@@ -386,25 +316,26 @@ function RecherchePage() {
     'collapsed' | 'expanded'
   >('expanded');
   const formTouchStartY = useRef<number | null>(null);
-  // Raccourcis de recherche rapide (issue #112) - trajets recents charges
-  // une seule fois au montage, voir l'effet ci-dessous.
+  // Historique des trajets (issue #112) - charge une seule fois au montage
+  // (voir l'effet ci-dessous), aplati en adresses recentes pour le dropdown
+  // des champs (issue #166, buildQuickEntries).
   const [historyEntries, setHistoryEntries] = useState<TripHistoryEntry[]>(
     [],
   );
-  // Raccourcis d'origine domicile/travail (issue #93/#113/#114) - derives du
-  // meme profil que selectedModes/accessibilityPreferences ci-dessous, null
-  // tant que non enregistres (voir OriginShortcuts, qui masque le bouton
-  // correspondant dans ce cas).
+  // Domicile/travail (issue #93/#113/#114) - derives du meme profil que
+  // selectedModes/accessibilityPreferences ci-dessous, null tant que non
+  // enregistres : buildQuickEntries omet alors simplement l'entree
+  // correspondante du dropdown (issue #166).
   const [homeShortcut, setHomeShortcut] = useState<PlaceSuggestion | null>(
     null,
   );
   const [workShortcut, setWorkShortcut] = useState<PlaceSuggestion | null>(
     null,
   );
-  // Raccourci d'origine "Ma position actuelle" (issue #93) - abonnement a la
-  // demande (voir useGeolocation), jamais au chargement de la page : la
-  // permission navigateur n'est sollicitee qu'au clic sur le bouton
-  // correspondant (OriginShortcuts), pas avant.
+  // Entree de dropdown "Ma position actuelle" (issue #93/#166) - abonnement a
+  // la demande (voir useGeolocation), jamais au chargement de la page : la
+  // permission navigateur n'est sollicitee qu'a l'activation de l'entree
+  // correspondante, pas avant.
   const [wantsPosition, setWantsPosition] = useState(false);
   const geolocation = useGeolocation(wantsPosition);
   const [positionError, setPositionError] = useState<string | undefined>(
@@ -504,30 +435,6 @@ function RecherchePage() {
       cancelled = true;
     };
   }, [isAuthenticated]);
-
-  // Relance automatique depuis l'ecran Historique complet (issue #174,
-  // bouton "Relancer cette recherche" de HistoriquePage) : origine/
-  // destination transmises via l'etat de navigation React Router plutot
-  // qu'un parametre d'URL, coherent avec l'absence de route /resultats
-  // dediee (voir le type Screen en tete de fichier). Meme relance que les
-  // raccourcis de recherche rapide (issue #112, handleQuickSearch) - pas de
-  // logique dupliquee. navigate(..., { replace: true, state: null })
-  // nettoie l'etat aussitot lu : sans ca, un retour arriere ou un
-  // rafraichissement de la page relancerait la meme recherche en boucle.
-  // handleQuickSearch/navigate volontairement absents des dependances (memes
-  // motifs qu'ailleurs dans ce fichier, ex. l'effet de chargement du profil
-  // ci-dessus) : ce sont des fonctions recreees a chaque rendu, les inclure
-  // ferait tourner cet effet a chaque rendu au lieu de seulement quand
-  // location.state change.
-  useEffect(() => {
-    const incoming = location.state as
-      | { origin: PlaceSuggestion; destination: PlaceSuggestion }
-      | null
-      | undefined;
-    if (!incoming?.origin || !incoming.destination) return;
-    navigate(location.pathname, { replace: true, state: null });
-    handleQuickSearch(incoming.origin, incoming.destination);
-  }, [location.state]);
 
   function toggleMode(mode: string) {
     setSelectedModes((current) =>
@@ -687,11 +594,14 @@ function RecherchePage() {
   }
 
   /**
-   * Clic sur un raccourci de recherche rapide (issue #112) : met a jour les
-   * champs origine/destination affiches (coherent avec "Modifier la
-   * recherche", voir RecherchePageResults - l'utilisateur doit retrouver ces
-   * valeurs s'il revient au formulaire) puis relance directement la
-   * recherche, sans passer par la validation de handleSubmit.
+   * Relance une recherche à partir d'un couple origine/destination déjà
+   * résolu, sans repasser par la validation de handleSubmit : met à jour les
+   * champs affichés (cohérent avec "Modifier la recherche", voir
+   * RecherchePageResults - l'utilisateur doit retrouver ces valeurs s'il
+   * revient au formulaire) puis appelle directement performSearch. Utilisée
+   * par la relance depuis l'écran /historique (issue #174, effet ci-dessous)
+   * - c'était aussi le clic sur un raccourci de recherche rapide (issue #112)
+   * avant que celui-ci ne soit retiré au profit du dropdown unifié (#166).
    */
   function handleQuickSearch(
     originPlace: PlaceSuggestion,
@@ -702,6 +612,113 @@ function RecherchePage() {
     setOrigin({ query: originPlace.label, selected: originPlace });
     setDestination({ query: destinationPlace.label, selected: destinationPlace });
     void performSearch(originPlace, destinationPlace);
+  }
+
+  // Relance automatique depuis l'ecran Historique complet (issue #174,
+  // bouton "Relancer cette recherche" de HistoriquePage) : origine/
+  // destination transmises via l'etat de navigation React Router plutot
+  // qu'un parametre d'URL, coherent avec l'absence de route /resultats
+  // dediee (voir le type Screen en tete de fichier). Meme relance que
+  // handleQuickSearch (ci-dessus) - pas de logique dupliquee.
+  // navigate(..., { replace: true, state: null }) nettoie l'etat aussitot
+  // lu : sans ca, un retour arriere ou un rafraichissement de la page
+  // relancerait la meme recherche en boucle. Declare apres handleQuickSearch
+  // (et non avec les autres effets en tete de composant) pour que la
+  // fonction soit lexicalement disponible - sinon react-hooks/immutability
+  // signale un acces avant declaration. handleQuickSearch/navigate
+  // volontairement absents des dependances (memes motifs qu'ailleurs dans ce
+  // fichier) : fonctions recreees a chaque rendu, les inclure ferait tourner
+  // cet effet a chaque rendu au lieu de seulement quand location.state change.
+  useEffect(() => {
+    const incoming = location.state as
+      | { origin: PlaceSuggestion; destination: PlaceSuggestion }
+      | null
+      | undefined;
+    if (!incoming?.origin || !incoming.destination) return;
+    navigate(location.pathname, { replace: true, state: null });
+    // handleQuickSearch enchaine plusieurs setState : differe via
+    // queueMicrotask pour ne pas les executer dans le corps synchrone de
+    // l'effet (meme motif que l'effet de geolocalisation plus haut, voir
+    // react-hooks/set-state-in-effect).
+    queueMicrotask(() =>
+      handleQuickSearch(incoming.origin, incoming.destination),
+    );
+  }, [location.state]);
+
+  /**
+   * Construit les entrées rapides du dropdown d'un champ d'adresse (issue
+   * #166, docs/specs/fusion-autocomplete-raccourcis.md) : position GPS,
+   * domicile, travail, adresses récentes - dans cet ordre (spec section 3.1).
+   *
+   * @param field  'origin' ou 'destination' : la position n'est proposée que
+   *               sur l'origine (aller "vers sa position actuelle" n'a pas de
+   *               sens) ; le reste est proposé sur les deux champs.
+   * @returns la liste passée telle quelle à `AddressField` (aucune logique
+   *          métier côté composant - il ne fait que la rendre).
+   */
+  function buildQuickEntries(field: 'origin' | 'destination'): AddressQuickEntry[] {
+    const entries: AddressQuickEntry[] = [];
+    // Remplit le champ courant avec un lieu déjà résolu (domicile, travail,
+    // adresse récente) - même effet qu'une sélection de suggestion géocodeur,
+    // sans relancer la recherche.
+    const fillField = (place: PlaceSuggestion) => {
+      const setField = field === 'origin' ? setOrigin : setDestination;
+      setField({ query: place.label, selected: place });
+    };
+
+    if (field === 'origin') {
+      entries.push({
+        key: 'current-position',
+        title: 'Ma position actuelle',
+        // Pendant l'acquisition GPS, l'entrée reste visible mais désactivée
+        // (même comportement que l'ancien bouton chip `OriginShortcuts`).
+        subtitle: wantsPosition ? 'Localisation…' : 'Votre position GPS',
+        icon: 'pin',
+        disabled: wantsPosition,
+        onSelect: () => setWantsPosition(true),
+      });
+    }
+
+    if (homeShortcut) {
+      entries.push({
+        key: 'home',
+        title: 'Domicile',
+        // homeShortcut.label vaut déjà `profile.homeLabel` ou, à défaut, les
+        // coordonnées formatées (voir l'effet de chargement du profil).
+        subtitle: homeShortcut.label,
+        icon: 'pin',
+        onSelect: () => fillField(homeShortcut),
+      });
+    }
+    if (workShortcut) {
+      entries.push({
+        key: 'work',
+        title: 'Travail',
+        subtitle: workShortcut.label,
+        icon: 'pin',
+        onSelect: () => fillField(workShortcut),
+      });
+    }
+
+    // Adresses récentes : on exclut celles déjà montrées comme domicile/
+    // travail et la valeur choisie dans l'AUTRE champ (spec section 3.2).
+    const otherSelected =
+      field === 'origin' ? destination.selected : origin.selected;
+    for (const place of deriveRecentAddresses(historyEntries, [
+      homeShortcut,
+      workShortcut,
+      otherSelected,
+    ])) {
+      entries.push({
+        key: `recent-${place.lat}-${place.lon}`,
+        title: place.label,
+        subtitle: 'Recherché récemment',
+        icon: 'history',
+        onSelect: () => fillField(place),
+      });
+    }
+
+    return entries;
   }
 
   /**
@@ -741,6 +758,7 @@ function RecherchePage() {
               value={origin.query}
               suggestions={originSuggestions}
               error={fieldErrors.origin}
+              quickEntries={buildQuickEntries('origin')}
               onChange={(value) =>
                 setOrigin({ query: value, selected: null })
               }
@@ -749,16 +767,14 @@ function RecherchePage() {
               }
             />
 
-            <OriginShortcuts
-              onUseCurrentPosition={() => setWantsPosition(true)}
-              isLocating={wantsPosition}
-              positionError={positionError}
-              home={homeShortcut}
-              work={workShortcut}
-              onSelect={(place) =>
-                setOrigin({ query: place.label, selected: place })
-              }
-            />
+            {/* Erreur de géolocalisation (permission refusée, indisponible) :
+                sous le champ, hors du dropdown (issue #166, spec section 4) -
+                l'entrée "Ma position actuelle" du dropdown, elle, se referme
+                dès que la valeur du champ change ou que l'utilisateur clique
+                ailleurs. */}
+            {positionError && (
+              <p className="recherche-position-error">{positionError}</p>
+            )}
 
             <button
               type="button"
@@ -775,6 +791,7 @@ function RecherchePage() {
               value={destination.query}
               suggestions={destinationSuggestions}
               error={fieldErrors.destination}
+              quickEntries={buildQuickEntries('destination')}
               onChange={(value) =>
                 setDestination({ query: value, selected: null })
               }
@@ -832,14 +849,6 @@ function RecherchePage() {
             )}
           </div>
         </form>
-
-        {/* Sous les champs de recherche et le bouton "Rechercher" (issue
-            #112) - hors du <form> : ne represente pas une soumission du
-            formulaire mais une relance directe (voir handleQuickSearch). */}
-        <RechercheQuickShortcuts
-          entries={historyEntries}
-          onSelect={handleQuickSearch}
-        />
       </div>
     );
   }
