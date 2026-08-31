@@ -22,10 +22,11 @@ interface TargetedCriterion {
 }
 
 /**
- * Un seul badge cible peut s'afficher (section 2.2 : "2 badges maximum sur
- * l'ensemble de la liste"). Si plusieurs preferences ciblees sont cochees
- * simultanement, l'ordre de ce tableau fait office de priorite : on prend le
- * premier critere trouve. `limit_transfers` passe avant `limit_walking_distance`
+ * Un seul badge cible peut s'afficher (section 2.2 : au plus 2 badges sur
+ * l'ensemble de la liste, un seul par carte). Si plusieurs preferences
+ * ciblees sont cochees simultanement, l'ordre de ce tableau fait office de
+ * priorite : on prend le premier critere trouve. `limit_transfers` passe
+ * avant `limit_walking_distance`
  * car il pese davantage dans le scoring pondere (25 % contre aucun poids
  * dedie a la marche, voir docs/specs/f3-scoring-perturbations.md section
  * 4.2). `wheelchair_accessible` est volontairement absent de cette liste :
@@ -50,11 +51,13 @@ const TARGETED_CRITERIA: TargetedCriterion[] = [
 ];
 
 /**
- * Libelles de badges a afficher par index d'itineraire dans la liste deja
+ * Libelle de badge a afficher par index d'itineraire dans la liste deja
  * triee recue de GET /trips - un index absent de cet objet n'affiche aucun
- * badge. Voir RecherchePageResults.tsx (ItineraryCard) pour le rendu.
+ * badge. AU PLUS UN libelle par carte (issue #169, section 2.2 : "jamais par
+ * itineraire individuel") : le type porte cette garantie, ce n'est plus un
+ * tableau. Voir RecherchePageResults.tsx (ItineraryCard) pour le rendu.
  */
-export type ItineraryBadges = Record<number, string[]>;
+export type ItineraryBadges = Record<number, string>;
 
 /**
  * Calcule les badges qualitatifs de scoring a afficher sur la liste de
@@ -66,9 +69,13 @@ export type ItineraryBadges = Record<number, string[]>;
  *   la place, si c'est un autre itineraire) le badge dedie a ce critere.
  *
  * Ne mute jamais le tableau `itineraries` recu, coherent avec la meme regle
- * deja appliquee par ScoringService cote backend. Le total de libelles
- * renvoyes ne depasse jamais 2, par construction (un seul badge global, un
- * seul badge cible au maximum) et non par verification a posteriori.
+ * deja appliquee par ScoringService cote backend. Par construction (et non
+ * par verification a posteriori) : au plus un libelle par carte, et au plus
+ * 2 sur toute la liste (un badge global sur l'index 0, un badge cible sur un
+ * autre index au maximum). Si le meilleur choix global est aussi celui qui
+ * satisfait le mieux le critere cible, seul le badge global s'affiche sur
+ * cette carte - il est prioritaire, et il n'y a pas d'autre carte ou poser
+ * le badge cible (issue #169).
  *
  * @param itineraries Itineraires deja tries par le backend (GET /trips) - l'ordre n'est jamais recalcule ici.
  * @param accessibilityPreferences Preferences cochees dans le profil de mobilite (frontend/src/lib/profile.ts) - tableau vide pour un profil incomplet ou une recherche anonyme (issue #64).
@@ -83,7 +90,7 @@ export function computeItineraryBadges(
 
   // Le premier itineraire de la liste deja triee est toujours le "meilleur
   // choix global" (c'est litteralement ce que le tri backend signifie).
-  badges[0] = [BEST_OVERALL_BADGE_LABEL];
+  badges[0] = BEST_OVERALL_BADGE_LABEL;
 
   // Si aucun critere n'est explicitement prioritaire pour l'utilisateur
   // (profil incomplet ou recherche sans compte), seul le badge global
@@ -105,8 +112,12 @@ export function computeItineraryBadges(
     }
   }
 
-  // Si le meilleur choix global satisfait deja le mieux ce critere, les deux
-  // libelles s'accumulent sur la meme carte (toujours <= 2 badges au total).
-  badges[bestIndex] = [...(badges[bestIndex] ?? []), criterion.badgeLabel];
+  // Si le meilleur choix global (index 0) satisfait deja le mieux ce critere,
+  // on ne pose PAS le badge cible : le badge global reste seul sur cette
+  // carte (prioritaire), et aucune autre carte ne se distingue sur ce
+  // critere (issue #169 - un seul badge par carte).
+  if (bestIndex === 0) return badges;
+
+  badges[bestIndex] = criterion.badgeLabel;
   return badges;
 }

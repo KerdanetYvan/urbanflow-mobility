@@ -36,7 +36,7 @@ describe('computeItineraryBadges', () => {
 
     const badges = computeItineraryBadges(itineraries, []);
 
-    expect(badges).toEqual({ 0: [BEST_OVERALL_BADGE_LABEL] });
+    expect(badges).toEqual({ 0: BEST_OVERALL_BADGE_LABEL });
   });
 
   it("ajoute un badge cible sur l'itineraire ayant le moins de correspondances quand limit_transfers est prioritaire, meme si ce n'est pas le premier", () => {
@@ -48,8 +48,8 @@ describe('computeItineraryBadges', () => {
 
     const badges = computeItineraryBadges(itineraries, ['limit_transfers']);
 
-    expect(badges[0]).toEqual([BEST_OVERALL_BADGE_LABEL]);
-    expect(badges[1]).toEqual(['Le moins de correspondances']);
+    expect(badges[0]).toBe(BEST_OVERALL_BADGE_LABEL);
+    expect(badges[1]).toBe('Le moins de correspondances');
     expect(badges[2]).toBeUndefined();
   });
 
@@ -61,7 +61,7 @@ describe('computeItineraryBadges', () => {
 
     const badges = computeItineraryBadges(itineraries, ['limit_walking_distance']);
 
-    expect(badges[1]).toEqual(['Le moins de marche à pied']);
+    expect(badges[1]).toBe('Le moins de marche à pied');
   });
 
   it('ne retient que limit_transfers quand plusieurs preferences ciblees sont cochees simultanement (priorite au poids scoring le plus eleve)', () => {
@@ -76,7 +76,7 @@ describe('computeItineraryBadges', () => {
       'limit_transfers',
     ]);
 
-    expect(badges[1]).toEqual(['Le moins de correspondances']);
+    expect(badges[1]).toBe('Le moins de correspondances');
     expect(badges[2]).toBeUndefined();
   });
 
@@ -85,18 +85,20 @@ describe('computeItineraryBadges', () => {
 
     const badges = computeItineraryBadges(itineraries, ['wheelchair_accessible']);
 
-    expect(badges).toEqual({ 0: [BEST_OVERALL_BADGE_LABEL] });
+    expect(badges).toEqual({ 0: BEST_OVERALL_BADGE_LABEL });
   });
 
-  it('cumule les deux badges sur le meme itineraire quand le meilleur choix global satisfait aussi le mieux le critere cible', () => {
+  it('ne garde que le badge global (pas de cumul) quand le meilleur choix global satisfait aussi le mieux le critere cible (issue #169)', () => {
     const itineraries = [itinerary({ transfers: 0 }), itinerary({ transfers: 3 })];
 
     const badges = computeItineraryBadges(itineraries, ['limit_transfers']);
 
-    expect(badges).toEqual({ 0: [BEST_OVERALL_BADGE_LABEL, 'Le moins de correspondances'] });
+    // Un seul badge par carte : l'index 0 garde le badge global, le badge
+    // cible n'est pose nulle part (aucune autre carte ne se distingue).
+    expect(badges).toEqual({ 0: BEST_OVERALL_BADGE_LABEL });
   });
 
-  it('ne produit jamais plus de 2 badges au total sur toute la liste', () => {
+  it('ne produit jamais plus de 2 badges au total, et jamais plus d\'un par carte (issue #169)', () => {
     const itineraries = [
       itinerary({ transfers: 3 }),
       itinerary({ transfers: 2 }),
@@ -106,7 +108,12 @@ describe('computeItineraryBadges', () => {
 
     const badges = computeItineraryBadges(itineraries, ['limit_transfers']);
 
-    expect(Object.values(badges).flat().length).toBeLessThanOrEqual(2);
+    const labels = Object.values(badges);
+    expect(labels.length).toBeLessThanOrEqual(2);
+    // Chaque valeur est un libelle unique (string), jamais un tableau.
+    for (const label of labels) {
+      expect(typeof label).toBe('string');
+    }
   });
 
   it('ne renvoie jamais de libelle contenant une valeur chiffree', () => {
@@ -114,7 +121,7 @@ describe('computeItineraryBadges', () => {
 
     const badges = computeItineraryBadges(itineraries, ['limit_transfers']);
 
-    for (const label of Object.values(badges).flat()) {
+    for (const label of Object.values(badges)) {
       expect(label).not.toMatch(/\d/);
     }
   });
