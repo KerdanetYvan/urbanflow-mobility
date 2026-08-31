@@ -124,6 +124,28 @@ describe('AddressField - entrées rapides', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('distingue visuellement un arrêt (kind stop) d\'une adresse (kind address) par une classe d\'icône (issue #168)', async () => {
+    const user = userEvent.setup();
+    renderField({
+      quickEntries: QUICK_ENTRIES,
+      suggestions: [
+        { label: 'République', lat: 48.1, lon: -1.6, kind: 'stop' },
+        { label: '12 Rue de Nemours, Rennes', lat: 48.1, lon: -1.7, kind: 'address' },
+      ],
+    });
+
+    await user.click(screen.getByLabelText('Origine'));
+
+    const stopBtn = screen.getByRole('button', { name: 'République' });
+    const addrBtn = screen.getByRole('button', {
+      name: '12 Rue de Nemours, Rennes',
+    });
+    // Les deux ont une icône (aria-hidden, donc pas dans le nom accessible),
+    // le libellé reste du texte propre sans suffixe.
+    expect(stopBtn.querySelector('.address-suggestion-icon')).toBeInTheDocument();
+    expect(addrBtn.querySelector('.address-suggestion-icon')).toBeInTheDocument();
+  });
+
   it("appelle le onSelect de l'entrée cliquée", async () => {
     const user = userEvent.setup();
     const onEntrySelect = vi.fn();
