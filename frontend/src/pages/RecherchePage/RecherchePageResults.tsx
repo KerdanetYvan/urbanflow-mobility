@@ -89,8 +89,8 @@ interface ItineraryCardProps {
   itinerary: TripItinerary;
   isSelected: boolean;
   onSelect: () => void;
-  /** Libelles de badges qualitatifs a afficher sur cette carte (issue #126) - jamais plus de 2 sur toute la liste, voir itineraryBadges.ts. */
-  badges: string[];
+  /** Badge qualitatif de scoring a afficher sur cette carte (issue #126/#169) - au plus un par carte, absent = aucun badge. Voir itineraryBadges.ts. */
+  badge?: string;
 }
 
 /**
@@ -105,7 +105,7 @@ interface ItineraryCardProps {
  * tripModeChips.ts) - le numero de ligne n'est pas le score, juste une
  * information factuelle sur l'itineraire.
  */
-function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCardProps) {
+function ItineraryCard({ itinerary, isSelected, onSelect, badge }: ItineraryCardProps) {
   const chips = tripModeChips(itinerary);
   // Texte cache, lu par les lecteurs d'ecran : les puces ci-dessous sont
   // `aria-hidden`, ce texte en est l'equivalent textuel (WCAG 1.1.1).
@@ -121,11 +121,9 @@ function ItineraryCard({ itinerary, isSelected, onSelect, badges }: ItineraryCar
       aria-current={isSelected || undefined}
       onClick={onSelect}
     >
-      {badges.length > 0 && (
+      {badge && (
         <span className="resultats-card-badges">
-          {badges.map((label) => (
-            <Badge key={label}>{label}</Badge>
-          ))}
+          <Badge>{badge}</Badge>
         </span>
       )}
       <span className="resultats-visually-hidden">Modes : {modesLabel}.</span>
@@ -185,7 +183,7 @@ interface ResultsListProps {
   onEditSearch: () => void;
   /** Message a afficher si la position en temps reel (issue #9) n'est pas disponible - voir geolocationMessage(). */
   geolocationMessage?: string;
-  /** Badges qualitatifs par index d'itineraire (issue #126) - voir itineraryBadges.ts. */
+  /** Badge qualitatif par index d'itineraire (issue #126/#169) - au plus un par carte, voir itineraryBadges.ts. */
   itineraryBadges: ItineraryBadges;
 }
 
@@ -217,7 +215,7 @@ function ResultsList({
               itinerary={itinerary}
               isSelected={index === selectedIndex}
               onSelect={() => onSelect(index)}
-              badges={itineraryBadges[index] ?? []}
+              badge={itineraryBadges[index]}
             />
           </li>
         ))}

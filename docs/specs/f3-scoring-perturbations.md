@@ -37,6 +37,7 @@ Au-delà du simple ordre, jusqu'à **2 badges maximum sur l'ensemble de la liste
 Règles :
 
 - 2 badges maximum affichés simultanément sur toute la liste, jamais plus, jamais par itinéraire individuel — reste minimal, cohérent avec le principe mobile-first du spec F2 (rien qui alourdisse l'écran pour un usager pressé comme Antoine).
+- **Au plus un badge par carte** ([#169](https://github.com/KerdanetYvan/urbanflow-mobility/issues/169)) : si l'itinéraire en tête de liste est *aussi* celui qui satisfait le mieux le critère ciblé, il ne porte **que** le badge "meilleur choix global" (prioritaire) — le badge ciblé n'est alors affiché nulle part, puisqu'aucun autre itinéraire ne se distingue sur ce critère. Le total sur la liste tombe à 1 dans ce cas.
 - Formulations qualitatives uniquement (jamais "+12% plus rapide", jamais de minutage comparatif) : le badge signale un choix, il ne justifie jamais un calcul.
 - Si aucun critère n'est explicitement prioritaire pour l'utilisateur (profil incomplet ou recherche sans compte, [#64](https://github.com/KerdanetYvan/urbanflow-mobility/issues/64)), seul le badge "meilleur choix global" s'affiche.
 
