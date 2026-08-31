@@ -185,8 +185,8 @@ describe('RecherchePageResults', () => {
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
   });
 
-  describe('itineraires regroupes par prochain passage (issue #127)', () => {
-    it('affiche les prochains passages quand le backend a regroupe plusieurs departs identiques', () => {
+  describe('itineraires regroupes par prochain passage (issue #127/#173)', () => {
+    it('affiche les prochains passages dans le detail de l\'itineraire selectionne, pas sur la carte compacte (issue #173)', () => {
       const grouped: TripItinerary = {
         ...FAST_ITINERARY,
         nextDepartures: [
@@ -197,21 +197,31 @@ describe('RecherchePageResults', () => {
       };
       const { container } = renderResults([grouped]);
 
-      const cards = desktopCards(container);
       // Heures formatees dynamiquement (formatTime, fuseau local) plutot que
       // codees en dur : le fuseau du runner CI n'est pas Europe/Paris comme
       // en local, un texte fige aurait echoue en CI sans etre faux ici.
-      expect(cards[0]).toHaveTextContent(
+      const expected =
         `Prochain passage à ${formatTime(grouped.nextDepartures![0])}, puis ` +
-          `${formatTime(grouped.nextDepartures![1])}, ${formatTime(grouped.nextDepartures![2])}`,
-      );
+        `${formatTime(grouped.nextDepartures![1])}, ${formatTime(grouped.nextDepartures![2])}`;
+
+      const detailPanel = container.querySelector(
+        '.resultats-panel-detail',
+      ) as HTMLElement;
+      expect(detailPanel).toHaveTextContent(expected);
+
+      // Plus sur la carte compacte de la liste (le but de #173 : l'alleger).
+      const cards = desktopCards(container);
+      expect(cards[0]).not.toHaveTextContent('Prochain passage');
     });
 
     it("n'affiche aucun texte de prochain passage quand l'itineraire n'a pas ete regroupe (nextDepartures absent)", () => {
       const { container } = renderResults([FAST_ITINERARY]);
 
-      const cards = desktopCards(container);
-      expect(cards[0]).not.toHaveTextContent('Prochain passage');
+      const detailPanel = container.querySelector(
+        '.resultats-panel-detail',
+      ) as HTMLElement;
+      expect(detailPanel).not.toHaveTextContent('Prochain passage');
+      expect(desktopCards(container)[0]).not.toHaveTextContent('Prochain passage');
     });
   });
 
