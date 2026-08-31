@@ -7,6 +7,7 @@ import type {
 import type {
   GeoPoint,
   TripItinerary,
+  TripSearchResult,
   TripSegment,
 } from './dto/trip-itinerary.dto';
 import { OtpClientService } from '../otp/otp-client.service';
@@ -38,8 +39,31 @@ export class TripsService {
    * utilisable sans compte, OptionalJwtAuthGuard) : sans profil disponible,
    * ScoringService applique uniquement ses criteres de base (duree,
    * correspondances), proche du tri natif d'OTP.
+   *
+   * Repli a pied (issue #190) : si la recherche normale ne renvoie aucun
+   * itineraire, on retente UNE fois en `mode=WALK` seul. Si un trajet a pied
+   * existe, il est renvoye avec `fallback: { kind: 'walk-only' }` pour que
+   * le frontend le presente comme une suggestion explicite ("aucun trajet en
+   * transport en commun, mais X min a pied") plutot qu'un etat vide sec. Un
+   * seul appel OTP supplementaire, et uniquement dans ce cas (eco-conception,
+   * CLAUDE.md).
    */
-  async search(dto: SearchTripsDto, userId?: string): Promise<TripItinerary[]> {
+  async search(
+    dto: SearchTripsDto,
+    userId?: string,
+  ): Promise<TripSearchResult> {
+    // Parametres communs aux deux appels OTP possibles (recherche normale
+    // puis, si besoin, repli a pied) - extraits pour ne pas les dupliquer.
+    const planParams = {
+      originLat: dto.originLat,
+      originLon: dto.originLon,
+      destinationLat: dto.destinationLat,
+      destinationLon: dto.destinationLon,
+      departureTime: dto.departureTime
+        ? new Date(dto.departureTime)
+        : undefined,
+    };
+
     // L'enregistrement de l'historique (issue #11) est lance en parallele du
     // reste - il n'a besoin ni du resultat OTP ni du profil, et
     // TripHistoryService#record avale ses propres erreurs (ne peut jamais
@@ -47,13 +71,7 @@ export class TripsService {
     // authentifiee, rien a historiser (voir OptionalJwtAuthGuard).
     const [itineraries, profile] = await Promise.all([
       this.otpClient.planTrip({
-        originLat: dto.originLat,
-        originLon: dto.originLon,
-        destinationLat: dto.destinationLat,
-        destinationLon: dto.destinationLon,
-        departureTime: dto.departureTime
-          ? new Date(dto.departureTime)
-          : undefined,
+        ...planParams,
         // Filtre de modes préférés (issue #87) - transmis tel quel, la
         // traduction en paramètre OTP est faite par OtpClientService.
         transportModes: dto.transportModes,
@@ -62,9 +80,30 @@ export class TripsService {
       userId ? this.tripHistoryService.record(userId, dto) : null,
     ]);
 
-    const mapped = itineraries.map((itinerary) => this.mapItinerary(itinerary));
-    const grouped = this.groupByRoute(mapped);
-    return this.scoringService.rank(grouped, profile);
+    const grouped = this.groupByRoute(
+      itineraries.map((itinerary) => this.mapItinerary(itinerary)),
+    );
+    if (grouped.length > 0) {
+      return { itineraries: await this.scoringService.rank(grouped, profile) };
+    }
+
+    // Aucun itineraire aux modes normaux : repli a pied (issue #190).
+    const walkItineraries = await this.otpClient.planTrip({
+      ...planParams,
+      walkOnly: true,
+    });
+    const walkGrouped = this.groupByRoute(
+      walkItineraries.map((itinerary) => this.mapItinerary(itinerary)),
+    );
+    if (walkGrouped.length === 0) {
+      // Rien a pied non plus : etat vide "sec", pas de fallback (le frontend
+      // affiche alors le message generique).
+      return { itineraries: [] };
+    }
+
+    // Pas de scoring : un trajet a pied unique, aucun critere pondere a
+    // departager (et le classement n'aurait de toute facon rien a trier).
+    return { itineraries: walkGrouped, fallback: { kind: 'walk-only' } };
   }
 
   /**

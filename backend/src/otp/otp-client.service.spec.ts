@@ -89,6 +89,22 @@ describe('OtpClientService', () => {
     expect(calledUrl.searchParams.get('mode')).toBe('WALK,BUS,SUBWAY');
   });
 
+  it('force mode=WALK seul quand walkOnly est demandé, en ignorant transportModes (repli à pied, issue #190)', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ plan: { itineraries: [] } }));
+
+    await service.planTrip({
+      originLat: 48.85,
+      originLon: 2.35,
+      destinationLat: 48.86,
+      destinationLon: 2.36,
+      transportModes: [TransportMode.BUS],
+      walkOnly: true,
+    });
+
+    const calledUrl = new URL(fetchSpy.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get('mode')).toBe('WALK');
+  });
+
   it("renvoie un tableau vide quand OTP repond avec une erreur 'aucun trajet' (id != 400)", async () => {
     fetchSpy.mockResolvedValue(
       jsonResponse({ error: { id: 404, message: 'PATH_NOT_FOUND' } }),

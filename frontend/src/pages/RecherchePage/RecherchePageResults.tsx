@@ -13,7 +13,7 @@ import {
 } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
 import { chipLabel, isLineMode, tripModeChips } from '../../lib/tripModeChips';
-import type { TripItinerary } from '../../lib/trips';
+import type { TripFallback, TripItinerary } from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
 import { computeItineraryBadges, type ItineraryBadges } from './itineraryBadges';
 import './RecherchePageResults.css';
@@ -177,6 +177,8 @@ interface ResultsListProps {
   geolocationMessage?: string;
   /** Badge qualitatif par index d'itineraire (issue #126/#169) - au plus un par carte, voir itineraryBadges.ts. */
   itineraryBadges: ItineraryBadges;
+  /** Repli renvoye par GET /trips (issue #190) - `walk-only` : la liste ci-dessous est le trajet a pied de repli, annonce par un bandeau. */
+  fallback?: TripFallback;
 }
 
 /**
@@ -193,10 +195,21 @@ function ResultsList({
   onEditSearch,
   geolocationMessage,
   itineraryBadges,
+  fallback,
 }: ResultsListProps) {
   return (
     <>
       <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
+      {fallback?.kind === 'walk-only' && (
+        // Repli a pied (issue #190) : la "liste" ci-dessous n'est pas un
+        // resultat normal mais l'itineraire a pied propose faute de transport
+        // en commun - on l'annonce explicitement plutot que de le laisser
+        // passer pour un trajet multimodal ordinaire.
+        <p className="resultats-fallback-note">
+          Aucun trajet en transport en commun à cette heure. Voici l’itinéraire
+          à pied&nbsp;: {formatDuration(itineraries[0].durationSeconds)}.
+        </p>
+      )}
       {geolocationMessage && (
         <p className="resultats-geolocation-hint">{geolocationMessage}</p>
       )}
@@ -212,6 +225,44 @@ function ResultsList({
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+interface EmptyResultsProps {
+  origin: PlaceSuggestion;
+  destination: PlaceSuggestion;
+  onEditSearch: () => void;
+}
+
+/**
+ * État vide (aucun itinéraire, pas même à pied) rendu DANS le panneau
+ * fusionné (issue #190) - la carte plein écran reste en fond avec les
+ * marqueurs origine/destination, plus de page `.resultats-page` séparée.
+ * Partagé entre le panneau desktop et le bandeau mobile, comme ResultsList.
+ *
+ * L'action de recours est le "Modifier la recherche" de `SearchContext`
+ * ci-dessus (édition en place, décision #190) - pas de second bouton
+ * redondant dans le message.
+ */
+function EmptyResults({ origin, destination, onEditSearch }: EmptyResultsProps) {
+  return (
+    <>
+      <SearchContext
+        origin={origin}
+        destination={destination}
+        onEditSearch={onEditSearch}
+      />
+      <div className="resultats-empty">
+        <p>Aucun itinéraire trouvé pour ce trajet, même à pied.</p>
+        <p>
+          Essayez d’élargir la plage horaire, ou de modifier l’origine ou la
+          destination.
+        </p>
+        {/* Emplacement prévu pour l'action "voir le prochain créneau
+            disponible" (issue #91, tâche suivante) : elle viendra ici, dans
+            la disposition d'état vide construite par #190. */}
+      </div>
     </>
   );
 }
@@ -360,6 +411,13 @@ interface RecherchePageResultsProps {
   destination: PlaceSuggestion;
   /** null = recherche en cours, reponse de GET /trips pas encore recue (issue #73, spec 2.4). */
   itineraries: TripItinerary[] | null;
+  /**
+   * Repli renvoye par GET /trips (issue #190). `walk-only` : `itineraries`
+   * contient le trajet a pied propose faute de transport en commun, affiche
+   * dans le panneau fusionne avec un bandeau explicatif. Absent avec
+   * `itineraries` vide = etat vide "sec" (message generique).
+   */
+  fallback?: TripFallback;
   /** Bascule vers la vue Edition du panneau fusionne (issue #171/#172) - ne demonte plus cet ecran. */
   onEditSearch: () => void;
   /** Preferences d'accessibilite du profil connecte (issue #126), voir frontend/src/lib/profile.ts. Absent/vide = profil incomplet ou recherche anonyme (issue #64) - seul le badge "meilleur choix global" s'affiche alors. */
@@ -430,6 +488,7 @@ function RecherchePageResults({
   origin,
   destination,
   itineraries,
+  fallback,
   onEditSearch,
   accessibilityPreferences,
   isEditingSearch = false,
@@ -588,27 +647,56 @@ function RecherchePageResults({
   }
 
   // --- Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
-  // une erreur, pas d'Alert ici - un message clair et une action de recours
-  // suffisent. Pas de carte plein ecran : rien a y tracer. Hors perimetre
-  // de la fusion (issue #171/#172, docs/specs/fusion-recherche-resultats.md
-  // section 5) : cet etat n'a jamais ete une disposition carte + panneau
-  // flottant, "Nouvelle recherche" reste un retour complet au formulaire. */
+  // une erreur, pas d'Alert ici. Depuis #190, il est rendu DANS le panneau
+  // fusionne (meme coquille que "recherche en cours" ci-dessus : carte plein
+  // ecran en fond avec origine/destination, panneau desktop + bandeau mobile)
+  // plutot que dans une page `.resultats-page` a part. "Modifier la recherche"
+  // bascule en vue Edition en place (onEditSearch), coherent avec le reste du
+  // panneau fusionne. Le repli a pied (fallback: 'walk-only') N'arrive PAS
+  // ici : dans ce cas itineraries contient le trajet a pied, on passe donc au
+  // rendu resultats normal ci-dessous (avec le bandeau explicatif de
+  // ResultsList). ---
   if (itineraries.length === 0) {
     return (
-      <section className="resultats-page">
-        <h1>Résultats</h1>
-        <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-        <div className="resultats-empty">
-          <p>Aucun itinéraire trouvé pour ce trajet.</p>
-          <p>
-            Essayez d'élargir la plage horaire ou d'ajouter un mode de
-            transport a la recherche.
-          </p>
-          <button type="button" className="resultats-link-button" onClick={onEditSearch}>
-            Nouvelle recherche
-          </button>
+      <div className="resultats-shell">
+        <h1 className="resultats-visually-hidden">Résultats</h1>
+        <div className="resultats-map-bg">
+          <MapView
+            origin={origin}
+            destination={destination}
+            variant="fullBleed"
+            userPosition={geolocation.position}
+          />
         </div>
-      </section>
+        {editPanel ?? (
+          <>
+            <div className="resultats-panels">
+              <div className="resultats-panel resultats-panel-list">
+                <EmptyResults
+                  origin={origin}
+                  destination={destination}
+                  onEditSearch={onEditSearch}
+                />
+              </div>
+            </div>
+            <div className="resultats-sheet" data-sheet-state="list">
+              <div className="resultats-sheet-handle">
+                <span
+                  className="resultats-sheet-handle-bar"
+                  aria-hidden="true"
+                />
+              </div>
+              <div className="resultats-sheet-body">
+                <EmptyResults
+                  origin={origin}
+                  destination={destination}
+                  onEditSearch={onEditSearch}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     );
   }
 
@@ -646,6 +734,7 @@ function RecherchePageResults({
                 onEditSearch={onEditSearch}
                 geolocationMessage={geolocationMessage(geolocation.status)}
                 itineraryBadges={itineraryBadges}
+                fallback={fallback}
               />
             </div>
             <div className="resultats-panel resultats-panel-detail">

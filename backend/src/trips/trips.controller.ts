@@ -9,7 +9,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
-import { TripItinerary } from './dto/trip-itinerary.dto';
+import { TripSearchResult } from './dto/trip-itinerary.dto';
 import { TripHistoryEntryDto } from './dto/trip-history-entry.dto';
 import { SearchTripsDto } from './dto/search-trips.dto';
 import { TripHistoryService } from './history/trip-history.service';
@@ -41,10 +41,9 @@ export class TripsController {
   })
   @ApiResponse({
     status: 200,
-    type: TripItinerary,
-    isArray: true,
+    type: TripSearchResult,
     description:
-      "Tableau vide = aucun itineraire trouve, ce n'est pas une erreur",
+      "`itineraries` vide = aucun itineraire trouve, ce n'est pas une erreur. `fallback` present = repli a pied propose faute de transport en commun (issue #190).",
   })
   @ApiResponse({
     status: 400,

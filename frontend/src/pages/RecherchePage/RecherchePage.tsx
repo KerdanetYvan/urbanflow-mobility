@@ -24,6 +24,7 @@ import {
   entryToPlaces,
   getTripHistory,
   searchTrips,
+  type TripFallback,
   type TripHistoryEntry,
   type TripItinerary,
 } from '../../lib/trips';
@@ -63,6 +64,13 @@ type Screen =
       origin: PlaceSuggestion;
       destination: PlaceSuggestion;
       itineraries: TripItinerary[];
+      /**
+       * Repli renvoyé par GET /trips (issue #190) : présent quand aucun
+       * trajet en transport en commun n'a été trouvé. `itineraries` contient
+       * alors soit le trajet à pied de repli (`kind: 'walk-only'`), soit
+       * rien du tout (état vide "sec", `fallback` absent).
+       */
+      fallback?: TripFallback;
     };
 
 /** Etat d'un champ origine/destination : le texte tape et, si l'utilisateur a choisi une suggestion, le lieu geocode correspondant. */
@@ -509,7 +517,7 @@ function RecherchePage() {
     setIsEditingSearch(false);
 
     try {
-      const itineraries = await searchTrips({
+      const result = await searchTrips({
         originLat: originPlace.lat,
         originLon: originPlace.lon,
         destinationLat: destinationPlace.lat,
@@ -541,7 +549,10 @@ function RecherchePage() {
         kind: 'resultats',
         origin: originPlace,
         destination: destinationPlace,
-        itineraries,
+        itineraries: result.itineraries,
+        // Repli a pied eventuel (issue #190) - transmis a RecherchePageResults
+        // pour l'afficher comme suggestion explicite plutot qu'un etat vide.
+        fallback: result.fallback,
       });
     } catch (error) {
       const message =
@@ -870,6 +881,7 @@ function RecherchePage() {
         origin={screen.origin}
         destination={screen.destination}
         itineraries={screen.kind === 'resultats' ? screen.itineraries : null}
+        fallback={screen.kind === 'resultats' ? screen.fallback : undefined}
         onEditSearch={() => {
           setIsEditingSearch(true);
           setFormSheetState('expanded');
