@@ -67,6 +67,20 @@ describe('PlacesService', () => {
     ]);
   });
 
+  it('met les adresses en tete quand la saisie commence par un chiffre ("44 boulevard de vitré")', async () => {
+    otpClient.geocode.mockResolvedValue([
+      { lat: 48.12, lng: -1.63, description: 'Vitré Foulon (1)', id: '1:s' },
+    ]);
+    nominatimClient.search.mockResolvedValue([
+      { label: '44 Boulevard de Vitré, Rennes', lat: 48.117, lon: -1.636 },
+    ]);
+
+    const result = await service.search({ query: '44 boulevard de vitré' });
+
+    expect(result.map((p) => p.kind)).toEqual(['address', 'stop']);
+    expect(result[0].label).toBe('44 Boulevard de Vitré, Rennes');
+  });
+
   it('plafonne a 5 arrets + 5 adresses', async () => {
     otpClient.geocode.mockResolvedValue(
       Array.from({ length: 8 }, (_, i) => ({

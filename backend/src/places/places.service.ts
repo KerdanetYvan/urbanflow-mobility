@@ -80,7 +80,15 @@ export class PlacesService {
             }))
         : [];
 
-    return [...stops, ...addresses];
+    // Ordre par defaut : arrets d'abord (un texte court vise le plus souvent
+    // un arret). MAIS si la saisie commence par un chiffre ("44 boulevard de
+    // vitré"), l'usager tape manifestement un numero de rue : on met les
+    // adresses en tete, sinon l'adresse recherchee se retrouve enfouie sous
+    // les arrets que le geocodeur OTP sort en matching flou (spec #167 §2.1).
+    const looksLikeStreetNumber = /^\s*\d/.test(dto.query);
+    return looksLikeStreetNumber
+      ? [...addresses, ...stops]
+      : [...stops, ...addresses];
   }
 
   /**

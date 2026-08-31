@@ -39,7 +39,7 @@ Les deux répondent à un besoin réel de l'usager d'un planificateur d'itinéra
 `PlacesService.search(query)` interroge **les deux sources en parallèle** et **fusionne** les résultats en une seule liste `PlaceSuggestion[]` :
 
 1. Appel OTP `/geocode` (existant) + appel Nominatim (nouveau), en parallèle (`Promise.allSettled` — voir §5 pour la dégradation si l'une échoue).
-2. **Arrêts en premier**, puis adresses. Justification : sur un planificateur d'itinéraire, un texte court tapé (« Rép », « Gare ») vise le plus souvent un arrêt ; les adresses complètent quand aucun arrêt ne correspond ou quand l'usager tape manifestement une adresse (chiffre + voie).
+2. **Arrêts en premier**, puis adresses — **sauf si la saisie commence par un chiffre** (« 44 boulevard de vitré »), auquel cas les adresses passent devant : un numéro en tête est un signal fort que l'usager tape une adresse, et sinon celle-ci se retrouve enfouie sous les résultats que le géocodeur OTP sort en matching flou. Justification de l'ordre par défaut : sur un planificateur d'itinéraire, un texte court (« Rép », « Gare ») vise le plus souvent un arrêt.
 3. **Plafonds** : au plus **5 arrêts** + **5 adresses** (10 entrées max dans le dropdown — cohérent avec la hauteur du dropdown `AddressField`, `docs/specs/fusion-autocomplete-raccourcis.md` §3.1).
 4. **Déduplication des arrêts** (voir §4.1) : les N poteaux `République (…)` deviennent **une seule** entrée `République`.
 
