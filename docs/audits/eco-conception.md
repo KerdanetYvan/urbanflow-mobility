@@ -81,4 +81,28 @@ Son traitement est isolé dans une dernière étape de #23, à n'intégrer que s
 
 ## 6. Décision — remontage de `MapView`
 
-_(À compléter — dernière étape de l'implémentation #23.)_
+**Intégré.** `MapView` ne remonte plus le `<MapContainer>` via une `key` : une
+seule instance Leaflet vit pour toute la durée du composant, et les
+changements de cadrage sont appliqués de façon impérative par un composant
+enfant `MapViewController` (`useMap()` + `useEffect` déclenché sur `viewKey`,
+la forme sérialisée stable de la vue cible → `map.fitBounds()` / `map.setView()`).
+
+Vérification (build de prod, parcours : recherche puis 2 sélections
+d'itinéraires) :
+
+| | Avant #23 (`main`) | Après §3 (cache seul, `key` conservée) | Après §6 (recadrage impératif) |
+|---|---:|---:|---:|
+| Requêtes de tuiles sur le parcours | 82 | 80 (dont 52 servies du cache) | **67** |
+| Nouvelles tuiles après un clic sur un itinéraire | rafale (remontage) | rafale absorbée par le cache | **0** |
+| Instances `.leaflet-container` dans le DOM | 1 (recréée à chaque fois) | 1 (recréée à chaque fois) | **1 (jamais recréée)** |
+
+- Aucune régression visuelle : captures headless (Chromium 1280×800) avant
+  recherche / 1er itinéraire / 2e itinéraire **identiques** à `main` (même
+  cadrage, mêmes marqueurs, même tracé).
+- Aucune régression d'accessibilité : suite e2e WCAG `npm run test:e2e`
+  **9/9** (dont « Recherche avec résultats », qui exerce la carte).
+- Tests unitaires `MapView.spec.tsx` : 9/9 inchangés.
+
+Le recadrage impératif supprime le rechargement de tuiles à chaque sélection
+d'itinéraire (le cache runtime du §3 n'en absorbait que le coût réseau, pas
+le travail de recréation du DOM ni les requêtes `CacheFirst` elles-mêmes).

@@ -26,6 +26,14 @@ const AUDIT_PASSWORD = 'AuditWcag123!';
  * qu'un message generique - necessaire pour corriger efficacement.
  */
 async function expectNoAxeViolations(page: Page) {
+  // Les ecrans hors /recherche sont charges a la demande (React.lazy, issue
+  // #23) : tant que le chunk n'est pas resolu, seule la doublure de
+  // <Suspense> (un Skeleton, sans <main> ni <h1>) est dans le DOM. Attendre
+  // le <h1> de l'ecran garantit qu'on lance axe sur la vraie page et non sur
+  // cet etat de chargement transitoire (meme precaution que le test
+  // "Recherche avec resultats" qui attend une card avant d'auditer).
+  await page.locator('h1').first().waitFor({ state: 'attached', timeout: 15_000 });
+
   const results = await new AxeBuilder({ page }).analyze();
   const summary = results.violations
     .map(
