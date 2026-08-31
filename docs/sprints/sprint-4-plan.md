@@ -49,7 +49,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 
 ### Phase D — Géocodage réel (Nominatim)
 
-- [ ] [#167](https://github.com/KerdanetYvan/urbanflow-mobility/issues/167) (PO) — Specs : intégrer Nominatim auto-hébergé pour un géocodage d'adresses réel
+- [x] [#167](https://github.com/KerdanetYvan/urbanflow-mobility/issues/167) (PO) — Specs : intégrer Nominatim auto-hébergé pour un géocodage d'adresses réel — `docs/specs/nominatim-geocodage-adresses.md` : **coexistence** OTP (arrêts) + Nominatim (adresses), fusionnés dans `GET /places` (arrêts d'abord, plafond 5+5). Service `nominatim` Docker (dev + prod) avec sa propre base PG + volume dédié, interne au réseau, `NOMINATIM_URL`. Données : extrait **Ille-et-Vilaine** (~105 Mo, OSM-FR), import bootstrap manuel (comme l'OSM d'OTP) — vigilance ressources (import 2-4 Go RAM / dizaines de min, base 5-15 Go disque, repos ~1 Go). Libellés : arrêt = nom seul dédupliqué (retirer le `(1615)`), adresse = `{numéro} {voie}, {commune}` ; nouveau champ `kind: 'stop' | 'address'` sur `PlaceSuggestion` (non cassant) → icône discrète côté front. Dégradation : une source down → résultats partiels en `200`, `503` seulement si les deux tombent. RGPD : rien ne sort de l'infra (Nominatim interne) → le blocage reverse-geocoding de #93 est levé, mais le reverse GPS reste hors périmètre (issue future).
 - [ ] [#168](https://github.com/KerdanetYvan/urbanflow-mobility/issues/168) (Dev BE) — Implémentation — dépend de #167
 
 ### Phase E — F3/Scoring déjà en Stretch avant cette clôture
