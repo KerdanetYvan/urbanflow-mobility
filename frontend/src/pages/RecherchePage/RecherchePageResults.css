@@ -296,33 +296,45 @@
   right: 0;
   bottom: 0;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   background: var(--color-bg);
   border-top-left-radius: var(--radius-md);
   border-top-right-radius: var(--radius-md);
   box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
-  /* La hauteur (donc l'etat visuel) change via l'attribut ci-dessous -
-     transitionnee plutot que basculee net, pour rester lisible comme un
-     "glissement" meme quand l'etat change par tap plutot que par geste. */
-  transition: height 0.22s ease-out;
+  /* Deux pistes de grille : la poignee (`auto`, toujours a sa hauteur
+     naturelle) puis le corps, dont la hauteur porte l'etat visuel du
+     bandeau (replie / liste / detail). Seule la 2e valeur change d'un
+     etat a l'autre - animer `grid-template-rows` plutot que `height`
+     (issue #181, finding "layout-transition" du detecteur Impeccable :
+     `transition: height` anime une propriete de layout, thrash/jank par
+     frame). `grid-template-rows` garde le corps a la taille exacte de la
+     portion visible, donc le defilement interne reste complet dans l'etat
+     "liste" - ce qu'un simple glissement `transform` casserait (bas de
+     liste rejete sous l'ecran, injoignable). */
+  grid-template-rows: auto 0;
+  transition: grid-template-rows 0.22s ease-out;
   overflow: hidden;
 }
 
+/* La 2e piste = hauteur cible du bandeau (repli / 60vh / 88vh, valeurs
+   d'avant #181) moins la poignee : le corps occupe pile la portion
+   visible, le bord haut du bandeau tombe a la meme place qu'avant. */
 .resultats-sheet[data-sheet-state='collapsed'] {
-  height: 4.5rem;
+  grid-template-rows: auto 0;
 }
 
 .resultats-sheet[data-sheet-state='list'] {
-  height: 60vh;
+  grid-template-rows: auto calc(60vh - 4.5rem);
 }
 
 .resultats-sheet[data-sheet-state='detail'] {
-  height: 88vh;
+  grid-template-rows: auto calc(88vh - 4.5rem);
 }
 
 .resultats-sheet-handle {
-  flex-shrink: 0;
+  /* 1re piste (`auto`) de la grille .resultats-sheet : la poignee garde
+     toujours sa hauteur naturelle, seul le corps sous elle s'ouvre/se
+     ferme. */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -365,8 +377,12 @@
 }
 
 .resultats-sheet-body {
-  flex: 1;
-  min-height: 0; /* necessaire pour qu'overflow-y fonctionne dans un flex item */
+  /* 2e piste de la grille .resultats-sheet (voir plus haut) : le corps
+     s'etire pour occuper toute la piste (align-self: stretch par defaut).
+     min-height: 0 leve le minimum implicite d'un item de grille, sans quoi
+     le corps refuserait de descendre sous la hauteur de son contenu et
+     overflow-y n'aurait rien a faire defiler. */
+  min-height: 0;
   overflow-y: auto;
   padding: 0 var(--space-4) var(--space-4);
 }
@@ -406,35 +422,53 @@
   border-top-left-radius: var(--radius-md);
   border-top-right-radius: var(--radius-md);
   box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
-  /* Transition imparfaite pour l'etat "expanded" ci-dessous (hauteur
-     intrinseque, non interpolable) - ecart volontaire, hors perimetre de
-     la spec #171/#172 (section 1) : l'animation elle-meme est traitee par
-     #181, juste apres, sur ces memes fichiers. */
-  transition: height 0.22s ease-out;
+  /* Hauteur intrinseque au contenu plutot que fixee a 70vh (ferme #160,
+     docs/specs/fusion-recherche-resultats.md section 3.2) : le bandeau
+     n'occupe que ce dont son contenu a besoin (peu, "Plus d'options"
+     replie par defaut), laissant la carte majoritairement visible au
+     premier chargement - max-height reste un garde-fou sur petit ecran
+     en paysage, jamais une hauteur cible imposee par defaut. Le bandeau
+     garde cette hauteur quel que soit l'etat ; c'est `transform:
+     translateY` qui le fait coulisser hors de l'ecran quand il est
+     replie (issue #181, meme finding "layout-transition" que
+     .resultats-sheet : animer `height` - a fortiori vers une hauteur
+     intrinseque non interpolable - provoque un reflow par frame,
+     `transform` est composite et interpole proprement).
+
+     Pourquoi `transform` ici et `grid-template-rows` sur .resultats-sheet :
+     ce panneau n'a que 2 etats (ouvert / replie), et replie il masque
+     entierement son corps (`visibility: hidden` ci-dessous, retire du
+     parcours clavier). Aucun etat intermediaire "partiellement visible +
+     defilable", donc le glissement `transform` ne peut pas rendre du
+     contenu injoignable - le piege qui, lui, imposait `grid-template-rows`
+     sur le bandeau resultats. */
+  max-height: 70vh;
+  transition: transform 0.22s ease-out;
   overflow: hidden;
 }
 
+/* Replie : on translate le bandeau de toute sa hauteur moins la portion
+   a garder visible (la poignee, 4.5rem). `100%` en translateY se rapporte
+   a la hauteur reelle du bandeau, donc la poignee reste seule visible
+   quel que soit le volume du formulaire. */
 .recherche-panel-form[data-sheet-state='collapsed'] {
-  height: 4.5rem;
+  transform: translateY(calc(100% - 4.5rem));
 }
 
-/* Sans ca, flex:1 laisse quand meme quelques pixels visibles du corps
-   (debut du message invite/de l'Alert) sous la poignee repliee - masque
-   entierement le corps replie plutot qu'un fragment de texte tronque. */
+.recherche-panel-form[data-sheet-state='expanded'] {
+  transform: translateY(0);
+}
+
+/* Corps du formulaire retire du parcours de tabulation et de l'arbre
+   d'accessibilite quand le bandeau est replie (meme intention que
+   l'ancienne regle `display: none`), mais en `visibility: hidden` : le
+   corps continue ainsi d'occuper sa hauteur dans le flux, et c'est cette
+   hauteur qui donne au bandeau la course necessaire pour coulisser via
+   `transform`. Non peint et deborde sous la poignee, il est de toute
+   facon invisible et masque par `overflow: hidden`. */
 .recherche-panel-form[data-sheet-state='collapsed']
   .recherche-panel-form-body {
-  display: none;
-}
-
-/* Hauteur intrinseque au contenu plutot que fixee a 70vh (ferme #160,
-   docs/specs/fusion-recherche-resultats.md section 3.2) : le bandeau
-   n'occupe que ce dont son contenu a besoin (peu, "Plus d'options"
-   replie par defaut), laissant la carte majoritairement visible au
-   premier chargement - max-height reste un garde-fou sur petit ecran en
-   paysage, jamais une hauteur cible imposee par defaut. */
-.recherche-panel-form[data-sheet-state='expanded'] {
-  height: auto;
-  max-height: 70vh;
+  visibility: hidden;
 }
 
 .recherche-panel-form-handle {
@@ -471,6 +505,17 @@
   min-height: 0; /* necessaire pour qu'overflow-y fonctionne dans un flex item */
   overflow-y: auto;
   padding: 0 var(--space-4) var(--space-4);
+}
+
+/* Respect de prefers-reduced-motion (meme motif que MapView.css /
+   Skeleton.css) : le changement d'etat des deux bandeaux reste
+   instantane pour qui a demande a reduire les animations - le
+   "glissement" `transform` est un pur agrement visuel. */
+@media (prefers-reduced-motion: reduce) {
+  .resultats-sheet,
+  .recherche-panel-form {
+    transition: none;
+  }
 }
 
 @media (min-width: 768px) {
@@ -519,10 +564,11 @@
 
   /* Meme specificite que les regles [data-sheet-state='collapsed'/'expanded']
      ci-dessus (attribut + classe) : gagne par ordre de cascade (declaree
-     apres) sans avoir besoin de !important - toujours hauteur naturelle en
-     desktop, quel que soit l'etat (non pertinent, pas de repli possible). */
+     apres) sans avoir besoin de !important - le panneau ne coulisse jamais
+     en desktop, quel que soit l'etat (non pertinent, pas de repli
+     possible), il reste a sa hauteur naturelle et en place. */
   .recherche-panel-form[data-sheet-state] {
-    height: auto;
+    transform: none;
   }
 
   /* Pas de repli en desktop (assez de place pour le panneau entier) - la
@@ -537,7 +583,7 @@
      desktop sans que ce corps ne reste cache. */
   .recherche-panel-form[data-sheet-state='collapsed']
     .recherche-panel-form-body {
-    display: block;
+    visibility: visible;
   }
 
   .recherche-panel-form-body {
