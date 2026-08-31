@@ -33,6 +33,14 @@ export interface PlanTripParams {
    * plutôt qu'un état vide sec.
    */
   walkOnly?: boolean;
+  /**
+   * Fenêtre de recherche d'OTP en secondes (`searchWindow`), depuis
+   * `departureTime` (issue #91). Absent = fenêtre dynamique par défaut d'OTP
+   * (~1-2h). TripsService la porte à 24h pour trouver le prochain créneau
+   * disponible quand aucun trajet n'existe à l'heure demandée, sans boucle
+   * de sondage - un seul appel supplémentaire.
+   */
+  searchWindowSeconds?: number;
 }
 
 /**
@@ -165,6 +173,11 @@ export class OtpClientService {
       params.walkOnly ? 'WALK' : toOtpModeParam(params.transportModes),
     );
     url.searchParams.set('numItineraries', '5');
+    // Fenêtre de recherche élargie (issue #91) : uniquement quand demandée,
+    // pour ne pas alourdir toutes les recherches - voir PlanTripParams.
+    if (params.searchWindowSeconds) {
+      url.searchParams.set('searchWindow', String(params.searchWindowSeconds));
+    }
 
     return url.toString();
   }

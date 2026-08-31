@@ -100,19 +100,35 @@ export class TripItinerary {
 
 /**
  * Nature du repli quand la recherche "normale" (transports en commun + modes
- * demandes) ne renvoie aucun itineraire (issue #190).
+ * demandes, a l'heure demandee) ne renvoie aucun itineraire.
  *
- * - `walk-only` : aucun trajet en transport en commun a cette heure, mais un
- *   trajet a pied a ete trouve en re-interrogeant OTP en `mode=WALK` seul ;
- *   `TripSearchResult.itineraries` contient alors cet itineraire a pied.
- *
- * (Issue #91, tache suivante, ajoutera `later-departure` + des champs
- * `requestedDepartureTime` / `actualDepartureTime` pour le cas "prochain
- * creneau disponible plus tard".)
+ * - `later-departure` (issue #91) : aucun trajet a l'heure demandee, mais un
+ *   trajet existe plus tard (fenetre de recherche OTP elargie a 24h) ;
+ *   `TripSearchResult.itineraries` contient ces trajets, `requestedDepartureTime`
+ *   et `actualDepartureTime` disent de combien le creneau a glisse.
+ * - `walk-only` (issue #190) : aucun trajet en transport en commun (meme
+ *   plus tard), mais un trajet a pied a ete trouve en re-interrogeant OTP en
+ *   `mode=WALK` seul ; `TripSearchResult.itineraries` contient cet itineraire
+ *   a pied.
  */
 export class TripFallback {
-  @ApiProperty({ enum: ['walk-only'], example: 'walk-only' })
-  kind: 'walk-only';
+  @ApiProperty({
+    enum: ['later-departure', 'walk-only'],
+    example: 'later-departure',
+  })
+  kind: 'later-departure' | 'walk-only';
+
+  @ApiPropertyOptional({
+    description:
+      'ISO 8601. Heure de depart demandee (ou "maintenant" resolu au moment de la recherche). Present uniquement pour kind="later-departure".',
+  })
+  requestedDepartureTime?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'ISO 8601. Heure de depart reelle du premier itineraire propose - posterieure a l\'heure demandee. Present uniquement pour kind="later-departure".',
+  })
+  actualDepartureTime?: string;
 }
 
 /**

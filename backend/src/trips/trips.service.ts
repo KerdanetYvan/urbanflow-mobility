@@ -16,6 +16,17 @@ import { ProfilesService } from '../profiles/profiles.service';
 import { ScoringService } from '../scoring/scoring.service';
 import { TripHistoryService } from './history/trip-history.service';
 
+/**
+ * Fenetre de recherche (en secondes) utilisee pour le repli "prochain
+ * creneau disponible" (issue #91). 24h = borne raisonnable : couvre le cas
+ * type (recherche apres le dernier depart du jour -> trajet le lendemain
+ * matin) sans autoriser une recherche a plusieurs jours, et correspond au
+ * `transit.maxSearchWindow` par defaut d'OTP 2.x (au-dela, OTP tronque de
+ * toute facon). Un seul appel avec cette fenetre, jamais de boucle
+ * (eco-conception, CLAUDE.md).
+ */
+const NEXT_SLOT_SEARCH_WINDOW_SECONDS = 24 * 60 * 60;
+
 @Injectable()
 export class TripsService {
   constructor(
@@ -40,13 +51,16 @@ export class TripsService {
    * ScoringService applique uniquement ses criteres de base (duree,
    * correspondances), proche du tri natif d'OTP.
    *
-   * Repli a pied (issue #190) : si la recherche normale ne renvoie aucun
-   * itineraire, on retente UNE fois en `mode=WALK` seul. Si un trajet a pied
-   * existe, il est renvoye avec `fallback: { kind: 'walk-only' }` pour que
-   * le frontend le presente comme une suggestion explicite ("aucun trajet en
-   * transport en commun, mais X min a pied") plutot qu'un etat vide sec. Un
-   * seul appel OTP supplementaire, et uniquement dans ce cas (eco-conception,
-   * CLAUDE.md).
+   * Replis quand la recherche normale ne renvoie rien (au plus 2 appels OTP
+   * supplementaires, et uniquement dans ce cas - eco-conception, CLAUDE.md) :
+   * 1. Prochain creneau (issue #91) : on relance la meme recherche avec la
+   *    fenetre OTP elargie a 24h. Si des trajets existent plus tard, on les
+   *    renvoie avec `fallback: { kind: 'later-departure', requestedDepartureTime,
+   *    actualDepartureTime }`.
+   * 2. Repli a pied (issue #190) : sinon, on retente en `mode=WALK` seul. Un
+   *    trajet a pied trouve est renvoye avec `fallback: { kind: 'walk-only' }`.
+   * 3. Sinon, `{ itineraries: [] }` (etat vide "sec", message generique cote
+   *    frontend).
    */
   async search(
     dto: SearchTripsDto,
@@ -87,7 +101,37 @@ export class TripsService {
       return { itineraries: await this.scoringService.rank(grouped, profile) };
     }
 
-    // Aucun itineraire aux modes normaux : repli a pied (issue #190).
+    // (#91) Aucun trajet a l'heure demandee : on cherche le prochain creneau
+    // disponible en elargissant la fenetre de recherche d'OTP a 24h (un seul
+    // appel, pas de boucle de sondage - voir searchWindowSeconds). L'heure de
+    // depart reste la meme ; c'est OTP qui, dans cette fenetre, remonte le
+    // premier depart possible au-dela de sa fenetre dynamique par defaut.
+    const requestedDeparture = planParams.departureTime ?? new Date();
+    const laterItineraries = await this.otpClient.planTrip({
+      ...planParams,
+      departureTime: requestedDeparture,
+      transportModes: dto.transportModes,
+      searchWindowSeconds: NEXT_SLOT_SEARCH_WINDOW_SECONDS,
+    });
+    const laterGrouped = this.groupByRoute(
+      laterItineraries.map((itinerary) => this.mapItinerary(itinerary)),
+    );
+    if (laterGrouped.length > 0) {
+      const ranked = await this.scoringService.rank(laterGrouped, profile);
+      return {
+        itineraries: ranked,
+        fallback: {
+          kind: 'later-departure',
+          requestedDepartureTime: requestedDeparture.toISOString(),
+          // Premier depart reellement propose (ranked[0] = tete de liste apres
+          // scoring ; startTime = plus proche des horaires groupes, #127).
+          actualDepartureTime: ranked[0].startTime,
+        },
+      };
+    }
+
+    // (#190) Toujours aucun trajet en transport en commun, meme plus tard :
+    // repli a pied.
     const walkItineraries = await this.otpClient.planTrip({
       ...planParams,
       walkOnly: true,

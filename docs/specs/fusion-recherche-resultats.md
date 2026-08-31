@@ -58,7 +58,10 @@ Aucun changement par rapport à la règle déjà actée dans `docs/specs/recherc
 
 Restent inchangés, hors périmètre de cette spec :
 - **Recherche en cours** (`itineraries === null`) : squelette de chargement affiché dans le panneau (déjà le cas aujourd'hui via `.resultats-panel-list`/`.resultats-sheet`) — devient naturellement le contenu du panneau fusionné pendant le chargement, sans changement de comportement.
-- **Résultat vide** (`itineraries.length === 0`) : à l'origine une page classique (`.resultats-page`), hors périmètre de *cette* spec. **Repris par l'issue [#190](https://github.com/KerdanetYvan/urbanflow-mobility/issues/190)** une fois le panneau fusionné livré : l'état vide est désormais rendu dans le panneau (même coquille que "recherche en cours", carte plein écran en fond avec origine/destination), `.resultats-page` supprimée, et l'action de recours est le "Modifier la recherche" de `SearchContext` (édition en place). Si un trajet à pied existe faute de transport en commun, il est proposé comme un résultat normal précédé d'un bandeau explicatif (`fallback: 'walk-only'` renvoyé par `GET /trips`).
+- **Résultat vide** (`itineraries.length === 0`) : à l'origine une page classique (`.resultats-page`), hors périmètre de *cette* spec. **Repris par l'issue [#190](https://github.com/KerdanetYvan/urbanflow-mobility/issues/190)** une fois le panneau fusionné livré : l'état vide est désormais rendu dans le panneau (même coquille que "recherche en cours", carte plein écran en fond avec origine/destination), `.resultats-page` supprimée, et l'action de recours est le "Modifier la recherche" de `SearchContext` (édition en place).
+- **Replis de `GET /trips`** (`fallback` non nul, `itineraries` non vide) : rendus comme des résultats normaux (liste + détail + tracé), précédés d'un bandeau `.resultats-fallback-note` :
+  - `later-departure` (issue [#91](https://github.com/KerdanetYvan/urbanflow-mobility/issues/91)) — aucun trajet à l'heure demandée : "Aucun trajet à HH:mm. Prochain trajet {le jour} à HH:mm." Le backend ré-interroge OTP une fois avec une fenêtre de 24h.
+  - `walk-only` (issue #190) — aucun trajet en transport en commun même plus tard : trajet à pied proposé, "Aucun trajet en transport en commun à cette heure. Voici l'itinéraire à pied : X min."
 
 ## 6. Exemple (persona du dossier, partie 2.3)
 

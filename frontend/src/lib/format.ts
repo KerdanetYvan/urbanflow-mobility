@@ -24,6 +24,32 @@ export function formatTime(iso: string): string {
 }
 
 /**
+ * Formate l'heure du prochain creneau propose (issue #91) relativement au
+ * jour demande : "a 08:05" si c'est le meme jour calendaire que
+ * `requestedIso`, sinon "<jour de la semaine> a 08:05" (ex. "vendredi a
+ * 08:05"). La fenetre de recherche etant plafonnee a 24h cote backend,
+ * l'ecart ne depasse jamais un jour, le nom du jour reste donc sans
+ * ambiguite.
+ */
+export function formatNextDeparture(
+  actualIso: string,
+  requestedIso: string,
+): string {
+  const actual = new Date(actualIso);
+  const requested = new Date(requestedIso);
+  const sameCalendarDay =
+    actual.getFullYear() === requested.getFullYear() &&
+    actual.getMonth() === requested.getMonth() &&
+    actual.getDate() === requested.getDate();
+
+  const time = formatTime(actualIso);
+  if (sameCalendarDay) return `à ${time}`;
+
+  const weekday = actual.toLocaleDateString('fr-FR', { weekday: 'long' });
+  return `${weekday} à ${time}`;
+}
+
+/**
  * Repli d'affichage de coordonnees brutes ("45.7640, 4.8600") quand aucun
  * libelle d'adresse n'est disponible - cas d'une entree d'historique dont la
  * recherche d'origine n'etait pas authentifiee au moment ou le libelle

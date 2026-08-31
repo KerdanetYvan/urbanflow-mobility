@@ -8,6 +8,7 @@ import { getTripModeIcon } from '../../components/tripModeIcon';
 import { toHexColor } from '../../lib/color';
 import {
   formatDuration,
+  formatNextDeparture,
   formatTime,
   formatTransfers,
 } from '../../lib/format';
@@ -200,14 +201,30 @@ function ResultsList({
   return (
     <>
       <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-      {fallback?.kind === 'walk-only' && (
-        // Repli a pied (issue #190) : la "liste" ci-dessous n'est pas un
-        // resultat normal mais l'itineraire a pied propose faute de transport
-        // en commun - on l'annonce explicitement plutot que de le laisser
-        // passer pour un trajet multimodal ordinaire.
+      {fallback && (
+        // Bandeau de repli : la "liste" ci-dessous n'est pas un resultat
+        // normal a l'heure demandee - on l'annonce explicitement.
         <p className="resultats-fallback-note">
-          Aucun trajet en transport en commun à cette heure. Voici l’itinéraire
-          à pied&nbsp;: {formatDuration(itineraries[0].durationSeconds)}.
+          {fallback.kind === 'later-departure' ? (
+            // Prochain creneau (issue #91) : aucun trajet a l'heure demandee,
+            // les itineraires ci-dessous partent plus tard.
+            <>
+              Aucun trajet à {formatTime(fallback.requestedDepartureTime)}.
+              Prochain trajet{' '}
+              {formatNextDeparture(
+                fallback.actualDepartureTime,
+                fallback.requestedDepartureTime,
+              )}
+              .
+            </>
+          ) : (
+            // Repli a pied (issue #190) : aucun trajet en transport en commun.
+            <>
+              Aucun trajet en transport en commun à cette heure. Voici
+              l’itinéraire à pied&nbsp;:{' '}
+              {formatDuration(itineraries[0].durationSeconds)}.
+            </>
+          )}
         </p>
       )}
       {geolocationMessage && (
@@ -244,6 +261,13 @@ interface EmptyResultsProps {
  * L'action de recours est le "Modifier la recherche" de `SearchContext`
  * ci-dessus (édition en place, décision #190) - pas de second bouton
  * redondant dans le message.
+ *
+ * Le repli "prochain créneau" (issue #91) et le repli à pied (#190) ne
+ * passent PAS par ici : dans ces deux cas `itineraries` est non vide (le
+ * trajet du repli), donc RecherchePageResults rend la liste normale avec un
+ * bandeau explicatif (voir ResultsList / `.resultats-fallback-note`). Cet
+ * état vide n'apparaît que lorsqu'il n'y a vraiment rien, même plus tard,
+ * même à pied.
  */
 function EmptyResults({ origin, destination, onEditSearch }: EmptyResultsProps) {
   return (
@@ -259,9 +283,6 @@ function EmptyResults({ origin, destination, onEditSearch }: EmptyResultsProps) 
           Essayez d’élargir la plage horaire, ou de modifier l’origine ou la
           destination.
         </p>
-        {/* Emplacement prévu pour l'action "voir le prochain créneau
-            disponible" (issue #91, tâche suivante) : elle viendra ici, dans
-            la disposition d'état vide construite par #190. */}
       </div>
     </>
   );

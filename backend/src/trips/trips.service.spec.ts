@@ -179,9 +179,10 @@ describe('TripsService', () => {
     ]);
   });
 
-  it('renvoie itineraries vide (sans fallback) quand ni le transport en commun ni la marche ne donnent de trajet', async () => {
-    // mockResolvedValue s'applique aux DEUX appels (recherche normale + repli
-    // a pied) : les deux renvoient une liste vide.
+  it('renvoie itineraries vide (sans fallback) quand rien ne donne de trajet, meme plus tard ni a pied', async () => {
+    // mockResolvedValue s'applique aux TROIS appels (recherche normale,
+    // prochain creneau #91, repli a pied #190) : tous renvoient une liste
+    // vide.
     otpClient.planTrip.mockResolvedValue([]);
 
     const result = await service.search({
@@ -191,12 +192,12 @@ describe('TripsService', () => {
       destinationLon: 2.36,
     });
 
-    // Repli a pied tente (2e appel), sans succes -> etat vide "sec".
-    expect(otpClient.planTrip).toHaveBeenCalledTimes(2);
+    // Les deux replis tentes (2e et 3e appels), sans succes -> etat vide "sec".
+    expect(otpClient.planTrip).toHaveBeenCalledTimes(3);
     expect(result).toEqual({ itineraries: [] });
   });
 
-  describe('repli a pied quand aucun trajet en transport en commun (issue #190)', () => {
+  describe("replis quand aucun trajet a l'heure demandee (issues #91 / #190)", () => {
     const WALK_OTP_ITINERARY = {
       startTime: 0,
       endTime: 900_000,
@@ -214,9 +215,59 @@ describe('TripsService', () => {
       ],
     };
 
-    it('retente en WALK seul et renvoie le trajet a pied avec fallback: walk-only', async () => {
+    /** Itineraire bus dont le depart tombe le lendemain matin. */
+    const NEXT_DAY_BUS = {
+      startTime: 50_400_000, // ~14h apres l'epoch UTC
+      endTime: 51_000_000,
+      duration: 600,
+      transfers: 0,
+      legs: [
+        {
+          mode: 'BUS',
+          routeShortName: 'T1',
+          startTime: 50_400_000,
+          endTime: 51_000_000,
+          distance: 1300,
+          from: { name: 'Place Centrale', lat: 48.85, lon: 2.35 },
+          to: { name: 'Université', lat: 48.86, lon: 2.36 },
+        },
+      ],
+    };
+
+    it("propose le prochain creneau (fenetre 24h) quand rien a l'heure demandee, avec fallback: later-departure (issue #91)", async () => {
       otpClient.planTrip
-        .mockResolvedValueOnce([]) // recherche normale : rien
+        .mockResolvedValueOnce([]) // recherche normale : rien a l'heure demandee
+        .mockResolvedValueOnce([NEXT_DAY_BUS]); // fenetre 24h : trajet plus tard
+
+      const result = await service.search({
+        originLat: 48.85,
+        originLon: 2.35,
+        destinationLat: 48.86,
+        destinationLon: 2.36,
+        departureTime: '2026-01-15T22:00:00.000Z',
+      });
+
+      // 2 appels seulement : le repli a pied n'est pas tente puisque le
+      // prochain creneau a deja donne un resultat.
+      expect(otpClient.planTrip).toHaveBeenCalledTimes(2);
+      expect(otpClient.planTrip).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          searchWindowSeconds: 24 * 60 * 60,
+          departureTime: new Date('2026-01-15T22:00:00.000Z'),
+        }),
+      );
+      expect(result.fallback).toEqual({
+        kind: 'later-departure',
+        requestedDepartureTime: '2026-01-15T22:00:00.000Z',
+        actualDepartureTime: new Date(50_400_000).toISOString(),
+      });
+      expect(result.itineraries).toHaveLength(1);
+    });
+
+    it('retente en WALK seul quand meme le prochain creneau ne donne rien, avec fallback: walk-only (issue #190)', async () => {
+      otpClient.planTrip
+        .mockResolvedValueOnce([]) // recherche normale
+        .mockResolvedValueOnce([]) // prochain creneau (24h) : toujours rien
         .mockResolvedValueOnce([WALK_OTP_ITINERARY]); // repli a pied : trouve
 
       const result = await service.search({
@@ -226,19 +277,17 @@ describe('TripsService', () => {
         destinationLon: 2.36,
       });
 
-      expect(otpClient.planTrip).toHaveBeenCalledTimes(2);
-      // Le 2e appel force mode=WALK (walkOnly), sans filtre de modes.
+      expect(otpClient.planTrip).toHaveBeenCalledTimes(3);
       expect(otpClient.planTrip).toHaveBeenLastCalledWith(
         expect.objectContaining({ walkOnly: true }),
       );
       expect(result.fallback).toEqual({ kind: 'walk-only' });
-      expect(result.itineraries).toHaveLength(1);
       expect(result.itineraries[0].segments.map((s) => s.mode)).toEqual([
         'WALK',
       ]);
     });
 
-    it('ne tente pas le repli a pied quand la recherche normale a deja des resultats', async () => {
+    it('ne tente aucun repli quand la recherche normale a deja des resultats', async () => {
       otpClient.planTrip.mockResolvedValueOnce([WALK_OTP_ITINERARY]);
 
       const result = await service.search({

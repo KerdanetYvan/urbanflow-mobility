@@ -201,6 +201,38 @@ describe('RecherchePage', () => {
     ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
   });
 
+  it("propage le fallback 'prochain creneau' de /trips jusqu'a la disposition resultats (issue #91)", async () => {
+    vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+      Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+    );
+    vi.mocked(tripsLib.searchTrips).mockResolvedValue({
+      itineraries: [
+        {
+          startTime: '2026-08-03T06:00:00.000Z',
+          endTime: '2026-08-03T06:25:00.000Z',
+          durationSeconds: 1500,
+          transfers: 0,
+          segments: [],
+        },
+      ],
+      fallback: {
+        kind: 'later-departure',
+        requestedDepartureTime: '2026-08-02T20:00:00.000Z',
+        actualDepartureTime: '2026-08-03T06:00:00.000Z',
+      },
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+    await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+    await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+    expect(
+      await screen.findAllByText(/Aucun trajet à \d{2}:\d{2}\. Prochain trajet/),
+    ).not.toHaveLength(0);
+  });
+
   it("revient au formulaire, criteres preremplis, quand l'appel a /trips echoue (issue #73)", async () => {
     vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
       Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),

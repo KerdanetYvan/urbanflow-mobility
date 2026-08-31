@@ -45,14 +45,25 @@ export interface TripItinerary {
 }
 
 /**
- * Nature du repli quand la recherche normale ne renvoie aucun itineraire
- * (issue #190). `walk-only` : aucun trajet en transport en commun, mais un
- * trajet a pied a ete trouve - il est dans `TripSearchResult.itineraries`.
- * (Issue #91 ajoutera `later-departure`.)
+ * Nature du repli quand la recherche normale ne renvoie aucun itineraire a
+ * l'heure demandee. Dans les deux cas, `TripSearchResult.itineraries`
+ * contient les trajets du repli (non vide).
+ *
+ * - `later-departure` (issue #91) : aucun trajet a l'heure demandee, mais un
+ *   trajet existe plus tard - `requestedDepartureTime` / `actualDepartureTime`
+ *   disent de combien le creneau a glisse.
+ * - `walk-only` (issue #190) : aucun trajet en transport en commun (meme plus
+ *   tard), un trajet a pied est propose a la place.
  */
-export interface TripFallback {
-  kind: 'walk-only';
-}
+export type TripFallback =
+  | { kind: 'walk-only' }
+  | {
+      kind: 'later-departure';
+      /** ISO 8601 - heure demandee (ou "maintenant" resolu au moment de la recherche). */
+      requestedDepartureTime: string;
+      /** ISO 8601 - heure de depart du premier itineraire propose, posterieure a l'heure demandee. */
+      actualDepartureTime: string;
+    };
 
 /**
  * Reponse de GET /trips (issue #7). Enveloppe plutot qu'un tableau nu depuis
