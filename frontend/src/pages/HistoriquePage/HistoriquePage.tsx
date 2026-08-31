@@ -51,9 +51,12 @@ function HistoryEntryCard({ entry }: { entry: TripHistoryEntry }) {
   return (
     <li className="historique-entry">
       <div className="historique-entry-route">
-        <span>{entry.originLabel ?? formatCoordinates(entry.originLat, entry.originLon)}</span>
+        <span className="historique-entry-endpoint">
+          {entry.originLabel ??
+            formatCoordinates(entry.originLat, entry.originLon)}
+        </span>
         <span className="historique-entry-arrow" aria-hidden="true">→</span>
-        <span>
+        <span className="historique-entry-endpoint">
           {entry.destinationLabel ??
             formatCoordinates(entry.destinationLat, entry.destinationLon)}
         </span>

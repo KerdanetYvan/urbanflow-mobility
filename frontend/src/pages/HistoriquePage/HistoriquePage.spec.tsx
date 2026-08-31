@@ -62,6 +62,43 @@ describe('HistoriquePage', () => {
     expect(screen.getByText('Bellecour')).toBeInTheDocument();
   });
 
+  it(
+    'porte chaque extremite du trajet dans un span tronquable, la fleche a ' +
+      'part (anti-debordement, issue #161)',
+    async () => {
+      vi.mocked(tripsLib.getTripHistory).mockResolvedValue([
+        {
+          id: 'entry-1',
+          originLat: 48.111,
+          originLon: -1.682,
+          // Adresse reelle longue (immeuble + residence + code postal) : le
+          // cas que la troncature CSS doit absorber sans casser la carte.
+          originLabel:
+            "12 Résidence Les Hauts de Beauregard, Bâtiment C, 35700 Rennes",
+          destinationLat: 48.127,
+          destinationLon: -1.682,
+          destinationLabel: 'Bellecour',
+          lastSearchedAt: '2026-08-15T14:05:00.000Z',
+        },
+      ]);
+
+      const { container } = renderPage();
+
+      const endpoints = await screen.findAllByText(
+        (_, el) => el?.classList.contains('historique-entry-endpoint') ?? false,
+      );
+      expect(endpoints).toHaveLength(2);
+      expect(endpoints[0]).toHaveTextContent(
+        '12 Résidence Les Hauts de Beauregard, Bâtiment C, 35700 Rennes',
+      );
+      // La fleche reste hors des spans tronquables (sinon elle disparaitrait
+      // avec l'ellipsis d'un libelle long).
+      const arrow = container.querySelector('.historique-entry-arrow');
+      expect(arrow).not.toHaveClass('historique-entry-endpoint');
+      expect(arrow).toHaveTextContent('→');
+    },
+  );
+
   it("affiche l'etat vide quand aucun trajet n'a encore ete recherche", async () => {
     vi.mocked(tripsLib.getTripHistory).mockResolvedValue([]);
 
