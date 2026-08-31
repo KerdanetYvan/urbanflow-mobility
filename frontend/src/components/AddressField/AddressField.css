@@ -24,7 +24,10 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
-  max-height: 14rem;
+  /* Assez haut pour montrer la fusion arrets + adresses (jusqu'a 10 entrees,
+     issue #168) sans forcer un scroll des les premiers resultats - au-dela
+     ca defile. */
+  max-height: 22rem;
   overflow-y: auto;
 }
 
@@ -46,20 +49,34 @@
   cursor: pointer;
 }
 
-/* Anti-débordement (issue #161) : une adresse géocodée longue (immeuble +
-   résidence + code postal) reste sur une seule ligne tronquée plutôt que
-   d'allonger le dropdown de plusieurs lignes. Ne s'applique pas aux entrées
-   rapides (`.address-quick-entry`, display: flex) : leurs deux lignes gèrent
-   déjà leur propre ellipsis (voir plus bas). */
-.address-suggestions button:not(.address-quick-entry) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .address-suggestions button:hover,
 .address-suggestions button:focus-visible {
   background: var(--color-bg-subtle);
+}
+
+/* Suggestion du géocodeur (issue #168) : icône (puce transport pour un
+   arrêt, épingle pour une adresse) + libellé sur une ligne. */
+.address-suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.address-suggestion-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+/* Anti-débordement (issue #161) : une adresse longue (immeuble + résidence +
+   code postal) reste sur une ligne tronquée plutôt que d'allonger le
+   dropdown - l'ellipsis vit sur le libellé, `min-width: 0` le laissant
+   rétrécir sous la largeur de son contenu dans le flex. */
+.address-suggestion-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Entrées rapides (issue #166, docs/specs/fusion-autocomplete-raccourcis.md) :

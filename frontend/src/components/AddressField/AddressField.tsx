@@ -1,6 +1,6 @@
 import { useState, type FocusEvent, type KeyboardEvent } from 'react';
 import FormField from '../FormField/FormField';
-import { HistoryIcon, MapPinIcon } from '../icons';
+import { BusIcon, HistoryIcon, MapPinIcon } from '../icons';
 import type { PlaceSuggestion } from '../../lib/places';
 import './AddressField.css';
 
@@ -137,8 +137,20 @@ function AddressField({
         <ul className="address-suggestions">
           {suggestions.map((suggestion) => (
             <li key={`${suggestion.lat}-${suggestion.lon}`}>
-              <button type="button" onClick={() => onSelect(suggestion)}>
-                {suggestion.label}
+              <button
+                type="button"
+                className="address-suggestion"
+                onClick={() => onSelect(suggestion)}
+              >
+                {/* Puce transport pour un arrêt (géocodeur OTP), épingle pour
+                    une adresse (Nominatim) ou un résultat sans `kind` connu
+                    (issue #168). */}
+                <span className="address-suggestion-icon" aria-hidden="true">
+                  {suggestion.kind === 'stop' ? <BusIcon /> : <MapPinIcon />}
+                </span>
+                <span className="address-suggestion-label">
+                  {suggestion.label}
+                </span>
               </button>
             </li>
           ))}

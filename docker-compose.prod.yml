@@ -69,6 +69,24 @@ services:
       - ./routing-engine/otp-config.json:/var/opentripplanner/otp-config.json:ro
     command: ["--build", "--serve"]
 
+  # Geocodage d'adresses (issue #167/#168). Comme otp : jamais expose, seul le
+  # reseau docker interne y accede (le backend l'appelle via NOMINATIM_URL).
+  # Embarque sa propre base PostgreSQL, isolee du service postgres applicatif.
+  # BOOTSTRAP initial obligatoire avant le premier demarrage utile : l'import
+  # de l'extrait OSM (~30 min, gourmand en RAM/disque) doit etre lance une
+  # fois sur le VPS, jamais en meme temps qu'un build de graphe OTP - voir
+  # routing-engine/README.md, section deploiement.
+  nominatim:
+    image: mediagis/nominatim:5.3.2
+    restart: always
+    environment:
+      PBF_URL: https://download.openstreetmap.fr/extracts/europe/france/bretagne/ille_et_vilaine.osm.pbf
+      NOMINATIM_PASSWORD: ${NOMINATIM_DB_PASSWORD}
+      IMPORT_WIKIPEDIA: "false"
+    volumes:
+      - nominatim_data:/var/lib/postgresql/16/main
+    shm_size: 1gb
+
   backend:
     build:
       context: ./backend
@@ -79,6 +97,7 @@ services:
       - postgres
       - postfix
       - otp
+      - nominatim
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -92,3 +111,6 @@ services:
 volumes:
   postgres_data:
   dkim_keys:
+  # Base PostgreSQL interne de Nominatim (issue #168) - plusieurs Go apres
+  # import, a provisionner sur le VPS en consequence.
+  nominatim_data:

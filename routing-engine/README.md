@@ -124,3 +124,26 @@ Distance volontairement pas trop courte entre arrêts adjacents (~1,3 km) : en d
 Le géocodeur indexe les noms d'arrêts/rues déjà chargés dans le graphe et fait du filtrage par **préfixe** (ex. `query=Uni` trouve "Université", mais une lettre isolée qui n'est pas en début de nom ne matche rien). Suffisant pour retrouver les 4 arrêts fictifs du jeu de données de test.
 
 **Vérifié manuellement** : `GET {OTP_URL}/geocode?query=Gare` renvoie `[{"lat":48.119,"lng":-1.674,"description":"Gare Test","id":"1:B"}]` ; une requête sans correspondance renvoie `[]`.
+
+## Géocodage d'adresses — Nominatim auto-hébergé (issue #167/#168)
+
+Le géocodeur OTP ci-dessus ne connaît que les **arrêts**. Pour de vraies **adresses postales**, le service `nominatim` (`docker-compose.yml` / `docker-compose.prod.yml`, image `mediagis/nominatim`) est ajouté en complément — voir `docs/specs/nominatim-geocodage-adresses.md`. `GET /places` fusionne les deux (arrêts d'abord, puis adresses).
+
+### Bootstrap de l'import (une fois par environnement)
+
+Nominatim embarque **sa propre base PostgreSQL** (volume `nominatim_data`, séparée du `postgres` applicatif) et importe l'extrait OSM au **premier démarrage** — étape longue et gourmande (voir la spec §3.3).
+
+```bash
+docker compose up -d nominatim
+# suit l'import (~30 min max ; ~6 min observé en session pour l'Ille-et-Vilaine
+# sans données Wikipedia) :
+docker compose logs -f nominatim
+# prêt quand :
+curl http://localhost:8081/status        # -> 200 (dev ; port 8081 non exposé en prod)
+```
+
+L'extrait est **téléchargé par le conteneur** (`PBF_URL` = Ille-et-Vilaine sur `download.openstreetmap.fr`, ~105 Mo — le département couvre toute la métropole). Rien à déposer à la main, contrairement à l'OSM d'OTP. Le volume conserve la base : les redémarrages suivants ne réimportent pas. Ré-import : `docker compose down -v` sur le volume `nominatim_data` puis `up` (ou `docker volume rm urbanflow-mobility_nominatim_data`).
+
+**Empreinte observée en session** (Ille-et-Vilaine, `IMPORT_WIKIPEDIA=false`) : import ~6 min, base ~volume de quelques Go. Sur le VPS : ne pas lancer cet import en même temps qu'un `otp --build`, et provisionner le disque en conséquence.
+
+**Vérifié en session** : `GET /places?query=rue de nemours` renvoie les arrêts OTP **puis** `Rue de Nemours, Rennes` (`kind: 'address'`) ; `query=republique` renvoie un seul `République` (poteaux dédupliqués) + adresses.
