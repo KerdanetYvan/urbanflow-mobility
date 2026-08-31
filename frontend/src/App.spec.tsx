@@ -87,7 +87,7 @@ describe('App (navigation)', () => {
     expect(navScope.queryByRole('link', { name: 'Connexion' })).not.toBeInTheDocument();
   });
 
-  it('redirige /connexion vers /profil si on est deja connecte', () => {
+  it('redirige /connexion vers /profil si on est deja connecte', async () => {
     saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
     vi.mocked(profileLib.getMyProfile).mockResolvedValue({
       id: 'profile-1',
@@ -100,8 +100,10 @@ describe('App (navigation)', () => {
 
     renderApp('/connexion');
 
+    // findByRole (async) : ProfilPage est chargée à la demande (code-splitting
+    // #23), le chunk se résout sur une microtâche.
     expect(
-      screen.getByRole('heading', { name: 'Profil de mobilité' }),
+      await screen.findByRole('heading', { name: 'Profil de mobilité' }),
     ).toBeInTheDocument();
   });
 
@@ -127,30 +129,30 @@ describe('App (navigation)', () => {
     renderApp('/profil');
 
     expect(
-      screen.getByRole('heading', { name: 'Connexion' }),
+      await screen.findByRole('heading', { name: 'Connexion' }),
     ).toBeInTheDocument();
   });
 
-  it('redirige vers la connexion si on visite /profil avec des jetons JWT prouves expires (issue #65, durcissement RequireAuth)', () => {
+  it('redirige vers la connexion si on visite /profil avec des jetons JWT prouves expires (issue #65, durcissement RequireAuth)', async () => {
     saveTokens({ accessToken: fakeJwt(-60), refreshToken: fakeJwt(-1) });
 
     renderApp('/profil');
 
     expect(
-      screen.getByRole('heading', { name: 'Connexion' }),
+      await screen.findByRole('heading', { name: 'Connexion' }),
     ).toBeInTheDocument();
     // getMyProfile n'a meme pas besoin d'etre appele : le rejet est purement
     // local, avant tout aller-retour reseau.
     expect(profileLib.getMyProfile).not.toHaveBeenCalled();
   });
 
-  it("ne redirige pas /connexion vers /profil si les jetons JWT sont prouves expires, meme si un jeton existe (issue #65)", () => {
+  it("ne redirige pas /connexion vers /profil si les jetons JWT sont prouves expires, meme si un jeton existe (issue #65)", async () => {
     saveTokens({ accessToken: fakeJwt(-60), refreshToken: fakeJwt(-1) });
 
     renderApp('/connexion');
 
     expect(
-      screen.getByRole('heading', { name: 'Connexion' }),
+      await screen.findByRole('heading', { name: 'Connexion' }),
     ).toBeInTheDocument();
   });
 
@@ -170,7 +172,11 @@ describe('App (navigation)', () => {
     const user = userEvent.setup();
     renderApp('/connexion');
 
-    await user.type(screen.getByLabelText('Adresse email'), 'alice@example.com');
+    // ConnexionPage est chargée à la demande (#23) : attendre le champ.
+    await user.type(
+      await screen.findByLabelText('Adresse email'),
+      'alice@example.com',
+    );
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse123');
     await user.click(screen.getByRole('button', { name: 'Se connecter' }));
 
@@ -230,7 +236,7 @@ describe('App (navigation)', () => {
     await user.click(screen.getByRole('link', { name: 'Profil' }));
 
     expect(
-      screen.getByRole('heading', { name: 'Profil de mobilité' }),
+      await screen.findByRole('heading', { name: 'Profil de mobilité' }),
     ).toBeInTheDocument();
     // Le lien actif doit porter aria-current="page" (ajoute automatiquement
     // par NavLink), utile aux lecteurs d'ecran et utilise comme crochet CSS.

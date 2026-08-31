@@ -52,32 +52,57 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Strategie de cache runtime pour les appels a l'API backend :
-        // NetworkFirst essaie toujours le reseau en premier (donnees
-        // fraiches en priorite - un itineraire recalcule ne doit pas servir
-        // une reponse perimee), et ne retombe sur le cache que si le reseau
-        // echoue (connectivite variable en mobilite, cf. contrainte
-        // transverse "Performances" du projet). Regle generique (prefixe
-        // /api/, pas un pattern par endpoint) qui suffit pour ce qui existe
-        // aujourd'hui (auth, profil) - a REVOIR au cas par cas quand les
-        // endpoints F2/F3 arriveront (recherche d'itineraires, GTFS-RT...),
-        // chacun n'ayant pas forcement besoin de la meme strategie ni de la
-        // meme duree de cache.
+        // Stratégies de cache runtime (éco-conception, issue #23, CLAUDE.md
+        // "limiter les appels réseau superflus" + "mode dégradé"). En prod,
+        // frontend et API sont servis par le même domaine (Caddy) : les
+        // requêtes API sont donc same-origin et matchent par `url.pathname`.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            // Tuiles OpenStreetMap : le plus gros du trafic (10-30 PNG par
+            // vue de carte). CacheFirst car une tuile à un (z, x, y) donné
+            // ne change quasiment jamais - un pan/zoom, un changement
+            // d'itinéraire ou une revisite les ressert du cache au lieu de
+            // les retélécharger.
+            urlPattern: ({ url }) => url.hostname.endsWith('.tile.openstreetmap.org'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'osm-tiles',
+              expiration: {
+                maxEntries: 250,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 jours
+                purgeOnQuotaError: true,
+              },
+              // 0 = réponses opaques (tuiles cross-origin sans CORS).
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Autocomplétion d'adresses (GET /places) : résultats très
+            // stables (noms d'arrêts, adresses). CacheFirst avec un TTL
+            // court élimine les appels répétés pour un même texte au cours
+            // d'une session (ex. effacer puis retaper).
+            urlPattern: ({ url }) => url.pathname.startsWith('/places'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'places-cache',
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 }, // 1h
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Trajets et profil (GET) : NetworkFirst - la fraîcheur prime
+            // (horaires, perturbations, profil modifié), le cache ne sert
+            // que de repli hors ligne (mode dégradé, cf. issue #10). TTL
+            // court, aligné sur la contrainte RGPD de durée de vie du cache
+            // local (dossier partie 10.2).
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/trips') ||
+              url.pathname.startsWith('/profiles'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
               networkTimeoutSeconds: 5,
-              expiration: {
-                maxEntries: 50,
-                // 1 jour : les donnees de trajet (horaires, perturbations)
-                // se perinent vite, pas la peine de les garder plus
-                // longtemps en cache (voir aussi la contrainte RGPD sur la
-                // duree de vie du cache local, dossier partie 10.2).
-                maxAgeSeconds: 60 * 60 * 24,
-              },
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 }, // 1j
               cacheableResponse: { statuses: [0, 200] },
             },
           },

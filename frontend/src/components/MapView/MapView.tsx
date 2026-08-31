@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
@@ -105,6 +106,74 @@ interface MapViewProps {
 }
 
 /**
+ * Recadre la carte de facon imperative quand la "forme" de la vue change
+ * (nouvel itineraire selectionne, passage d'un point a deux, retour a la vue
+ * par defaut...), sans remonter l'instance Leaflet.
+ *
+ * Eco-conception (issue #23, voir docs/audits/eco-conception.md section 6) :
+ * l'implementation precedente forcait un remontage complet du <MapContainer>
+ * via une `key` derivee des bounds - a chaque selection d'itineraire, tout le
+ * DOM de la carte etait detruit puis recree et l'integralite des tuiles
+ * rechargee. Ce composant enfant applique le nouveau cadrage sur la meme
+ * instance : seules les tuiles reellement nouvelles sont demandees (et le
+ * cache runtime du service worker sert celles deja vues).
+ *
+ * Les props sont volontairement toutes des scalaires (pas d'objet `bounds`
+ * ni de tuple `center`, recrees a chaque rendu de MapView et donc inutiles
+ * en dependance d'effet) : ce sont ces scalaires eux-memes qui declenchent
+ * le recadrage quand ils changent, et l'effet peut tous les lister en
+ * dependances sans avertissement `react-hooks/exhaustive-deps`.
+ *
+ * @param swLat,swLng,neLat,neLng  coins sud-ouest / nord-est du rectangle a
+ *   cadrer ; tous `undefined` quand il n'y a pas au moins deux points.
+ * @param centerLat,centerLon  centre fixe a afficher quand il n'y a pas de
+ *   rectangle (un seul point, ou vue par defaut).
+ * @param zoom  niveau de zoom associe au centre fixe.
+ * @returns rien (composant de pilotage, pas de rendu propre).
+ */
+function MapViewController({
+  swLat,
+  swLng,
+  neLat,
+  neLng,
+  centerLat,
+  centerLon,
+  zoom,
+}: {
+  swLat: number | undefined;
+  swLng: number | undefined;
+  neLat: number | undefined;
+  neLng: number | undefined;
+  centerLat: number;
+  centerLon: number;
+  zoom: number;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (
+      swLat !== undefined &&
+      swLng !== undefined &&
+      neLat !== undefined &&
+      neLng !== undefined
+    ) {
+      // Meme marge que l'ancien `boundsOptions` du <MapContainer>.
+      map.fitBounds(
+        L.latLngBounds([
+          [swLat, swLng],
+          [neLat, neLng],
+        ]),
+        { padding: [24, 24] },
+      );
+    } else {
+      map.setView([centerLat, centerLon], zoom);
+    }
+  }, [map, swLat, swLng, neLat, neLng, centerLat, centerLon, zoom]);
+
+  return null;
+}
+
+/**
  * Affichage cartographique d'un itineraire (F2, issue #8) : trace de chaque
  * segment colore selon son mode (voir modeStyles.ts), suivant les rues/voies
  * reellement parcourues (segment.geometry, decode depuis OpenTripPlanner
@@ -187,15 +256,17 @@ function MapView({
   const isFullBleed = variant === 'fullBleed';
 
   // MapContainer de react-leaflet n'applique bounds/center/zoom de facon
-  // fiable qu'au montage - la carte reste desormais montee en continu
-  // pendant tout l'etat "formulaire" (choix successif origine puis
-  // destination, #111), contrairement a avant ou chaque etat remontait une
-  // instance neuve. Cette cle force un remontage propre a chaque changement
-  // de "forme" de la vue plutot que de dependre d'un comportement reactif
-  // non garanti de react-leaflet sur ces props.
-  const viewKey = bounds
-    ? `bounds:${bounds.getSouthWest().toString()}|${bounds.getNorthEast().toString()}`
-    : `point:${fixedCenter.lat},${fixedCenter.lon}`;
+  // fiable qu'au montage. La carte reste montee en continu (une seule
+  // instance Leaflet pour toute la duree de vie du composant) ; les
+  // changements de cadrage ulterieurs sont appliques de facon imperative par
+  // <MapViewController> ci-dessous (issue #23, remplace l'ancien remontage
+  // complet du conteneur via une `key`, voir docs/audits/eco-conception.md
+  // section 6). On extrait les coins du rectangle en scalaires : passes tels
+  // quels a MapViewController, ils peuvent servir de dependances d'effet
+  // stables (un objet L.LatLngBounds serait recree a chaque rendu).
+  const sw = bounds?.getSouthWest();
+  const ne = bounds?.getNorthEast();
+  const fixedCenterTuple: [number, number] = [fixedCenter.lat, fixedCenter.lon];
 
   return (
     <div
@@ -208,11 +279,10 @@ function MapView({
         .join(' ')}
     >
       <MapContainer
-        key={viewKey}
         {...(bounds
           ? { bounds, boundsOptions: { padding: [24, 24] } }
           : {
-              center: [fixedCenter.lat, fixedCenter.lon] as [number, number],
+              center: fixedCenterTuple,
               zoom: singlePoint ? SINGLE_POINT_ZOOM : DEFAULT_ZOOM,
             })}
         // Molette : desactivee en mode 'boxed' (comportement d'origine de
@@ -228,9 +298,25 @@ function MapView({
         className="mapview-container"
         aria-hidden="true"
       >
+        {/* Applique tout changement de cadrage sur l'instance deja montee
+            (issue #23) - remplace l'ancien remontage complet du conteneur. */}
+        <MapViewController
+          swLat={sw?.lat}
+          swLng={sw?.lng}
+          neLat={ne?.lat}
+          neLng={ne?.lng}
+          centerLat={fixedCenter.lat}
+          centerLon={fixedCenter.lon}
+          zoom={singlePoint ? SINGLE_POINT_ZOOM : DEFAULT_ZOOM}
+        />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          // Éco-conception (issue #23) : ne charge les tuiles qu'une fois le
+          // pan/zoom terminé, pas à chaque frame intermédiaire - évite une
+          // rafale de requêtes tuiles pendant un geste. (Le cache runtime du
+          // service worker sert le reste depuis le disque, voir vite.config.ts.)
+          updateWhenIdle
         />
         {segments.map((segment, index) => {
           const style = getModeStyle(segment.mode);
