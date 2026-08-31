@@ -530,6 +530,11 @@ function RecherchePage() {
               destinationLabel: destinationPlace.label,
             }
           : {}),
+        // Modes de transport preferes (issue #87) : transmis seulement si au
+        // moins une case est cochee. Liste vide = filtre absent, le backend
+        // considere alors tous les modes (docs/specs/filtre-modes-transport.md
+        // section 6).
+        ...(selectedModes.length > 0 ? { transportModes: selectedModes } : {}),
       });
 
       setScreen({

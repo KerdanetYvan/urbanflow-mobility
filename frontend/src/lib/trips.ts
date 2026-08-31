@@ -46,16 +46,6 @@ export interface TripItinerary {
 
 /**
  * Parametres de recherche transmis a GET /trips (issue #7).
- *
- * Pas de champ pour les modes de transport preferes : SearchTripsDto
- * (backend) ne les accepte pas encore, et le pipeline de validation global
- * rejette toute requete avec un champ non declare (whitelist +
- * forbidNonWhitelisted, voir backend/src/main.ts) - les envoyer ferait
- * echouer l'appel avec un 400. Le formulaire de recherche (#35) les affiche
- * neanmoins (voir docs/specs/f2-ecrans-planification.md section 2.1) pour
- * suivre la spec ecran, mais ne les transmet pas encore a l'API : filtrer
- * /trips par mode est un chantier backend a part, non couvert par ce ticket
- * (voir issue #87, Stretch).
  */
 export interface SearchTripsParams {
   originLat: number;
@@ -72,6 +62,15 @@ export interface SearchTripsParams {
    */
   originLabel?: string;
   destinationLabel?: string;
+  /**
+   * Modes de transport preferes a privilegier (issue #87), valeurs alignees
+   * sur TRANSPORT_MODES (lib/profile.ts) / l'enum TransportMode backend.
+   * Envoyes uniquement quand au moins un mode est coche : une liste vide est
+   * omise, le backend considere alors tous les modes (docs/specs/
+   * filtre-modes-transport.md section 6). Transmis en parametres repetes
+   * (`transportModes=bus&transportModes=tram`).
+   */
+  transportModes?: string[];
 }
 
 /**
@@ -101,6 +100,12 @@ export function searchTrips(params: SearchTripsParams): Promise<TripItinerary[]>
       ? { destinationLabel: params.destinationLabel }
       : {}),
   });
+  // Modes preferes (issue #87) : un parametre repete par mode
+  // (`transportModes=bus&transportModes=tram`), forme geree par le
+  // @Transform de SearchTripsDto. Rien ajoute si la liste est vide/absente.
+  for (const mode of params.transportModes ?? []) {
+    query.append('transportModes', mode);
+  }
   return apiGetWithOptionalAuth<TripItinerary[]>(`/trips?${query.toString()}`);
 }
 

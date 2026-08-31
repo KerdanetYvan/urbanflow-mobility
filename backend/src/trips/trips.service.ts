@@ -54,6 +54,9 @@ export class TripsService {
         departureTime: dto.departureTime
           ? new Date(dto.departureTime)
           : undefined,
+        // Filtre de modes préférés (issue #87) - transmis tel quel, la
+        // traduction en paramètre OTP est faite par OtpClientService.
+        transportModes: dto.transportModes,
       }),
       userId ? this.profilesService.findByUserIdOrNull(userId) : null,
       userId ? this.tripHistoryService.record(userId, dto) : null,

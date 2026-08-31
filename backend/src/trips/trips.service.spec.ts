@@ -1,3 +1,4 @@
+import { TransportMode } from '../profiles/transport-mode.enum';
 import { ScoringService } from '../scoring/scoring.service';
 import { TripsService } from './trips.service';
 
@@ -57,6 +58,24 @@ describe('TripsService', () => {
 
     expect(otpClient.planTrip).toHaveBeenCalledWith(
       expect.objectContaining({ departureTime: undefined }),
+    );
+  });
+
+  it('transmet les modes de transport preferes tels quels a OtpClientService (issue #87)', async () => {
+    otpClient.planTrip.mockResolvedValue([]);
+
+    await service.search({
+      originLat: 48.85,
+      originLon: 2.35,
+      destinationLat: 48.86,
+      destinationLon: 2.36,
+      transportModes: [TransportMode.BUS, TransportMode.TRAM],
+    });
+
+    expect(otpClient.planTrip).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transportModes: [TransportMode.BUS, TransportMode.TRAM],
+      }),
     );
   });
 
