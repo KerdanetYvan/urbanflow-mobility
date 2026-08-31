@@ -10,6 +10,8 @@ import type {
   OtpItinerary,
   OtpPlanResponse,
 } from './interfaces/otp-plan-response.interface';
+import { toOtpModeParam } from './otp-modes';
+import type { TransportMode } from '../profiles/transport-mode.enum';
 
 export interface PlanTripParams {
   originLat: number;
@@ -18,6 +20,12 @@ export interface PlanTripParams {
   destinationLon: number;
   /** Absent = "maintenant" au moment de l'appel. */
   departureTime?: Date;
+  /**
+   * Modes de transport préférés à privilégier (issue #87, SearchTripsDto).
+   * Absent ou vide = aucun filtre (tous les transports en commun). Traduit
+   * en paramètre `mode` d'OTP par toOtpModeParam.
+   */
+  transportModes?: TransportMode[];
 }
 
 /**
@@ -139,11 +147,12 @@ export class OtpClientService {
     );
     url.searchParams.set('date', this.formatDate(departure, timeZone));
     url.searchParams.set('time', this.formatTime(departure, timeZone));
-    // TRANSIT+WALK : les seuls modes que notre jeu de donnees de test
-    // (routing-engine/test-fixtures/) sait vraiment planifier (voir son
-    // README) - velo/trottinette (GBFS, F3) et covoiturage ne sont pas
-    // encore integres a OTP, a ajouter avec leurs issues dediees.
-    url.searchParams.set('mode', 'TRANSIT,WALK');
+    // Modes préférés (issue #87) traduits en paramètre `mode` d'OTP :
+    // `TRANSIT,WALK` par défaut (aucun filtre), sinon `WALK` + les
+    // transports en commun retenus. Vélo/trottinette (GBFS, F3) et
+    // covoiturage ne sont pas encore intégrés à OTP - ignorés au routage
+    // même si cochés (voir otp-modes.ts).
+    url.searchParams.set('mode', toOtpModeParam(params.transportModes));
     url.searchParams.set('numItineraries', '5');
 
     return url.toString();

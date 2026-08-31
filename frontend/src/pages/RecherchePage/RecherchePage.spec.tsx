@@ -424,6 +424,48 @@ describe('RecherchePage', () => {
 
       expect(screen.getByRole('checkbox', { name: 'Tram' })).toBeChecked();
     });
+
+    it('transmet les modes coches a GET /trips au lancement de la recherche (issue #87)', async () => {
+      vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+        Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+      );
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue([]);
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Bus' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Métro' }));
+
+      await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+      await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+      await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => {
+        expect(tripsLib.searchTrips).toHaveBeenCalledWith(
+          expect.objectContaining({ transportModes: ['bus', 'metro'] }),
+        );
+      });
+    });
+
+    it('omet transportModes quand aucun mode n\'est coche (issue #87, filtre absent = tous les modes)', async () => {
+      vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+        Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+      );
+      vi.mocked(tripsLib.searchTrips).mockResolvedValue([]);
+      const user = userEvent.setup();
+      renderPage();
+
+      await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+      await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+      await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => {
+        expect(tripsLib.searchTrips).toHaveBeenCalled();
+      });
+      const [params] = vi.mocked(tripsLib.searchTrips).mock.calls[0];
+      expect(params).not.toHaveProperty('transportModes');
+    });
   });
 
   it("transmet accessibilityPreferences du profil connecte a l'ecran de resultats, pour le badge cible de scoring (issue #126)", async () => {

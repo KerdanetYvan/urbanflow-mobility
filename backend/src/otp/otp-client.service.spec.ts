@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { TransportMode } from '../profiles/transport-mode.enum';
 import { OtpClientService } from './otp-client.service';
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
@@ -71,6 +72,21 @@ describe('OtpClientService', () => {
     expect(calledUrl.searchParams.get('mode')).toBe('TRANSIT,WALK');
     expect(calledUrl.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(calledUrl.searchParams.get('time')).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it("traduit les modes de transport préférés en paramètre `mode` d'OTP (issue #87)", async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ plan: { itineraries: [] } }));
+
+    await service.planTrip({
+      originLat: 48.85,
+      originLon: 2.35,
+      destinationLat: 48.86,
+      destinationLon: 2.36,
+      transportModes: [TransportMode.BUS, TransportMode.METRO],
+    });
+
+    const calledUrl = new URL(fetchSpy.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get('mode')).toBe('WALK,BUS,SUBWAY');
   });
 
   it("renvoie un tableau vide quand OTP repond avec une erreur 'aucun trajet' (id != 400)", async () => {

@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
+  IsEnum,
   IsISO8601,
   IsLatitude,
   IsLongitude,
@@ -8,6 +10,7 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
+import { TransportMode } from '../../profiles/transport-mode.enum';
 
 /**
  * Parametres de GET /trips (issue #7).
@@ -72,4 +75,36 @@ export class SearchTripsDto {
   @IsString()
   @MaxLength(200)
   destinationLabel?: string;
+
+  /**
+   * Modes de transport préférés à privilégier pour cette recherche (issue
+   * #87), alignés sur l'enum TransportMode (profiles/transport-mode.enum.ts).
+   *
+   * Accepté sous deux formes en query string, normalisées en tableau par le
+   * @Transform ci-dessous :
+   *   - paramètre répété : `?transportModes=bus&transportModes=tram`
+   *   - liste séparée par des virgules : `?transportModes=bus,tram`
+   *
+   * Absent ou vide = aucun filtre, tous les modes considérés (comportement
+   * historique, docs/specs/filtre-modes-transport.md section 6). Les modes
+   * pas encore routables par OTP (vélo/trottinette GBFS, covoiturage) sont
+   * acceptés ici mais ignorés au calcul d'itinéraire (voir otp-modes.ts).
+   */
+  @ApiPropertyOptional({
+    enum: TransportMode,
+    isArray: true,
+    example: [TransportMode.BUS, TransportMode.TRAM],
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }): unknown =>
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((mode) => mode.trim())
+          .filter(Boolean)
+      : value,
+  )
+  @IsArray()
+  @IsEnum(TransportMode, { each: true })
+  transportModes?: TransportMode[];
 }
