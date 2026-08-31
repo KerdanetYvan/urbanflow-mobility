@@ -231,6 +231,11 @@ function MapView({
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          // Éco-conception (issue #23) : ne charge les tuiles qu'une fois le
+          // pan/zoom terminé, pas à chaque frame intermédiaire - évite une
+          // rafale de requêtes tuiles pendant un geste. (Le cache runtime du
+          // service worker sert le reste depuis le disque, voir vite.config.ts.)
+          updateWhenIdle
         />
         {segments.map((segment, index) => {
           const style = getModeStyle(segment.mode);

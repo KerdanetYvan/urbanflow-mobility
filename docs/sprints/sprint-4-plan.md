@@ -54,7 +54,7 @@ En cas de doute (case pas à jour, session interrompue en plein travail), vérif
 
 ### Phase E — F3/Scoring déjà en Stretch avant cette clôture
 
-- [ ] [#23](https://github.com/KerdanetYvan/urbanflow-mobility/issues/23) (Dev FE) — Éco-conception : limiter les appels réseau
+- [*] [#23](https://github.com/KerdanetYvan/urbanflow-mobility/issues/23) (Dev FE) — Éco-conception : limiter les appels réseau
 - [ ] [#13](https://github.com/KerdanetYvan/urbanflow-mobility/issues/13) (Dev BE) — Ingestion des flux GBFS (vélos/trottinettes libre-service)
 - [ ] [#14](https://github.com/KerdanetYvan/urbanflow-mobility/issues/14) (Dev BE) — Abonnement aux mises à jour GTFS-Realtime
 - [ ] [#18](https://github.com/KerdanetYvan/urbanflow-mobility/issues/18) (Dev BE/FE) — Recalcul automatique et notification push sur perturbation — dépend de #14
