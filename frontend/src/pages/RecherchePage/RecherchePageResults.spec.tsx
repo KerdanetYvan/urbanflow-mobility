@@ -404,6 +404,38 @@ describe('RecherchePageResults', () => {
     ).toBeInTheDocument();
   });
 
+  it('affiche le repli "prochain creneau" comme un resultat normal, avec un bandeau heure demandee -> heure reelle (issue #91)', () => {
+    // Demandé à 22:00, prochain trajet le lendemain à 08:00.
+    const laterItinerary: TripItinerary = {
+      ...FAST_ITINERARY,
+      startTime: '2026-08-03T06:00:00.000Z',
+      endTime: '2026-08-03T06:25:00.000Z',
+    };
+
+    const { container } = renderResults(
+      [laterItinerary],
+      undefined,
+      undefined,
+      {
+        kind: 'later-departure',
+        requestedDepartureTime: '2026-08-02T20:00:00.000Z',
+        actualDepartureTime: '2026-08-03T06:00:00.000Z',
+      },
+    );
+
+    const listPanel = container.querySelector(
+      '.resultats-panel-list',
+    ) as HTMLElement;
+    const note = within(listPanel).getByText(/Aucun trajet à \d{2}:\d{2}/);
+    // "Aucun trajet à HH:mm. Prochain trajet <jour> à HH:mm."
+    expect(note).toHaveTextContent(/Prochain trajet .*\d{2}:\d{2}\.?$/);
+    // Un vrai resultat est affiche en dessous (pas l'etat vide).
+    expect(container.querySelector('.resultats-empty')).not.toBeInTheDocument();
+    expect(
+      within(listPanel).getByRole('button', { name: /min/ }),
+    ).toBeInTheDocument();
+  });
+
   describe('badges de ligne par mode de transport (issue #129)', () => {
     it('affiche un badge de ligne avec le numero de ligne pour un segment BUS, a la place de l icone', () => {
       const { container } = renderResults([FAST_ITINERARY]);

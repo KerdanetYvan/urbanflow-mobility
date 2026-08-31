@@ -105,6 +105,30 @@ describe('OtpClientService', () => {
     expect(calledUrl.searchParams.get('mode')).toBe('WALK');
   });
 
+  it('ajoute searchWindow seulement quand searchWindowSeconds est fourni (prochain créneau, issue #91)', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ plan: { itineraries: [] } }));
+    const base = {
+      originLat: 48.85,
+      originLon: 2.35,
+      destinationLat: 48.86,
+      destinationLon: 2.36,
+    };
+
+    await service.planTrip(base);
+    expect(
+      new URL(fetchSpy.mock.calls[0][0] as string).searchParams.has(
+        'searchWindow',
+      ),
+    ).toBe(false);
+
+    await service.planTrip({ ...base, searchWindowSeconds: 24 * 60 * 60 });
+    expect(
+      new URL(fetchSpy.mock.calls[1][0] as string).searchParams.get(
+        'searchWindow',
+      ),
+    ).toBe('86400');
+  });
+
   it("renvoie un tableau vide quand OTP repond avec une erreur 'aucun trajet' (id != 400)", async () => {
     fetchSpy.mockResolvedValue(
       jsonResponse({ error: { id: 404, message: 'PATH_NOT_FOUND' } }),
