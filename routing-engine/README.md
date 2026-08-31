@@ -44,6 +44,16 @@ rm routing-engine/data/bretagne-latest.osm.pbf
 
 (Même remarque que pour l'extrait ligne-a : sous Git Bash/Windows, préfixer `docker run` avec `MSYS_NO_PATHCONV=1` si le montage `/data` est mal interprété.)
 
+**Alternative si Geofabrik est indisponible** (rencontré en session le 2026-08-31, HTTP 502 côté Geofabrik) : `download.openstreetmap.fr` fournit des extraits au **département**. `ille_et_vilaine.osm.pbf` (~105 Mo, plus léger que toute la Bretagne) couvre entièrement Rennes Métropole — même découpe `osmium` ensuite, source différente :
+
+```bash
+curl -L "https://download.openstreetmap.fr/extracts/europe/france/bretagne/ille_et_vilaine.osm.pbf" -o routing-engine/data/ille-et-vilaine.osm.pbf
+docker run --rm -v "$(pwd)/routing-engine/data:/data" ubuntu:24.04 bash -c "apt-get update -qq && apt-get install -y -qq osmium-tool && osmium extract --bbox -1.95,47.97,-1.48,48.30 /data/ille-et-vilaine.osm.pbf -o /data/osm-metropole.osm.pbf --overwrite"
+rm routing-engine/data/ille-et-vilaine.osm.pbf
+```
+
+Vérifié en session : `osm-metropole.osm.pbf` de 38 Mo (~3,2 M nœuds), graphe OTP construit en ~60 s avec le vrai flux STAR (1804 arrêts, 155 lignes, 70 183 courses) ; `GET /trips` République → Beaulieu-Université renvoie bien un segment `SUBWAY` ligne `b`.
+
 **Vérifié manuellement (de-risking local avant déploiement)** : avec `gtfs-metropole.zip` (#12) + `osm-metropole.osm.pbf` dans `data/`, OTP construit le graphe complet en 36s (`Graph built. |V|=157,499 |E|=410,038`, `Transit built. |Stops|=1,496 |Patterns|=347`) et le sert sans erreur. Pic mémoire mesuré via `docker stats` pendant le build et une fois stabilisé : **2,79 Go**, très en dessous du budget du VPS-2 cible (8 Go, partagés avec `postgres`/`postfix`/`backend`) — pas besoin de contraindre le heap JVM (`JAVA_TOOL_OPTIONS=-Xmx...`, supporté par l'image si un jour nécessaire). `GET /otp/routers/default/plan` entre J.F. Kennedy et La Poterie renvoie bien un segment `SUBWAY` sur la ligne `a`, cette fois depuis le graphe métropolitain complet (pas l'extrait borné de #90).
 
 ### Runbook de bootstrap initial (premier déploiement avec données réelles)
