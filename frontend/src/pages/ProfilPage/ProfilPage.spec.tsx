@@ -325,6 +325,28 @@ describe('ProfilPage', () => {
       );
     });
 
+    it(
+      'ne montre aucun dropdown au focus des champs domicile/travail vides ' +
+        '(issue #166, spec section 6)',
+      async () => {
+        mockExistingProfile();
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(await screen.findByLabelText('Domicile'));
+
+        // Les entrées rapides de /recherche ("Ma position actuelle",
+        // "Recherché récemment"...) sont un comportement opt-in : ProfilPage
+        // ne l'active pas, le champ reste au géocodeur seul dès 2 caractères.
+        expect(
+          screen.queryByRole('button', { name: /Ma position actuelle/ }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText('Recherché récemment'),
+        ).not.toBeInTheDocument();
+      },
+    );
+
     it('envoie la nouvelle adresse travail selectionnee, sans toucher au domicile (laisse vide)', async () => {
       mockExistingProfile();
       vi.mocked(placesLib.searchPlaces).mockResolvedValue([RUE_DE_LA_PAIX]);

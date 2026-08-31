@@ -65,7 +65,7 @@ Soit, au maximum : 1 (position) + 1 (domicile) + 1 (travail) + 4 (historique) = 
 - Pour chaque entrée d'historique, dans l'ordre (plus récent d'abord), produire **deux** `PlaceSuggestion` candidates : son origine et sa destination (via la même conversion que `entryToPlaces` — libellé enregistré, ou coordonnées formatées en repli).
 - **Dédupliquer** par coordonnées arrondies (même clé que celle utilisée pour les `key` React de la liste de suggestions : `lat`-`lon`), en gardant la première occurrence (donc la plus récente).
 - **Exclure** de cette liste : l'adresse déjà retenue pour Domicile et celle retenue pour Travail (éviter d'afficher deux fois la même adresse sous deux étiquettes), ainsi que la valeur déjà sélectionnée dans **l'autre** champ (ne pas proposer comme destination l'origine qu'on vient de choisir).
-- Tronquer à **3**.
+- Tronquer à **4** (`MAX_RECENT_ADDRESSES`, voir section 3.1).
 
 Cette dérivation est faite côté `RecherchePage` (qui détient déjà `historyEntries`, `homeShortcut`, `workShortcut`) et passée à `AddressField` en props — `AddressField` reste un composant de présentation sans logique métier, comme aujourd'hui.
 

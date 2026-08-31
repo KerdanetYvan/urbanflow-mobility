@@ -51,6 +51,46 @@
   background: var(--color-bg-subtle);
 }
 
+/* Entrées rapides (issue #166, docs/specs/fusion-autocomplete-raccourcis.md) :
+   même conteneur/liste que les suggestions du géocodeur, mais chaque bouton
+   porte une icône + deux lignes (titre = rôle, sous-titre = adresse). */
+.address-quick-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.address-quick-entry-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.address-quick-entry-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* laisse l'ellipsis opérer sur les deux lignes ci-dessous */
+}
+
+.address-quick-entry-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.address-quick-entry-subtitle {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.address-quick-entry:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 /* Annonce le nombre de suggestions aux lecteurs d'ecran (aria-live) sans
    rien afficher visuellement - le contenu reste accessible au clavier via
    la liste elle-meme, ce texte n'est qu'un complement pour lecteur
