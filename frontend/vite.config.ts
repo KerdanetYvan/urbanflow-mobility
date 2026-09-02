@@ -90,6 +90,23 @@ export default defineConfig({
             },
           },
           {
+            // Stations/vehicules en libre-service (GET /shared-mobility-stations,
+            // issue #13) : NetworkFirst avec un TTL tres court - le backend
+            // rafraichit deja son propre cache toutes les minutes
+            // (GbfsCacheService), un TTL plus long ici resservirait des
+            // compteurs de disponibilite perimes. Le cache ne sert que de
+            // repli hors ligne (mode dégradé, issue #10), jamais de source
+            // de fraicheur.
+            urlPattern: ({ url }) => url.pathname.startsWith('/shared-mobility-stations'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'shared-mobility-cache',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 5, maxAgeSeconds: 60 }, // 1 min
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Trajets et profil (GET) : NetworkFirst - la fraîcheur prime
             // (horaires, perturbations, profil modifié), le cache ne sert
             // que de repli hors ligne (mode dégradé, cf. issue #10). TTL

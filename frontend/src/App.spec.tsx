@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import * as profileLib from './lib/profile';
 import * as authLib from './lib/auth';
 import { saveTokens, clearTokens } from './lib/authStorage';
+import * as sharedMobilityLib from './lib/sharedMobility';
 import { fakeJwt } from './test/fakeJwt';
 import App from './App';
 
@@ -17,6 +18,12 @@ vi.mock('./lib/profile', async () => {
     await vi.importActual<typeof import('./lib/profile')>('./lib/profile');
   return { ...actual, getMyProfile: vi.fn() };
 });
+
+// La route racine ('/') rend RecherchePage, qui affiche MapView en
+// permanence (issue #110) - celle-ci charge les stations en libre-service
+// au montage (issue #13). Meme raisonnement que lib/profile ci-dessus :
+// evite un vrai appel reseau dans ce fichier de test de navigation.
+vi.mock('./lib/sharedMobility');
 
 // MemoryRouter simule un historique de navigation en memoire (pas besoin
 // d'un vrai navigateur ni de jsdom.location) : utile pour tester le routing
@@ -32,6 +39,9 @@ function renderApp(initialPath = '/') {
 describe('App (navigation)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
+      [],
+    );
   });
 
   afterEach(() => {

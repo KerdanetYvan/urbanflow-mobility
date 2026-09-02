@@ -1,6 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import * as sharedMobilityLib from '../../lib/sharedMobility';
+import type { SharedMobilityStation } from '../../lib/sharedMobility';
 import type { TripItinerary } from '../../lib/trips';
 import MapView from './MapView';
+
+// Stations en libre-service (issue #13) : MapView les charge au montage via
+// useSharedMobilityStations - mocke pour ne jamais dependre d'un vrai appel
+// reseau dans les tests (meme raisonnement que lib/places dans
+// RecherchePage.spec.tsx). Valeur par defaut vide : les tests existants
+// (aucun rapport avec cette fonctionnalite) n'ont pas a s'en soucier.
+vi.mock('../../lib/sharedMobility');
 
 const ITINERARY: TripItinerary = {
   startTime: '2026-08-02T08:00:00.000Z',
@@ -40,6 +49,12 @@ const ITINERARY: TripItinerary = {
 };
 
 describe('MapView', () => {
+  beforeEach(() => {
+    vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
+      [],
+    );
+  });
+
   it("affiche un resume textuel et une legende des modes utilises (alternative a la carte)", () => {
     render(<MapView itinerary={ITINERARY} />);
 
@@ -155,6 +170,60 @@ describe('MapView', () => {
       // seule fois, pas "Bus Bus" (issue #129, regression finale review).
       expect(screen.getByText('Bus')).toBeInTheDocument();
       expect(screen.queryByText('Bus Bus')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('stations/vehicules en libre-service (issue #13)', () => {
+    const STATIONS: SharedMobilityStation[] = [
+      {
+        id: '5501',
+        name: 'République',
+        lat: 48.11,
+        lon: -1.68,
+        kind: 'station',
+        bikesAvailable: 4,
+        docksAvailable: 41,
+        isRenting: true,
+      },
+      {
+        id: '5502',
+        name: 'Gares',
+        lat: 48.1,
+        lon: -1.67,
+        kind: 'station',
+        bikesAvailable: 0,
+        docksAvailable: 0,
+        isRenting: false,
+      },
+    ];
+
+    it('affiche un marqueur par station renvoyee par GET /shared-mobility-stations', async () => {
+      vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
+        STATIONS,
+      );
+
+      const { container } = render(<MapView />);
+
+      // Vue par defaut (aucune prop origine/destination/itineraire) : les
+      // seuls marqueurs possibles sont ceux des stations, voir le test
+      // "vue par defaut" plus haut qui etablit ce meme fait sans elles.
+      await waitFor(() => {
+        expect(container.querySelectorAll('.mapview-marker')).toHaveLength(2);
+      });
+    });
+
+    it("colore differemment une station sans velo disponible (badge '0')", async () => {
+      vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
+        STATIONS,
+      );
+
+      const { container } = render(<MapView />);
+
+      await waitFor(() => {
+        expect(container.querySelectorAll('.mapview-marker')).toHaveLength(2);
+      });
+      const badges = Array.from(container.querySelectorAll('.mapview-marker svg text'));
+      expect(badges.map((badge) => badge.textContent)).toEqual(['4', '0']);
     });
   });
 });
