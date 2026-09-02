@@ -43,24 +43,50 @@
   font-size: var(--text-sm);
 }
 
+/* Disposition compacte (issue #233) : ligne (bouton d'inversion a gauche +
+   colonne origine/destination a droite) plutot que l'ancienne colonne
+   unique ou le bouton occupait sa propre "ligne" entre les deux champs -
+   recupere l'espace vertical qu'il consommait seul. */
 .recherche-addresses {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--space-2);
 }
 
-/* Bouton "Inverser origine/destination" centre entre les deux champs, jamais
-   au bout d'une longue liste de champs optionnels (section 2.2 de la spec). */
+/* Colonne origine/destination (issue #233) : les deux AddressField
+   s'empilent naturellement a hauteur egale (contenu intrinsequement
+   identique, pas de contrainte de hauteur explicite necessaire) - le
+   `gap` remplace l'espacement individuel de chaque champ, neutralise
+   ci-dessous (.field, normalement margin-bottom: var(--space-5)) pour
+   eviter un double espacement gap + marge. */
+.recherche-addresses-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.recherche-addresses-fields .field {
+  margin-bottom: 0;
+}
+
+/* Bouton "Inverser origine/destination" (issue #233) : colonne pleine
+   hauteur a gauche des deux champs (empilement conserve a droite, donc la
+   meme icone a fleches verticales - components/icons.tsx#SwapIcon - reste
+   pertinente sans rotation). Largeur cible 10-20% de la largeur totale
+   (retour utilisateur en session) : un rem fixe plutot qu'un pourcentage
+   pour rester lisible/cliquable meme sur les tres petits ecrans, ou un
+   pourcentage deviendrait trop etroit pour la cible tactile minimale. */
 .recherche-swap {
-  align-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
-  margin: calc(var(--space-2) * -1) 0;
+  align-self: stretch;
+  width: 3.5rem;
+  min-width: var(--touch-target-min);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text);
   cursor: pointer;

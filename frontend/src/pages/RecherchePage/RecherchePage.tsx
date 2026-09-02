@@ -846,31 +846,13 @@ function RecherchePage() {
           onSubmit={(event) => void handleSubmit(event)}
           className="recherche-form"
         >
+          {/* Disposition compacte (issue #233) : le bouton d'inversion
+              n'occupe plus sa propre "ligne" entre les deux champs (ancien
+              positionnement centre avec marge negative, voir git blame) -
+              il devient une colonne pleine hauteur a gauche d'une colonne
+              origine/destination empilee, qui recupere l'espace vertical
+              que le bouton consommait seul. */}
           <div className="recherche-addresses">
-            <AddressField
-              id="origin-address"
-              label="Origine"
-              value={origin.query}
-              suggestions={originSuggestions}
-              error={fieldErrors.origin}
-              quickEntries={buildQuickEntries('origin')}
-              onChange={(value) =>
-                setOrigin({ query: value, selected: null })
-              }
-              onSelect={(place) =>
-                setOrigin({ query: place.label, selected: place })
-              }
-            />
-
-            {/* Erreur de géolocalisation (permission refusée, indisponible) :
-                sous le champ, hors du dropdown (issue #166, spec section 4) -
-                l'entrée "Ma position actuelle" du dropdown, elle, se referme
-                dès que la valeur du champ change ou que l'utilisateur clique
-                ailleurs. */}
-            {positionError && (
-              <p className="recherche-position-error">{positionError}</p>
-            )}
-
             <button
               type="button"
               className="recherche-swap"
@@ -880,20 +862,48 @@ function RecherchePage() {
               <SwapIcon />
             </button>
 
-            <AddressField
-              id="destination-address"
-              label="Destination"
-              value={destination.query}
-              suggestions={destinationSuggestions}
-              error={fieldErrors.destination}
-              quickEntries={buildQuickEntries('destination')}
-              onChange={(value) =>
-                setDestination({ query: value, selected: null })
-              }
-              onSelect={(place) =>
-                setDestination({ query: place.label, selected: place })
-              }
-            />
+            <div className="recherche-addresses-fields">
+              <AddressField
+                id="origin-address"
+                label="Origine"
+                value={origin.query}
+                suggestions={originSuggestions}
+                error={fieldErrors.origin}
+                quickEntries={buildQuickEntries('origin')}
+                hideLabel
+                onChange={(value) =>
+                  setOrigin({ query: value, selected: null })
+                }
+                onSelect={(place) =>
+                  setOrigin({ query: place.label, selected: place })
+                }
+              />
+
+              {/* Erreur de géolocalisation (permission refusée, indisponible) :
+                  sous le champ, hors du dropdown (issue #166, spec section 4) -
+                  l'entrée "Ma position actuelle" du dropdown, elle, se referme
+                  dès que la valeur du champ change ou que l'utilisateur clique
+                  ailleurs. */}
+              {positionError && (
+                <p className="recherche-position-error">{positionError}</p>
+              )}
+
+              <AddressField
+                id="destination-address"
+                label="Destination"
+                value={destination.query}
+                suggestions={destinationSuggestions}
+                error={fieldErrors.destination}
+                quickEntries={buildQuickEntries('destination')}
+                hideLabel
+                onChange={(value) =>
+                  setDestination({ query: value, selected: null })
+                }
+                onSelect={(place) =>
+                  setDestination({ query: place.label, selected: place })
+                }
+              />
+            </div>
           </div>
 
           {/* Bouton dedie toujours visible (issue #108/#109, voir

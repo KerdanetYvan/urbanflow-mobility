@@ -45,6 +45,12 @@ interface AddressFieldProps {
    * comportement historique inchangé (issue #166, spec section 6).
    */
   quickEntries?: AddressQuickEntry[];
+  /**
+   * Rendu compact (issue #233, champs origine/destination de /recherche) :
+   * transmis tel quel à `FormField` - voir son commentaire pour le detail
+   * (label toujours dans le DOM, juste masque visuellement).
+   */
+  hideLabel?: boolean;
 }
 
 /**
@@ -75,6 +81,7 @@ function AddressField({
   onChange,
   onSelect,
   quickEntries,
+  hideLabel,
 }: AddressFieldProps) {
   // Focus quelque part DANS le champ (input ou une entrée rapide) : piloté par
   // les gestionnaires focus/blur du conteneur, qui se propagent depuis les
@@ -125,6 +132,7 @@ function AddressField({
         onChange={(event) => onChange(event.target.value)}
         error={error}
         autoComplete="off"
+        hideLabel={hideLabel}
       />
       <div aria-live="polite" className="address-field-sr-only">
         {showSuggestions
