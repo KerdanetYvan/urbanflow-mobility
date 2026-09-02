@@ -35,6 +35,10 @@ fix(frontend): corrige l'affichage de la carte sur mobile
 docs(claude): met à jour les conventions de nommage
 ```
 
+## Environnement
+
+Node **20** (voir `.nvmrc` à la racine, aligné sur la version utilisée par la CI GitHub Actions — `nvm use`) — recommandé même si non strictement imposé (`engines` non renseigné dans les `package.json`, projet mené en solo, pas de contrainte à faire respecter à d'autres contributeurs). Le seul cas où une version plus récente posait problème était corrigé par ailleurs (issue #222, conflit entre le `localStorage` global expérimental de Node 22+ et celui de jsdom dans les tests frontend) — s'aligner sur `.nvmrc` reste la voie la plus simple pour éviter toute autre divergence future avec la CI.
+
 ## Avant d'ouvrir une Pull Request
 
 1. Vérifier que les tests passent (`npm test` dans `frontend/` ou `backend/`)

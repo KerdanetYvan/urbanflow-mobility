@@ -25,7 +25,7 @@ Framework : **Vitest** + **React Testing Library** (`@testing-library/react`, `@
 
 - Environnement simulé : `jsdom` (voir `vite.config.ts`, clé `test`).
 - `globals: true` : `describe`/`it`/`expect` disponibles sans import (cohérent avec Jest côté backend).
-- `src/test/setup.ts` : chargé avant chaque fichier de test, ajoute les matchers `jest-dom`.
+- `src/test/setup.ts` : chargé avant chaque fichier de test, ajoute les matchers `jest-dom` **et** remplace `localStorage` par une implémentation en mémoire (issue #222) — Node 22+ expose un accesseur `localStorage` global expérimental qui masque celui de jsdom (`get`/`set` qui ne stockent rien sans le flag CLI `--localstorage-file`), faisant échouer en cascade toute suite touchant `localStorage` (directement ou via `authStorage.ts`/`AuthProvider`). Aucune configuration ni variable d'environnement à connaître : `npm test` fonctionne nativement quelle que soit la version de Node installée.
 
 Convention de nommage : `<composant>.spec.tsx` (ou `.spec.ts` pour un fichier non-JSX), **colocalisé** à côté du fichier testé — même convention que le backend (`src/App.tsx` → `src/App.spec.tsx`).
 
