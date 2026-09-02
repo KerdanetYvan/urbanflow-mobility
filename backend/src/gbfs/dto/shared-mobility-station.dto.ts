@@ -18,10 +18,17 @@ export type SharedMobilityKind = 'station' | 'vehicle';
 export class SharedMobilityStation {
   @ApiProperty({
     description:
-      'Identifiant stable cote operateur (station_id ou bike_id du flux GBFS)',
+      "Identifiant stable cote operateur (station_id ou bike_id du flux GBFS) - unique au sein d'un operateur, PAS forcement entre operateurs (voir operatorId pour lever toute ambiguite si plusieurs operateurs sont configures, issue #15).",
     example: '5501',
   })
   id: string;
+
+  @ApiProperty({
+    description:
+      "Identifiant de l'operateur source (MobilityOperatorConfig#id, issue #15) - permet de distinguer deux stations qui partageraient le meme id entre deux operateurs differents une fois leurs flux fusionnes.",
+    example: 'star-rennes',
+  })
+  operatorId: string;
 
   @ApiProperty({
     required: false,

@@ -10,6 +10,7 @@ function jsonResponse(body: unknown, ok = true, status = 200): Response {
 }
 
 const DISCOVERY_URL = 'https://operateur.example/gbfs/gbfs.json';
+const OPERATOR_ID = 'operateur-test';
 
 describe('GbfsClientService', () => {
   let service: GbfsClientService;
@@ -94,11 +95,12 @@ describe('GbfsClientService', () => {
       },
     });
 
-    const result = await service.fetchStations(DISCOVERY_URL);
+    const result = await service.fetchStations(DISCOVERY_URL, OPERATOR_ID);
 
     expect(result).toEqual([
       {
         id: '5501',
+        operatorId: OPERATOR_ID,
         name: 'République',
         lat: 48.110026,
         lon: -1.678037,
@@ -124,7 +126,7 @@ describe('GbfsClientService', () => {
       },
     });
 
-    const [station] = await service.fetchStations(DISCOVERY_URL);
+    const [station] = await service.fetchStations(DISCOVERY_URL, OPERATOR_ID);
     expect(station.isRenting).toBe(false);
   });
 
@@ -142,7 +144,7 @@ describe('GbfsClientService', () => {
       },
     });
 
-    const [station] = await service.fetchStations(DISCOVERY_URL);
+    const [station] = await service.fetchStations(DISCOVERY_URL, OPERATOR_ID);
     expect(station.docksAvailable).toBe(14);
   });
 
@@ -154,9 +156,10 @@ describe('GbfsClientService', () => {
       status: { data: { stations: [] } },
     });
 
-    const [station] = await service.fetchStations(DISCOVERY_URL);
+    const [station] = await service.fetchStations(DISCOVERY_URL, OPERATOR_ID);
     expect(station).toMatchObject({
       id: 'orpheline',
+      operatorId: OPERATOR_ID,
       bikesAvailable: 0,
       isRenting: false,
     });
@@ -218,11 +221,12 @@ describe('GbfsClientService', () => {
       return Promise.reject(new Error(`URL inattendue dans le test : ${url}`));
     });
 
-    const result = await service.fetchStations(DISCOVERY_URL);
+    const result = await service.fetchStations(DISCOVERY_URL, OPERATOR_ID);
 
     expect(result).toEqual([
       {
         id: 'v1',
+        operatorId: OPERATOR_ID,
         lat: 48.1,
         lon: -1.6,
         kind: 'vehicle',
@@ -235,13 +239,17 @@ describe('GbfsClientService', () => {
   it('renvoie un tableau vide (sans exception) si le fichier de decouverte est injoignable', async () => {
     fetchSpy.mockRejectedValue(new Error('ECONNREFUSED'));
 
-    await expect(service.fetchStations(DISCOVERY_URL)).resolves.toEqual([]);
+    await expect(
+      service.fetchStations(DISCOVERY_URL, OPERATOR_ID),
+    ).resolves.toEqual([]);
   });
 
   it('renvoie un tableau vide si le fichier de decouverte repond en erreur HTTP', async () => {
     fetchSpy.mockResolvedValue(jsonResponse(null, false, 503));
 
-    await expect(service.fetchStations(DISCOVERY_URL)).resolves.toEqual([]);
+    await expect(
+      service.fetchStations(DISCOVERY_URL, OPERATOR_ID),
+    ).resolves.toEqual([]);
   });
 
   it("renvoie un tableau vide si aucun feed exploitable n'est publie (ni station_information, ni free_bike_status)", async () => {
@@ -253,7 +261,9 @@ describe('GbfsClientService', () => {
       }),
     );
 
-    await expect(service.fetchStations(DISCOVERY_URL)).resolves.toEqual([]);
+    await expect(
+      service.fetchStations(DISCOVERY_URL, OPERATOR_ID),
+    ).resolves.toEqual([]);
   });
 
   it('renvoie un tableau vide si station_information repond en JSON illisible', async () => {
@@ -283,6 +293,8 @@ describe('GbfsClientService', () => {
       } as unknown as Response);
     });
 
-    await expect(service.fetchStations(DISCOVERY_URL)).resolves.toEqual([]);
+    await expect(
+      service.fetchStations(DISCOVERY_URL, OPERATOR_ID),
+    ).resolves.toEqual([]);
   });
 });

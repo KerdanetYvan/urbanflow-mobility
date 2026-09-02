@@ -7,6 +7,7 @@ describe('GbfsController', () => {
     const stations: SharedMobilityStation[] = [
       {
         id: '5501',
+        operatorId: 'star-rennes',
         name: 'République',
         lat: 48.11,
         lon: -1.68,

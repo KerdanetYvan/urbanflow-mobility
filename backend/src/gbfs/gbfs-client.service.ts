@@ -58,10 +58,9 @@ interface GbfsFreeBikeStatusRow {
  *
  * "Generique" au sens de l'exigence d'interoperabilite (CLAUDE.md) : ne
  * suppose rien de specifique a un operateur, uniquement le standard GBFS
- * (https://gbfs.org) - un nouvel operateur s'integre par simple changement
- * de GBFS_DISCOVERY_URL, sans modification de ce service (voir issue #15,
- * architecture pluggable, pour la generalisation a d'autres familles de flux
- * que GBFS).
+ * (https://gbfs.org) - un nouvel operateur s'integre par simple ajout d'une
+ * entree a MOBILITY_OPERATORS (issue #15, voir OperatorsService), sans
+ * modification de ce service.
  *
  * Degradation (meme contrat que NominatimClientService, voir
  * geocoding/nominatim-client.service.ts) : jamais d'exception, une source
@@ -75,10 +74,17 @@ export class GbfsClientService {
 
   /**
    * Point d'entree : gbfs.json -> feeds pertinents -> stations unifiees.
+   * `operatorId` (MobilityOperatorConfig#id, issue #15) est repris tel quel
+   * sur chaque station renvoyee - permet a l'appelant (GbfsCacheService) de
+   * fusionner les resultats de plusieurs operateurs sans perdre leur origine
+   * ni risquer une collision d'id entre deux operateurs distincts.
    * `[]` (logge) si le flux est injoignable, mal forme, ou ne publie ni
    * station_information ni free_bike_status (aucun feed exploitable).
    */
-  async fetchStations(discoveryUrl: string): Promise<SharedMobilityStation[]> {
+  async fetchStations(
+    discoveryUrl: string,
+    operatorId: string,
+  ): Promise<SharedMobilityStation[]> {
     const discovery = await this.fetchJson<GbfsDiscoveryResponse>(discoveryUrl);
     if (!discovery) return [];
 
@@ -90,11 +96,12 @@ export class GbfsClientService {
       return this.fetchStationBased(
         stationInformationUrl,
         feeds.get('station_status'),
+        operatorId,
       );
     }
 
     if (freeBikeStatusUrl) {
-      return this.fetchFreeFloating(freeBikeStatusUrl);
+      return this.fetchFreeFloating(freeBikeStatusUrl, operatorId);
     }
 
     this.logger.warn(
@@ -143,6 +150,7 @@ export class GbfsClientService {
   private async fetchStationBased(
     informationUrl: string,
     statusUrl: string | undefined,
+    operatorId: string,
   ): Promise<SharedMobilityStation[]> {
     const [information, status] = await Promise.all([
       this.fetchJson<{ data: { stations: GbfsStationInformationRow[] } }>(
@@ -174,6 +182,7 @@ export class GbfsClientService {
 
         return {
           id: row.station_id,
+          operatorId,
           name: row.name,
           lat: row.lat,
           lon: row.lon,
@@ -197,6 +206,7 @@ export class GbfsClientService {
    */
   private async fetchFreeFloating(
     freeBikeStatusUrl: string,
+    operatorId: string,
   ): Promise<SharedMobilityStation[]> {
     const feed = await this.fetchJson<{
       data: { bikes: GbfsFreeBikeStatusRow[] };
@@ -213,6 +223,7 @@ export class GbfsClientService {
       )
       .map((row) => ({
         id: row.bike_id,
+        operatorId,
         lat: row.lat,
         lon: row.lon,
         kind: 'vehicle' as const,
