@@ -735,11 +735,17 @@ describe('RecherchePage', () => {
         renderPage();
 
         await waitFor(() => {
+          // originLabel/destinationLabel inclus : contrairement au test
+          // #174 ci-dessus (visiteur non authentifie), ce test authentifie
+          // l'utilisateur (le suivi necessite un compte, voir
+          // performSearch - libelles transmis uniquement si isAuthenticated).
           expect(tripsLib.searchTrips).toHaveBeenCalledWith({
             originLat: GARE.lat,
             originLon: GARE.lon,
+            originLabel: GARE.label,
             destinationLat: HOTEL_DE_VILLE.lat,
             destinationLon: HOTEL_DE_VILLE.lon,
+            destinationLabel: HOTEL_DE_VILLE.label,
           });
         });
       },

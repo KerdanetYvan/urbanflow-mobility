@@ -31,7 +31,13 @@ function matches(
   itinerary: TripItinerary,
 ): boolean {
   if (!followedTrip) return false;
-  const lastSegment = itinerary.segments[itinerary.segments.length - 1];
+  // Un itineraire sans segment n'a pas de destination a comparer - ne peut
+  // jamais correspondre a un suivi (garde defensive : ce composant est
+  // rendu pour tout itineraire affiche, pas seulement au clic sur
+  // "Suivre", contrairement a toStartFollowingTripInput qui n'est appelee
+  // que sur un itineraire reel deja recu de GET /trips).
+  const lastSegment = itinerary.segments.at(-1);
+  if (!lastSegment) return false;
   return (
     followedTrip.destinationLat === lastSegment.to.lat &&
     followedTrip.destinationLon === lastSegment.to.lon &&
