@@ -16,8 +16,17 @@ jobs:
   move-to-review:
     name: Basculer les issues liées en Review/QA
     runs-on: ubuntu-latest
-    # Une PR encore en brouillon n'est pas prete pour la revue.
-    if: github.event.pull_request.draft == false
+    # Une PR encore en brouillon n'est pas prete pour la revue. Les PR
+    # Dependabot sont exclues en plus (bug constate en session, PR #205-214) :
+    # GitHub ne transmet jamais les secrets du depot aux workflows declenches
+    # par un PR Dependabot (restriction de securite native, pas un bug de ce
+    # workflow) - PROJECT_TOKEN y resout systematiquement vide, ce qui faisait
+    # echouer le job (gh CLI, exit 4) au lieu de simplement n'avoir rien a
+    # faire. Sans consequence fonctionnelle (une PR Dependabot ne contient
+    # jamais "Closes #N"), mais polluait chaque PR de dependance d'un X rouge.
+    if: |
+      github.event.pull_request.draft == false &&
+      github.actor != 'dependabot[bot]'
     steps:
       - name: Basculer le Status des issues liées
         env:
