@@ -46,6 +46,18 @@ export class TripSegment {
   })
   routeTextColor?: string;
 
+  @ApiPropertyOptional({
+    description:
+      "Identifiant GTFS brut de la ligne (route_id), tel que renvoye par OpenTripPlanner (issue #18) - absent pour un segment a pied. Sert a recouper ce segment avec une perturbation GTFS-Realtime (GtfsRealtimeCacheService#findDisruptions, issue #14) ; jamais affiche tel quel a l'usager (routeName est le libelle a afficher).",
+  })
+  routeId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Identifiant GTFS brut de la course (trip_id), tel que renvoye par OpenTripPlanner (issue #18) - absent pour un segment a pied. Meme usage que routeId : recoupement avec une perturbation GTFS-Realtime, jamais affiche a l'usager.",
+  })
+  tripId?: string;
+
   @ApiProperty()
   startTime: string;
 
@@ -96,6 +108,13 @@ export class TripItinerary {
       'Horaires de depart (ISO 8601, tries par ordre chronologique) de tous les itineraires strictement identiques (hors horaire) regroupes sous ce resultat (issue #127) - present uniquement quand au moins deux itineraires ont ete regroupes, absent sinon (pas de regroupement artificiel quand chaque itineraire renvoye par OTP est deja distinct). startTime correspond toujours au premier element de ce tableau.',
   })
   nextDepartures?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'true si au moins un segment de cet itineraire est actuellement touche par une perturbation GTFS-Realtime (ScoringService, issue #18) - absent (pas juste false) quand ce n\'est pas le cas, pour ne pas alourdir chaque itineraire d\'un champ presque toujours a false. Sert au frontend a afficher le marqueur "Perturbation en cours" (docs/specs/f3-scoring-perturbations.md section 3.3), visuellement distinct des badges de la section 2.2 du meme spec - jamais une explication du score, qui reste invisible (meme section 2).',
+    example: true,
+  })
+  disrupted?: boolean;
 }
 
 /**

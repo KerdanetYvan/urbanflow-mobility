@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
+import Alert from '../../components/Alert/Alert';
 import Badge from '../../components/Badge/Badge';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import { getTripModeIcon } from '../../components/tripModeIcon';
+import TripFollowButton from '../../components/TripFollowButton/TripFollowButton';
 import { toHexColor } from '../../lib/color';
 import {
   formatDuration,
@@ -303,6 +305,18 @@ interface ItinerarySegmentsProps {
 function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
   return (
     <>
+      {itinerary.disrupted && (
+        // Marqueur "Perturbation en cours" (issue #18,
+        // docs/specs/f3-scoring-perturbations.md section 3.3) - cas a part
+        // des badges qualitatifs (Badge, section 2.2 du meme spec) :
+        // alerte de securite/actualite de trajet, visuellement distincte
+        // (Alert, pas Badge), affichee independamment de leurs regles.
+        <Alert variant="warning" title="Perturbation en cours">
+          Ce trajet est actuellement touché par une perturbation - le
+          classement des itinéraires en tient déjà compte.
+        </Alert>
+      )}
+      <TripFollowButton itinerary={itinerary} />
       {itinerary.nextDepartures && itinerary.nextDepartures.length > 1 && (
         // Itineraires identiques regroupes sous ce resultat (issue #127) :
         // les prochains departs (au-dela du premier, deja visible dans le

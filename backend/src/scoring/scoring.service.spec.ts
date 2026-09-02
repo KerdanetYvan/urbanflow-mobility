@@ -50,6 +50,7 @@ function buildProfile(
 describe('ScoringService', () => {
   let service: ScoringService;
   let weatherService: { getCurrentConditions: jest.Mock };
+  let gtfsRealtimeCache: { findDisruptions: jest.Mock };
 
   beforeEach(() => {
     // Pas de pluie par defaut (voir CurrentWeather) : les tests qui ne
@@ -58,7 +59,14 @@ describe('ScoringService', () => {
     weatherService = {
       getCurrentConditions: jest.fn().mockResolvedValue(null),
     };
-    service = new ScoringService(weatherService as never);
+    // Aucune perturbation par defaut (issue #18) : les tests qui ne portent
+    // pas sur ce critere restent inchanges par rapport a avant son
+    // introduction.
+    gtfsRealtimeCache = { findDisruptions: jest.fn().mockReturnValue([]) };
+    service = new ScoringService(
+      weatherService as never,
+      gtfsRealtimeCache as never,
+    );
   });
 
   it("sans profil ni pluie : l'itineraire le plus court gagne", async () => {
@@ -299,6 +307,82 @@ describe('ScoringService', () => {
         rapideMaisBeaucoupDeMarche,
         unPeuPlusLentMaisPeuDeMarche,
       ]);
+    });
+  });
+
+  describe('critere perturbation GTFS-Realtime (issue #18)', () => {
+    it(
+      'un itineraire dont un segment est perturbe passe derriere une ' +
+        'alternative propre de duree proche',
+      async () => {
+        // routeId sert d'identifiant stable pour reconnaitre chaque
+        // itineraire dans le resultat : rank() renvoie desormais des copies
+        // (jamais les objets recus, voir sa docstring), la comparaison par
+        // reference (toBe) ne fonctionne donc plus ici.
+        const perturbe = buildItinerary({
+          durationSeconds: 600,
+          segments: [buildSegment({ mode: 'BUS', routeId: 'ligne-a' })],
+        });
+        const propre = buildItinerary({
+          durationSeconds: 610,
+          segments: [buildSegment({ mode: 'BUS', routeId: 'ligne-b' })],
+        });
+        gtfsRealtimeCache.findDisruptions.mockImplementation(
+          ({ routeId }: { routeId?: string }) =>
+            routeId === 'ligne-a' ? [{ kind: 'alert' }] : [],
+        );
+
+        const [first] = await service.rank([perturbe, propre], null);
+
+        // Le trajet perturbe etait pourtant le plus rapide (10s de moins) -
+        // la penalite (15 points, equivalent 15 min) l'emporte largement.
+        expect(first.segments[0].routeId).toBe('ligne-b');
+      },
+    );
+
+    it("marque disrupted: true l'itineraire touche, absent (pas false) sur l'autre", async () => {
+      const perturbe = buildItinerary({
+        segments: [buildSegment({ mode: 'BUS', tripId: 'course-1' })],
+      });
+      const propre = buildItinerary({
+        segments: [buildSegment({ mode: 'BUS', tripId: 'course-2' })],
+      });
+      gtfsRealtimeCache.findDisruptions.mockImplementation(
+        ({ tripId }: { tripId?: string }) =>
+          tripId === 'course-1' ? [{ kind: 'cancellation' }] : [],
+      );
+
+      const result = await service.rank([perturbe, propre], null);
+
+      const marque = result.find((i) => i.segments[0].tripId === 'course-1');
+      const nonMarque = result.find((i) => i.segments[0].tripId === 'course-2');
+      expect(marque?.disrupted).toBe(true);
+      expect(nonMarque?.disrupted).toBeUndefined();
+    });
+
+    it("transmet routeId ET tripId du segment a findDisruptions (recoupement par l'un ou l'autre)", async () => {
+      const itinerary = buildItinerary({
+        segments: [
+          buildSegment({ mode: 'BUS', routeId: 'ligne-x', tripId: 'course-x' }),
+        ],
+      });
+
+      await service.rank([itinerary], null);
+
+      expect(gtfsRealtimeCache.findDisruptions).toHaveBeenCalledWith({
+        routeId: 'ligne-x',
+        tripId: 'course-x',
+      });
+    });
+
+    it('aucune perturbation : classement inchange, aucun itineraire marque disrupted', async () => {
+      const court = buildItinerary({ durationSeconds: 600 });
+      const long = buildItinerary({ durationSeconds: 900 });
+
+      const result = await service.rank([long, court], null);
+
+      expect(result).toEqual([court, long]);
+      expect(result.every((i) => i.disrupted === undefined)).toBe(true);
     });
   });
 });

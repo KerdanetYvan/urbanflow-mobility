@@ -1,0 +1,14 @@
+/* Bouton "Suivre ce trajet" (issue #18) - place au-dessus du detail
+   segment par segment (voir ItinerarySegments, RecherchePageResults.tsx),
+   meme emplacement que le bloc "Prochain passage" (issue #173). */
+.trip-follow {
+  margin: 0 0 var(--space-3);
+}
+
+.trip-follow-button {
+  width: 100%;
+}
+
+.trip-follow .alert {
+  margin: var(--space-2) 0 0;
+}

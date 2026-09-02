@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import * as profileLib from './lib/profile';
 import * as authLib from './lib/auth';
 import { saveTokens, clearTokens } from './lib/authStorage';
+import * as followedTripLib from './lib/followedTrip';
 import * as sharedMobilityLib from './lib/sharedMobility';
 import { fakeJwt } from './test/fakeJwt';
 import App from './App';
@@ -24,6 +25,9 @@ vi.mock('./lib/profile', async () => {
 // au montage (issue #13). Meme raisonnement que lib/profile ci-dessus :
 // evite un vrai appel reseau dans ce fichier de test de navigation.
 vi.mock('./lib/sharedMobility');
+// Meme raisonnement pour l'effet de reprise d'un trajet suivi (issue #18,
+// RecherchePage) au montage de la route racine.
+vi.mock('./lib/followedTrip');
 
 // MemoryRouter simule un historique de navigation en memoire (pas besoin
 // d'un vrai navigateur ni de jsdom.location) : utile pour tester le routing
@@ -42,6 +46,7 @@ describe('App (navigation)', () => {
     vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
       [],
     );
+    vi.mocked(followedTripLib.getCurrentFollowedTrip).mockResolvedValue(null);
   });
 
   afterEach(() => {

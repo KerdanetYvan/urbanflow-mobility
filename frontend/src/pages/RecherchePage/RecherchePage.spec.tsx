@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { AuthProvider } from '../../lib/AuthProvider';
 import { clearTokens, saveTokens } from '../../lib/authStorage';
+import * as followedTripLib from '../../lib/followedTrip';
 import * as placesLib from '../../lib/places';
 import * as profileLib from '../../lib/profile';
 import * as sharedMobilityLib from '../../lib/sharedMobility';
@@ -16,6 +17,10 @@ vi.mock('../../lib/places');
 // dependre d'un vrai appel reseau dans ce fichier de test, qui ne
 // s'interesse pas a cette fonctionnalite.
 vi.mock('../../lib/sharedMobility');
+// Effet de reprise d'un trajet suivi au montage (issue #18) + TripFollowButton
+// (rendu par RecherchePageResults une fois des itineraires trouves) -
+// mocke pour la meme raison que sharedMobility ci-dessus.
+vi.mock('../../lib/followedTrip');
 // Mock partiel (meme motif que lib/profile ci-dessous et HistoriquePage.spec.tsx) :
 // entryToPlaces est une fonction pure reutilisee par RechercheQuickShortcuts,
 // un automock complet la remplacerait par un vi.fn() sans valeur de retour et
@@ -83,6 +88,9 @@ describe('RecherchePage', () => {
     vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
       [],
     );
+    // Aucun trajet suivi par defaut (issue #18) - les tests qui verifient
+    // la reprise automatique ecrasent ce mock avec un suivi explicite.
+    vi.mocked(followedTripLib.getCurrentFollowedTrip).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -687,6 +695,77 @@ describe('RecherchePage', () => {
 
     it("ne relance rien quand la page est ouverte sans etat de navigation", () => {
       renderPage();
+      expect(tripsLib.searchTrips).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reprise automatique d\'un trajet suivi (issue #18)', () => {
+    it(
+      "relance la recherche origine/destination du suivi actif au tap sur " +
+        'la notification (ouverture sur "/recherche" sans etat de navigation)',
+      async () => {
+        saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+        vi.mocked(followedTripLib.getCurrentFollowedTrip).mockResolvedValue({
+          id: 'followed-1',
+          userId: 'user-1',
+          originLat: GARE.lat,
+          originLon: GARE.lon,
+          originLabel: GARE.label,
+          destinationLat: HOTEL_DE_VILLE.lat,
+          destinationLon: HOTEL_DE_VILLE.lon,
+          destinationLabel: HOTEL_DE_VILLE.label,
+          segments: [],
+          transportModes: null,
+          endTime: '2026-08-20T19:00:00.000Z',
+          lastNotifiedDisruptionSignature: null,
+          createdAt: '2026-08-20T18:00:00.000Z',
+        });
+        vi.mocked(tripsLib.searchTrips).mockResolvedValue({
+          itineraries: [
+            {
+              startTime: 't0',
+              endTime: 't1',
+              durationSeconds: 600,
+              transfers: 0,
+              segments: [],
+            },
+          ],
+        });
+
+        renderPage();
+
+        await waitFor(() => {
+          // originLabel/destinationLabel inclus : contrairement au test
+          // #174 ci-dessus (visiteur non authentifie), ce test authentifie
+          // l'utilisateur (le suivi necessite un compte, voir
+          // performSearch - libelles transmis uniquement si isAuthenticated).
+          expect(tripsLib.searchTrips).toHaveBeenCalledWith({
+            originLat: GARE.lat,
+            originLon: GARE.lon,
+            originLabel: GARE.label,
+            destinationLat: HOTEL_DE_VILLE.lat,
+            destinationLon: HOTEL_DE_VILLE.lon,
+            destinationLabel: HOTEL_DE_VILLE.label,
+          });
+        });
+      },
+    );
+
+    it("ne relance rien pour un visiteur non authentifie (le suivi necessite un compte, issue #18)", () => {
+      renderPage();
+      expect(followedTripLib.getCurrentFollowedTrip).not.toHaveBeenCalled();
+      expect(tripsLib.searchTrips).not.toHaveBeenCalled();
+    });
+
+    it("ne relance rien quand l'utilisateur authentifie ne suit aucun trajet", async () => {
+      saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+      vi.mocked(followedTripLib.getCurrentFollowedTrip).mockResolvedValue(null);
+
+      renderPage();
+
+      await waitFor(() =>
+        expect(followedTripLib.getCurrentFollowedTrip).toHaveBeenCalled(),
+      );
       expect(tripsLib.searchTrips).not.toHaveBeenCalled();
     });
   });

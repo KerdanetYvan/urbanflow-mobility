@@ -52,6 +52,14 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Notifications push (issue #18) : generateSW (stratégie déjà en
+        // place pour la PWA, issue #19) ne permet pas d'injecter du code
+        // personnalisé (écouteurs 'push'/'notificationclick') directement
+        // dans le service worker généré - importScripts() est le mécanisme
+        // officiel de Workbox pour le compléter sans passer en mode
+        // injectManifest (qui changerait toute la stratégie de precache
+        // actuelle). Voir public/push-sw.js.
+        importScripts: ['/push-sw.js'],
         // Stratégies de cache runtime (éco-conception, issue #23, CLAUDE.md
         // "limiter les appels réseau superflus" + "mode dégradé"). En prod,
         // frontend et API sont servis par le même domaine (Caddy) : les

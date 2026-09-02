@@ -13,15 +13,16 @@ describe('TripsService', () => {
     profilesService = { findByUserIdOrNull: jest.fn() };
     tripHistoryService = { record: jest.fn().mockResolvedValue(undefined) };
     // ScoringService reel (pas de mock) avec un stub meteo neutre (pas de
-    // pluie) : le comportement du classement (y compris le critere meteo,
-    // issue #17) est teste separement dans scoring.service.spec.ts /
-    // weather.service.spec.ts, pas ici.
+    // pluie) et un cache GTFS-Realtime stub sans perturbation (issue #18) :
+    // le comportement du classement (critere meteo #17, critere perturbation
+    // #18) est teste separement dans scoring.service.spec.ts, pas ici.
     service = new TripsService(
       otpClient as never,
       profilesService as never,
-      new ScoringService({
-        getCurrentConditions: () => Promise.resolve(null),
-      } as never),
+      new ScoringService(
+        { getCurrentConditions: () => Promise.resolve(null) } as never,
+        { findDisruptions: () => [] } as never,
+      ),
       tripHistoryService as never,
     );
   });
@@ -111,6 +112,11 @@ describe('TripsService', () => {
             // sans '#', relayees telles quelles (voir TripsService#mapLeg).
             routeColor: 'EE1D23',
             routeTextColor: 'FFFFFF',
+            // route_id/trip_id prefixes par l'id de feed OTP ("1:") - voir
+            // OtpLeg#routeId, issue #18. TripsService#mapLeg doit retirer ce
+            // prefixe avant d'exposer TripSegment#routeId/tripId.
+            routeId: '1:7-0001',
+            tripId: '1:1_MERCREDI-17818859',
             startTime: 61000,
             endTime: 601000,
             distance: 1300,
@@ -145,6 +151,8 @@ describe('TripsService', () => {
             routeName: undefined,
             routeColor: undefined,
             routeTextColor: undefined,
+            routeId: undefined,
+            tripId: undefined,
             startTime: new Date(1000).toISOString(),
             endTime: new Date(61000).toISOString(),
             durationSeconds: 60,
@@ -161,6 +169,9 @@ describe('TripsService', () => {
             routeName: 'T1',
             routeColor: 'EE1D23',
             routeTextColor: 'FFFFFF',
+            // Prefixe de feed OTP ("1:") retire (voir mapLeg/stripOtpFeedPrefix).
+            routeId: '7-0001',
+            tripId: '1_MERCREDI-17818859',
             startTime: new Date(61000).toISOString(),
             endTime: new Date(601000).toISOString(),
             durationSeconds: 540,
