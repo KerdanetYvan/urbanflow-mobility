@@ -863,30 +863,36 @@ function RecherchePage() {
             </button>
 
             <div className="recherche-addresses-fields">
-              <AddressField
-                id="origin-address"
-                label="Origine"
-                value={origin.query}
-                suggestions={originSuggestions}
-                error={fieldErrors.origin}
-                quickEntries={buildQuickEntries('origin')}
-                hideLabel
-                onChange={(value) =>
-                  setOrigin({ query: value, selected: null })
-                }
-                onSelect={(place) =>
-                  setOrigin({ query: place.label, selected: place })
-                }
-              />
+              {/* Wrapper dedie (issue #233) : porte le separateur interne
+                  avec la destination (border-bottom, voir CSS) - inclut
+                  volontairement l'erreur de geolocalisation eventuelle, qui
+                  reste ainsi rattachee visuellement au champ Origine. */}
+              <div className="recherche-address-origin">
+                <AddressField
+                  id="origin-address"
+                  label="Origine"
+                  value={origin.query}
+                  suggestions={originSuggestions}
+                  error={fieldErrors.origin}
+                  quickEntries={buildQuickEntries('origin')}
+                  hideLabel
+                  onChange={(value) =>
+                    setOrigin({ query: value, selected: null })
+                  }
+                  onSelect={(place) =>
+                    setOrigin({ query: place.label, selected: place })
+                  }
+                />
 
-              {/* Erreur de géolocalisation (permission refusée, indisponible) :
-                  sous le champ, hors du dropdown (issue #166, spec section 4) -
-                  l'entrée "Ma position actuelle" du dropdown, elle, se referme
-                  dès que la valeur du champ change ou que l'utilisateur clique
-                  ailleurs. */}
-              {positionError && (
-                <p className="recherche-position-error">{positionError}</p>
-              )}
+                {/* Erreur de géolocalisation (permission refusée, indisponible) :
+                    sous le champ, hors du dropdown (issue #166, spec section 4) -
+                    l'entrée "Ma position actuelle" du dropdown, elle, se referme
+                    dès que la valeur du champ change ou que l'utilisateur clique
+                    ailleurs. */}
+                {positionError && (
+                  <p className="recherche-position-error">{positionError}</p>
+                )}
+              </div>
 
               <AddressField
                 id="destination-address"

@@ -46,23 +46,35 @@
 /* Disposition compacte (issue #233) : ligne (bouton d'inversion a gauche +
    colonne origine/destination a droite) plutot que l'ancienne colonne
    unique ou le bouton occupait sa propre "ligne" entre les deux champs -
-   recupere l'espace vertical qu'il consommait seul. */
+   recupere l'espace vertical qu'il consommait seul.
+   Le cadre (bordure + arrondi) vit ICI, sur le conteneur englobant - pas
+   sur chaque cellule (bouton, origine, destination) individuellement,
+   contrairement au premier jet (retour utilisateur en session) : un seul
+   cadre exterieur, des separateurs fins entre cellules (voir
+   .recherche-swap/.recherche-address-origin ci-dessous), aucun espace
+   (`gap: 0`, implicite) entre elles - les champs sont "colles". `overflow:
+   hidden` decoupe les coins des cellules internes (devenues carrees, voir
+   plus bas) sur l'arrondi du cadre exterieur. */
 .recherche-addresses {
   display: flex;
   flex-direction: row;
-  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg);
 }
 
-/* Colonne origine/destination (issue #233) : les deux AddressField
-   s'empilent naturellement a hauteur egale (contenu intrinsequement
-   identique, pas de contrainte de hauteur explicite necessaire) - le
-   `gap` remplace l'espacement individuel de chaque champ, neutralise
-   ci-dessous (.field, normalement margin-bottom: var(--space-5)) pour
-   eviter un double espacement gap + marge. */
+/* Colonne origine/destination (issue #233) : aucun `gap` (contrairement au
+   premier jet) - les deux champs sont colles, separes par la seule
+   bordure de .recherche-address-origin ci-dessous. `.field`
+   (normalement margin-bottom: var(--space-5)) et l'input qu'il porte
+   (normalement son propre cadre complet, voir components/FormField/
+   FormField.css) sont neutralises : plus aucune cellule interne ne
+   dessine SON PROPRE cadre, seul celui de .recherche-addresses ci-dessus
+   reste visible. */
 .recherche-addresses-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
   flex: 1;
   min-width: 0;
 }
@@ -71,13 +83,49 @@
   margin-bottom: 0;
 }
 
+.recherche-addresses-fields .field input {
+  border: none;
+  border-radius: 0;
+}
+
+/* Meme raison que .recherche-swap:focus-visible ci-dessous (offset negatif) :
+   l'anneau de focus par defaut de .field input (FormField.css) est un
+   box-shadow qui deborde VERS L'EXTERIEUR de l'input - rogne par le
+   overflow: hidden du cadre commun sur au moins un cote pour chaque champ
+   (le haut pour Origine, le bas pour Destination, la droite pour les
+   deux). Remplace par un box-shadow INSET, dessine a l'interieur de
+   l'input, jamais coupe. */
+.recherche-addresses-fields .field input:focus-visible {
+  box-shadow: inset 0 0 0 3px
+    color-mix(in srgb, var(--color-primary-emphasis) 25%, transparent);
+}
+
+.recherche-addresses-fields .field-error,
+.recherche-addresses-fields .field-help {
+  /* Ces messages heritaient d'un alignement pense pour un champ isole
+     (pas de padding horizontal propre, voir FormField.css) - a l'interieur
+     du cadre commun, ils toucheraient sinon son bord. */
+  padding: 0 var(--space-3);
+}
+
+/* Separateur interne entre Origine et Destination (issue #233) - remplace
+   le `gap` de .recherche-addresses-fields ci-dessus : seule bordure encore
+   visible entre les deux champs, l'input lui-meme n'en dessine plus (voir
+   .recherche-addresses-fields .field input ci-dessus). */
+.recherche-address-origin {
+  border-bottom: 1px solid var(--color-border);
+}
+
 /* Bouton "Inverser origine/destination" (issue #233) : colonne pleine
    hauteur a gauche des deux champs (empilement conserve a droite, donc la
    meme icone a fleches verticales - components/icons.tsx#SwapIcon - reste
    pertinente sans rotation). Largeur cible 10-20% de la largeur totale
    (retour utilisateur en session) : un rem fixe plutot qu'un pourcentage
    pour rester lisible/cliquable meme sur les tres petits ecrans, ou un
-   pourcentage deviendrait trop etroit pour la cible tactile minimale. */
+   pourcentage deviendrait trop etroit pour la cible tactile minimale.
+   Plus de cadre propre (border/border-radius retires, voir le commentaire
+   de .recherche-addresses ci-dessus) - seule une bordure DROITE subsiste,
+   separateur avec la colonne origine/destination. */
 .recherche-swap {
   display: flex;
   align-items: center;
@@ -85,8 +133,8 @@
   align-self: stretch;
   width: 3.5rem;
   min-width: var(--touch-target-min);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: none;
+  border-right: 1px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text);
   cursor: pointer;
@@ -96,9 +144,14 @@
   background: var(--color-bg-subtle);
 }
 
+/* Offset NEGATIF (contrairement au reste de l'app, ex. Button.css) - issue
+   #233 : .recherche-addresses (parent) applique desormais overflow: hidden
+   pour decouper les coins internes sur son propre arrondi (voir son
+   commentaire) - un anneau qui deborderait vers l'exterieur (offset positif)
+   serait rogne par ce clip, invisible au clavier. */
 .recherche-swap:focus-visible {
   outline: 2px solid var(--color-primary-emphasis);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 /* Suggestions d'autocompletion des champs Origine/Destination : voir
