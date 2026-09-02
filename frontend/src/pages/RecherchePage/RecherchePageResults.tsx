@@ -182,6 +182,8 @@ interface ResultsListProps {
   itineraryBadges: ItineraryBadges;
   /** Repli renvoye par GET /trips (issue #190) - `walk-only` : la liste ci-dessous est le trajet a pied de repli, annonce par un bandeau. */
   fallback?: TripFallback;
+  /** Resultats servis depuis le cache local, mode degrade (issue #10) - voir RecherchePageResultsProps#fromCache. */
+  fromCache?: boolean;
 }
 
 /**
@@ -199,10 +201,22 @@ function ResultsList({
   geolocationMessage,
   itineraryBadges,
   fallback,
+  fromCache,
 }: ResultsListProps) {
   return (
     <>
       <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
+      {fromCache && (
+        // Mode degrade (issue #10) : ces resultats viennent du cache local,
+        // pas d'une reponse fraiche - horaires/perturbations potentiellement
+        // perimes. Distinct du bandeau de repli ci-dessous (fallback), les
+        // deux peuvent coexister (un trajet en cache peut lui-meme etre un
+        // repli a pied/prochain creneau).
+        <Alert variant="warning" title="Résultats hors ligne">
+          Connexion indisponible - voici les résultats de votre dernière
+          recherche pour ce trajet, potentiellement obsolètes.
+        </Alert>
+      )}
       {fallback && (
         // Bandeau de repli : la "liste" ci-dessous n'est pas un resultat
         // normal a l'heure demandee - on l'annonce explicitement.
@@ -453,6 +467,14 @@ interface RecherchePageResultsProps {
    * `itineraries` vide = etat vide "sec" (message generique).
    */
   fallback?: TripFallback;
+  /**
+   * Ces resultats viennent du cache local, pas d'une reponse fraiche de
+   * GET /trips (issue #10, "mode dégradé") - la recherche a echoue faute de
+   * connexion, un trajet identique etait deja en cache
+   * (frontend/src/lib/tripCache.ts). Annonce explicite, distincte du
+   * bandeau de repli ci-dessus (fallback).
+   */
+  fromCache?: boolean;
   /** Bascule vers la vue Edition du panneau fusionne (issue #171/#172) - ne demonte plus cet ecran. */
   onEditSearch: () => void;
   /** Preferences d'accessibilite du profil connecte (issue #126), voir frontend/src/lib/profile.ts. Absent/vide = profil incomplet ou recherche anonyme (issue #64) - seul le badge "meilleur choix global" s'affiche alors. */
@@ -524,6 +546,7 @@ function RecherchePageResults({
   destination,
   itineraries,
   fallback,
+  fromCache,
   onEditSearch,
   accessibilityPreferences,
   isEditingSearch = false,
@@ -770,6 +793,7 @@ function RecherchePageResults({
                 geolocationMessage={geolocationMessage(geolocation.status)}
                 itineraryBadges={itineraryBadges}
                 fallback={fallback}
+                fromCache={fromCache}
               />
             </div>
             <div className="resultats-panel resultats-panel-detail">
@@ -815,6 +839,7 @@ function RecherchePageResults({
                   onEditSearch={onEditSearch}
                   geolocationMessage={geolocationMessage(geolocation.status)}
                   itineraryBadges={itineraryBadges}
+                  fromCache={fromCache}
                 />
               )}
             </div>

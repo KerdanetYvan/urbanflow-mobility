@@ -21,6 +21,7 @@ import { getCurrentFollowedTrip } from '../../lib/followedTrip';
 import { formatCoordinates } from '../../lib/format';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import type { PlaceSuggestion } from '../../lib/places';
+import { getCachedTrip, saveTripToCache } from '../../lib/tripCache';
 import {
   entryToPlaces,
   getTripHistory,
@@ -72,6 +73,14 @@ type Screen =
        * rien du tout (état vide "sec", `fallback` absent).
        */
       fallback?: TripFallback;
+      /**
+       * Résultats servis depuis le cache local (issue #10, "mode dégradé")
+       * plutôt que d'une réponse fraîche de GET /trips - la recherche a
+       * échoué faute de connexion, mais un trajet identique était déjà en
+       * cache (lib/tripCache.ts). RecherchePageResults l'annonce
+       * explicitement, distinct du bandeau de repli ci-dessus (fallback).
+       */
+      fromCache?: boolean;
     };
 
 /** Etat d'un champ origine/destination : le texte tape et, si l'utilisateur a choisi une suggestion, le lieu geocode correspondant. */
@@ -555,7 +564,33 @@ function RecherchePage() {
         // pour l'afficher comme suggestion explicite plutot qu'un etat vide.
         fallback: result.fallback,
       });
+      // Mode degrade (issue #10) : une recherche reussie alimente le cache
+      // local, consulte plus bas si une future recherche echoue faute de
+      // connexion. Apres setScreen (jamais avant) : le cache est un
+      // sous-produit de l'affichage reussi, pas une condition dessus.
+      saveTripToCache(originPlace, destinationPlace, result);
     } catch (error) {
+      // Mode degrade (issue #10) : error instanceof ApiError signifie que
+      // le backend a bien ete joint (et a repondu une erreur metier) - un
+      // repli sur le cache n'aurait alors aucun sens, la connexion n'est
+      // pas en cause. Dans le cas contraire (fetch n'a pas pu joindre le
+      // backend), on cherche un trajet en cache pour ce meme couple
+      // origine/destination avant d'abandonner sur l'ecran formulaire.
+      if (!(error instanceof ApiError)) {
+        const cached = getCachedTrip(originPlace, destinationPlace);
+        if (cached) {
+          setScreen({
+            kind: 'resultats',
+            origin: originPlace,
+            destination: destinationPlace,
+            itineraries: cached.result.itineraries,
+            fallback: cached.result.fallback,
+            fromCache: true,
+          });
+          return;
+        }
+      }
+
       const message =
         error instanceof ApiError
           ? error.message
@@ -926,6 +961,7 @@ function RecherchePage() {
         destination={screen.destination}
         itineraries={screen.kind === 'resultats' ? screen.itineraries : null}
         fallback={screen.kind === 'resultats' ? screen.fallback : undefined}
+        fromCache={screen.kind === 'resultats' ? screen.fromCache : undefined}
         onEditSearch={() => {
           setIsEditingSearch(true);
           setFormSheetState('expanded');

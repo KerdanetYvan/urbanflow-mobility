@@ -273,6 +273,128 @@ describe('RecherchePage', () => {
     expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
   });
 
+  describe('mode dégradé - cache local des derniers trajets utiles (issue #10)', () => {
+    afterEach(() => {
+      localStorage.removeItem('urbanflow.tripCache.v1');
+    });
+
+    it(
+      'affiche les resultats en cache (bandeau "hors ligne" explicite) quand ' +
+        "une recherche identique echoue faute de connexion (pas d'ApiError - " +
+        'le backend n\'a jamais ete joint)',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+          Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+        );
+        const itineraries = [
+          {
+            startTime: 't0',
+            endTime: 't1',
+            durationSeconds: 600,
+            transfers: 0,
+            segments: [],
+          },
+        ];
+        vi.mocked(tripsLib.searchTrips).mockResolvedValueOnce({ itineraries });
+        const user = userEvent.setup();
+        renderPage();
+
+        // Premiere recherche reussie : alimente le cache local.
+        await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+        await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+        await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+
+        // Deuxieme recherche, meme trajet, echoue faute de connexion (fetch
+        // rejette sans jamais joindre le backend - pas une ApiError).
+        vi.mocked(tripsLib.searchTrips).mockRejectedValueOnce(
+          new TypeError('Failed to fetch'),
+        );
+        await user.click(
+          screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
+        );
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+        expect(
+          await screen.findAllByText('Résultats hors ligne'),
+        ).not.toHaveLength(0);
+        // Toujours sur l'ecran resultats (pas de retour au formulaire) - le
+        // cache a pris le relais.
+        expect(
+          screen.getAllByRole('button', { name: 'Modifier la recherche' }).length,
+        ).toBeGreaterThan(0);
+      },
+    );
+
+    it(
+      "revient au formulaire avec le message d'erreur habituel quand la " +
+        'recherche echoue et qu\'aucun trajet en cache ne correspond',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+          Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+        );
+        vi.mocked(tripsLib.searchTrips).mockRejectedValue(
+          new TypeError('Failed to fetch'),
+        );
+        const user = userEvent.setup();
+        renderPage();
+
+        await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+        await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+        expect(
+          await screen.findByText('Connexion indisponible, réessayez.'),
+        ).toBeInTheDocument();
+        // Retour au formulaire (pas de trajet en cache pour ce couple) -
+        // meme comportement qu'avant #10.
+        expect(screen.getByLabelText('Origine')).toHaveValue('Gare Part-Dieu');
+      },
+    );
+
+    it(
+      "ignore le cache et affiche l'erreur habituelle quand le backend a " +
+        'bien ete joint (ApiError) - la connexion n\'est pas en cause',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+          Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+        );
+        const itineraries = [
+          {
+            startTime: 't0',
+            endTime: 't1',
+            durationSeconds: 600,
+            transfers: 0,
+            segments: [],
+          },
+        ];
+        vi.mocked(tripsLib.searchTrips).mockResolvedValueOnce({ itineraries });
+        const user = userEvent.setup();
+        renderPage();
+
+        await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+        await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+        await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+
+        vi.mocked(tripsLib.searchTrips).mockRejectedValueOnce(
+          new ApiError('Moteur de calcul indisponible', 503),
+        );
+        await user.click(
+          screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
+        );
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+        expect(
+          await screen.findByText('Moteur de calcul indisponible'),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText('Résultats hors ligne'),
+        ).not.toBeInTheDocument();
+      },
+    );
+  });
+
   it("'Modifier la recherche' revient au formulaire avec les criteres preremplis (issue #73)", async () => {
     vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
       Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),

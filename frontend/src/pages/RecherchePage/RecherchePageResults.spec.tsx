@@ -133,6 +133,7 @@ function renderResults(
   onEditSearch = vi.fn(),
   accessibilityPreferences?: string[],
   fallback?: TripFallback,
+  fromCache?: boolean,
 ) {
   return {
     onEditSearch,
@@ -146,6 +147,7 @@ function renderResults(
           destination={DESTINATION}
           itineraries={itineraries}
           fallback={fallback}
+          fromCache={fromCache}
           onEditSearch={onEditSearch}
           accessibilityPreferences={accessibilityPreferences}
         />
@@ -257,6 +259,41 @@ describe('RecherchePageResults', () => {
       expect(
         screen.queryByText('Perturbation en cours'),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('mode degrade - resultats servis depuis le cache local (issue #10)', () => {
+    it('affiche un bandeau explicite quand fromCache est vrai', () => {
+      renderResults([FAST_ITINERARY], undefined, undefined, undefined, true);
+
+      expect(
+        screen.getAllByText('Résultats hors ligne').length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("n'affiche aucun bandeau de mode degrade pour un resultat frais (fromCache absent)", () => {
+      renderResults([FAST_ITINERARY]);
+
+      expect(
+        screen.queryByText('Résultats hors ligne'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('affiche le bandeau de mode degrade ET le bandeau de repli simultanement si les deux sont presents', () => {
+      renderResults(
+        [FAST_ITINERARY],
+        undefined,
+        undefined,
+        { kind: 'walk-only' },
+        true,
+      );
+
+      expect(
+        screen.getAllByText('Résultats hors ligne').length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText(/Aucun trajet en transport en commun/).length,
+      ).toBeGreaterThan(0);
     });
   });
 

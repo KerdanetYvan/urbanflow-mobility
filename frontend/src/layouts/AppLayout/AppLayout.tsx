@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import Alert from '../../components/Alert/Alert';
 import { useAuth } from '../../lib/useAuth';
+import { useOnlineStatus } from '../../lib/useOnlineStatus';
 import { BrandMarkIcon, HistoryIcon, LockIcon, SearchIcon, UserIcon } from '../../components/icons';
 import './AppLayout.css';
 
@@ -58,6 +60,7 @@ const NAV_ITEMS: NavItem[] = [
  */
 function AppLayout() {
   const { isAuthenticated } = useAuth();
+  const isOnline = useOnlineStatus();
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.visibility === 'authenticated-only') return isAuthenticated;
@@ -90,6 +93,20 @@ function AppLayout() {
           <span className="app-title-suffix">Mobility</span>
         </p>
       </header>
+
+      {/* Etat degrade explicite (F2, issue #10) - bandeau permanent tant que
+          le navigateur se signale hors ligne (useOnlineStatus,
+          navigator.onLine + evenements online/offline), visible sur tout
+          ecran plutot qu'un simple echec silencieux au prochain appel
+          reseau. Les resultats de recherche affiches depuis le cache local
+          (lib/tripCache.ts) portent leur propre bandeau, plus specifique -
+          voir RecherchePageResults. */}
+      {!isOnline && (
+        <Alert variant="warning" title="Hors ligne">
+          Vous êtes actuellement hors ligne. Certaines fonctionnalités
+          peuvent être indisponibles ou afficher des données non à jour.
+        </Alert>
+      )}
 
       <nav className="app-nav" aria-label="Navigation principale">
         {visibleNavItems.map((item) => (
