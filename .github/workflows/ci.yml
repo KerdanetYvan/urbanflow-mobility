@@ -106,6 +106,19 @@ jobs:
     # Seulement sur un push reel sur main (pas sur les PR) : merger sur main
     # redeploie automatiquement, ouvrir/mettre a jour une PR ne deploie rien.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # File d'attente plutot que deploiements en parallele (bug constate en
+    # session : 6 merges Dependabot enchaines ont declenche 6 runs quasi
+    # simultanes, chacun lancant `docker compose up -d` sur le MEME VPS -
+    # 5 des 6 ont echoue en collision sur le nom du conteneur backend,
+    # "Conflict. The container name ... is already in use"). Un seul groupe
+    # de concurrence pour tout push sur main : un deploiement en cours n'est
+    # jamais interrompu (cancel-in-progress: false, un `docker compose up -d`
+    # a moitie applique laisserait la prod dans un etat incertain), le
+    # suivant attend simplement son tour au lieu de se battre sur les memes
+    # conteneurs.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
 
