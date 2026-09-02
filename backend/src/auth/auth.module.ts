@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -13,7 +13,10 @@ import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 
 @Module({
   imports: [
-    UsersModule,
+    // forwardRef() : UsersModule importe desormais AuthModule en retour
+    // (issue #164, JwtAuthGuard sur DELETE /users/me) - voir le commentaire
+    // symetrique dans users.module.ts pour le detail du cycle.
+    forwardRef(() => UsersModule),
     MailModule,
     PassportModule,
     // JwtModule est configure ici avec le secret d'ACCES par defaut ;

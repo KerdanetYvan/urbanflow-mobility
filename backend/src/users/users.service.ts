@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { MoreThan, QueryFailedError, Repository } from 'typeorm';
@@ -107,5 +111,54 @@ export class UsersService {
       resetTokenHash: null,
       resetTokenExpiresAt: null,
     });
+  }
+
+  /**
+   * Supprime definitivement le compte de l'utilisateur (issue #164, droit a
+   * l'effacement - RGPD article 17). Exige le mot de passe en clair pour
+   * confirmer l'action (voir DeleteAccountDto) : nature destructive et
+   * irreversible, on ne se repose pas uniquement sur la possession d'un
+   * access token (qui peut fuiter/etre partage) pour une action de cette
+   * gravite - meme logique de defense en profondeur qu'un changement de mot
+   * de passe critique.
+   *
+   * La suppression de la ligne `users` entraine, par cascade
+   * (`onDelete: 'CASCADE'` sur chaque relation - voir MobilityProfile,
+   * TripHistoryEntry, FollowedTrip, PushSubscription), la suppression de
+   * toutes les donnees liees dans la meme transaction geree par Postgres :
+   * pas besoin de les supprimer une a une ici.
+   *
+   * Ne verifie PAS explicitement que `userId` existe avant de chercher
+   * l'utilisateur : si JwtStrategy.validate() a laisse passer la requete,
+   * c'est que l'utilisateur existait encore a cet instant (verification
+   * ajoutee par cette meme issue, voir jwt.strategy.ts) - le `if (!user)`
+   * ci-dessous n'est qu'un filet de securite en cas d'appel direct au
+   * service (tests, ou future evolution qui contournerait le guard).
+   *
+   * ForbiddenException (403), PAS UnauthorizedException (401), pour un mot
+   * de passe de confirmation incorrect - distinction volontaire et
+   * importante cote frontend : `authRequest` (lib/api.ts) interprete TOUT
+   * 401 comme "access token expire", tente automatiquement un
+   * rafraichissement puis rejoue la requete UNE fois avant, en cas de
+   * nouvel echec, d'effacer les jetons stockes et d'annoncer "Session
+   * expiree". Un mot de passe errone n'a rien a voir avec la validite du
+   * jeton : le signaler en 401 ferait perdre a tort sa session a un
+   * utilisateur authentifie qui s'est simplement trompe de mot de passe
+   * (jetons effaces, message d'erreur incorrect affiche). 403 n'entre pas
+   * dans ce mecanisme de retry, propage tel quel le message "Mot de passe
+   * incorrect" (voir AccountActions#confirmDelete cote frontend).
+   */
+  async remove(userId: string, password: string): Promise<void> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new ForbiddenException();
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordMatches) {
+      throw new ForbiddenException('Mot de passe incorrect');
+    }
+
+    await this.usersRepository.remove(user);
   }
 }

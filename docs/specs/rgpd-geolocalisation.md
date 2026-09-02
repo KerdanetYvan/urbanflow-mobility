@@ -2,6 +2,7 @@
 
 > Casquette Dev BE — issue [#22](https://github.com/KerdanetYvan/urbanflow-mobility/issues/22), Sprint 3.
 > S'applique à toute future colonne/donnée de géolocalisation introduite par [#11](https://github.com/KerdanetYvan/urbanflow-mobility/issues/11) (historique des trajets) et [#113](https://github.com/KerdanetYvan/urbanflow-mobility/issues/113) (adresses domicile/travail) — voir [4](#4-application-à-11113--obligations-pour-les-futures-colonnes).
+> Le parcours utilisateur du droit à l'effacement (RGPD article 17) est documenté par [#164](https://github.com/KerdanetYvan/urbanflow-mobility/issues/164), section [5](#5-droit-à-leffacement-164--le-parcours-utilisateur-pas-seulement-le-mécanisme).
 
 ## 1. Constat de départ (pourquoi ce document précède toute colonne concrète)
 
@@ -70,3 +71,33 @@ Checklist à cocher par #11 et #113 au moment d'introduire leurs colonnes de gé
 - [x] `GEOLOCATION_ENCRYPTION_KEY` renseignée dans l'environnement de déploiement concerné (dev, CI, prod) — absente en CI/tests, la valeur de test du fichier `.spec.ts` du transformer suffit, jamais une vraie clé de production dans un test — #11 vérifié en conditions réelles (round-trip chiffré/déchiffré contre la DB de dev), #113 vérifié de la même façon (création avec domicile complet, lecture déchiffrée via `GET /profiles/me`, colonnes confirmées chiffrées en base via `psql`)
 - [x] Politique de rétention/purge définie et implémentée selon le type de donnée (section 3.1 ou 3.2) — #11 fait (`TripHistoryService#purgeExpired`, purge quotidienne automatique via `@Cron`/`@nestjs/schedule`, 12 mois glissants), #113 fait (aucune purge temporelle, conforme à la section 3.2 — donnée de profil durable, effacée uniquement par mise à jour explicite ou suppression du compte)
 - [x] `onDelete: 'CASCADE'` sur toute relation vers `User` portant la donnée — #11 fait (`TripHistoryEntry.user`, `ManyToOne`, vérifié en conditions réelles), #113 fait (`MobilityProfile.user`, `OneToOne`, déjà en place avant #113 — vérifié en conditions réelles : la suppression d'un compte de test entraîne bien la suppression de son profil, domicile/travail inclus)
+
+## 5. Droit à l'effacement (#164) : le parcours utilisateur, pas seulement le mécanisme
+
+Les sections 3.1/3.2 documentaient déjà le **mécanisme** technique de suppression en cascade (`onDelete: 'CASCADE'`) — vérifié en conditions réelles dès #11/#113, avant même que #164 n'existe. Ce que #164 a ajouté, c'est le **moyen pour un utilisateur réel de le déclencher lui-même** (RGPD article 17) : jusqu'à cette issue, seule une suppression manuelle en base pouvait exercer ce droit, malgré un mécanisme déjà fonctionnel — constat de la revue de fin de Sprint 3 (`docs/sprints/sprint-3-retro.md`).
+
+### 5.1 Point d'entrée
+
+`DELETE /users/me` (`backend/src/users/users.controller.ts`), protégé par `JwtAuthGuard` — jamais un id de compte fourni par le client, toujours celui du jeton (`user.sub`), même principe IDOR que `ProfilesController` (issue #22/#68).
+
+### 5.2 Confirmation explicite (nature destructive et irréversible)
+
+Le mot de passe du compte est exigé dans le corps de la requête (`DeleteAccountDto`), vérifié côté **backend** (`UsersService#remove`, `bcrypt.compare`) avant toute suppression — jamais une simple confirmation côté client. Cohérent avec la contrainte posée dès la création de l'issue : "ne pas se reposer uniquement sur une boîte de dialogue côté client".
+
+Côté frontend (`ProfilPage.tsx#AccountActions`), le bouton "Supprimer mon compte" ouvre un second état de confirmation (rappel explicite du caractère définitif + champ mot de passe) — jamais un `window.confirm()` navigateur, anti-pattern d'accessibilité pour une action de cette gravité.
+
+**Choix du code HTTP en cas d'échec** : `403 Forbidden`, pas `401 Unauthorized`, pour un mot de passe de confirmation incorrect — décision technique notable découverte en implémentant #164. `authRequest` (`frontend/src/lib/api.ts`) interprète tout `401` comme "jeton d'accès expiré", tente automatiquement un rafraîchissement puis rejoue la requête ; en cas de nouvel échec, il efface les jetons stockés et annonce "Session expirée". Un mot de passe de confirmation erroné n'a rien à voir avec la validité du jeton — le signaler en 401 aurait fait perdre à tort sa session à un utilisateur authentifié qui s'est simplement trompé de mot de passe. `403` ne déclenche pas ce mécanisme : le message "Mot de passe incorrect" est affiché tel quel, sans effet de bord sur la session.
+
+### 5.3 Suppression des données liées
+
+Emportée par la cascade déjà en place et vérifiée (sections 3.1/3.2, plus `PushSubscription` et `FollowedTrip` introduits depuis par #18) : profil de mobilité, historique de trajets, trajet actuellement suivi, abonnements aux notifications push. Une seule ligne supprimée (`users`), Postgres se charge du reste dans la même transaction — pas de suppression manuelle une à une côté applicatif.
+
+### 5.4 Invalidation des jetons
+
+Les JWT de ce projet sont **sans état par construction** (voir `backend/src/auth/auth.service.ts`) — aucune liste de révocation n'existe, `logout()` côté frontend est déjà documenté comme "purement local" (`lib/auth.ts`). Sans changement supplémentaire, un access token déjà émis serait resté valide jusqu'à son expiration naturelle (15 min par défaut) même après suppression du compte.
+
+`JwtStrategy.validate()` (`backend/src/auth/jwt.strategy.ts`) vérifie désormais, à **chaque requête authentifiée**, que l'utilisateur du jeton existe toujours en base — sinon `401 Unauthorized`. Compromis retenu plutôt que d'introduire une liste de révocation dédiée (portée disproportionnée pour ce projet) : un coût d'une requête DB supplémentaire par appel protégé, en échange d'une coupure d'accès immédiate après suppression plutôt qu'une attente de l'expiration du token. Le refresh token, lui, était déjà invalidé de fait : `AuthService#refresh` vérifie l'existence de l'utilisateur avant de renouveler la paire de jetons (comportement préexistant à #164, pas une nouveauté).
+
+### 5.5 Code mort clarifié (`deleteProfile`)
+
+`lib/profile.ts#deleteProfile()` (`DELETE /profiles/me`) restait un code mort avant #164 (aucun appelant dans l'app, cité dans le constat d'origine de l'issue) — et le reste après #164 : cette fonction supprime uniquement le *profil de mobilité* (préférences, domicile/travail), pas le compte. Ce n'est pas la même action que la suppression de compte (#164 introduit `lib/auth.ts#deleteAccount()`, `DELETE /users/me`, sans rapport avec `deleteProfile`) — les deux endpoints existent pour des besoins différents et légitimes (réinitialiser ses préférences sans perdre son compte, vs. exercer son droit à l'effacement). Décision : ne pas router `deleteProfile()` derrière un bouton pour cette issue (aucun critère d'acceptation de #164 ne demande "réinitialiser mes préférences" — ce serait une fonctionnalité distincte, hors périmètre) ; le code reste en l'état, testé, prêt à être branché le jour où un tel besoin se confirme.

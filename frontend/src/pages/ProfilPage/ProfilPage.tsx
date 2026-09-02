@@ -4,9 +4,11 @@ import Alert from '../../components/Alert/Alert';
 import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
+import FormField from '../../components/FormField/FormField';
+import { LockIcon } from '../../components/icons';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import { ApiError } from '../../lib/api';
-import { logout } from '../../lib/auth';
+import { deleteAccount, logout } from '../../lib/auth';
 import { formatCoordinates } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
 import { useAuth } from '../../lib/useAuth';
@@ -198,6 +200,125 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
   );
 }
 
+interface AccountActionsProps {
+  onLogout: () => void;
+  /**
+   * Appele apres suppression reussie du compte (issue #164) - a la charge
+   * de ProfilPage de naviguer/invalider la session (memes garde-fous de
+   * transition que handleLogout, voir son commentaire plus bas).
+   */
+  onAccountDeleted: () => void;
+}
+
+/**
+ * Actions de compte (deconnexion, suppression du compte - issue #164),
+ * communes aux deux etats de ProfilPage (onboarding et formulaire
+ * d'edition) - extrait en composant partage plutot que duplique dans les
+ * deux branches du rendu, meme motif que ProfileOnboarding ci-dessus.
+ *
+ * La suppression de compte n'est JAMAIS un simple `confirm()` navigateur
+ * (anti-pattern d'accessibilite/UX pour une action destructive et
+ * irreversible - critere explicite de l'issue #164, RGPD article 17) :
+ * cliquer sur "Supprimer mon compte" bascule vers un second etat de
+ * confirmation, avec rappel explicite du caractere definitif de l'action et
+ * ressaisie du mot de passe (la seule reponse "oui" a une boite de dialogue
+ * ne suffit pas a confirmer une action de cette gravite - meme raisonnement
+ * que la reinitialisation de mot de passe, qui exige elle aussi une preuve
+ * de possession plutot qu'une simple confirmation cote client).
+ */
+function AccountActions({ onLogout, onAccountDeleted }: AccountActionsProps) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function cancel() {
+    setIsConfirming(false);
+    setPassword('');
+    setError(null);
+  }
+
+  async function confirmDelete() {
+    setError(null);
+    setIsDeleting(true);
+    try {
+      await deleteAccount(password);
+      onAccountDeleted();
+    } catch (err) {
+      // Message d'API affiche tel quel (ex. "Mot de passe incorrect", voir
+      // UsersService#remove cote backend) - reste sur l'etat de
+      // confirmation pour permettre une nouvelle tentative, contrairement a
+      // un retour au bouton initial qui ferait perdre le contexte.
+      const message =
+        err instanceof ApiError ? err.message : 'Une erreur inattendue est survenue.';
+      setError(message);
+      setIsDeleting(false);
+    }
+  }
+
+  if (!isConfirming) {
+    return (
+      <div className="profil-account-actions">
+        <Button type="button" variant="secondary" onClick={onLogout} className="profil-logout">
+          Se déconnecter
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setIsConfirming(true)}
+          className="profil-delete-toggle"
+        >
+          Supprimer mon compte
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="profil-account-actions">
+      <div className="profil-delete-confirm">
+        <Alert variant="warning" title="Suppression définitive du compte">
+          Votre compte, votre profil de mobilité, votre historique de trajets
+          et vos abonnements seront supprimés définitivement. Cette action
+          est irréversible.
+        </Alert>
+        {error && (
+          <Alert variant="error" title="Erreur">
+            {error}
+          </Alert>
+        )}
+        <FormField
+          id="delete-account-password"
+          label="Mot de passe (confirmation)"
+          type="password"
+          icon={<LockIcon />}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+        />
+        <div className="profil-delete-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={cancel}
+            disabled={isDeleting}
+          >
+            Annuler
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void confirmDelete()}
+            disabled={isDeleting || !password}
+            className="profil-delete-confirm-btn"
+          >
+            {isDeleting ? 'Suppression…' : 'Supprimer définitivement'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Ecran de gestion du profil de mobilite (F1, issue #34).
  *
@@ -330,6 +451,22 @@ function ProfilPage() {
     });
   }
 
+  /**
+   * Suite d'une suppression de compte reussie (issue #164) - meme
+   * destination et meme raisonnement que handleLogout ci-dessus (les deux
+   * mettent fin a la session) : /recherche reste utilisable sans compte
+   * (issue #64), et startTransition() est indispensable pour la meme raison
+   * exacte que documentee sur handleLogout (course avec RequireAuth). Les
+   * jetons sont deja nettoyes par deleteAccount() (voir lib/auth.ts), pas
+   * besoin de rappeler logout() ici.
+   */
+  function handleAccountDeleted() {
+    startTransition(() => {
+      navigate('/recherche');
+      setAuthenticated(false);
+    });
+  }
+
   function toggleMode(mode: string) {
     setSelectedModes((current) =>
       current.includes(mode)
@@ -427,16 +564,10 @@ function ProfilPage() {
       <section className="profil-page">
         <h1>Profil de mobilité</h1>
         <ProfileOnboarding onComplete={() => navigate('/recherche')} />
-        <div className="profil-account-actions">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleLogout}
-            className="profil-logout"
-          >
-            Se déconnecter
-          </Button>
-        </div>
+        <AccountActions
+          onLogout={handleLogout}
+          onAccountDeleted={handleAccountDeleted}
+        />
       </section>
     );
   }
@@ -537,16 +668,10 @@ function ProfilPage() {
       {/* Hors du <form> : ne doit pas pouvoir etre declenche par un Entree
           dans un champ du formulaire de profil (comportement par defaut
           d'un bouton submit a l'interieur d'un <form>). */}
-      <div className="profil-account-actions">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleLogout}
-          className="profil-logout"
-        >
-          Se déconnecter
-        </Button>
-      </div>
+      <AccountActions
+        onLogout={handleLogout}
+        onAccountDeleted={handleAccountDeleted}
+      />
     </section>
   );
 }

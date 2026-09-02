@@ -1,6 +1,7 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
+import * as bcrypt from 'bcryptjs';
 import { QueryFailedError } from 'typeorm';
 import { User } from './user.entity';
 import { UsersService } from './users.service';
@@ -15,6 +16,7 @@ function createRepositoryMock() {
     findOneBy: jest.fn(),
     create: jest.fn((data: Partial<User>) => data),
     save: jest.fn(),
+    remove: jest.fn(),
   };
 }
 
@@ -90,6 +92,41 @@ describe('UsersService', () => {
       expect(repository.findOneBy).toHaveBeenCalledWith({
         email: 'alice@example.com',
       });
+    });
+  });
+
+  describe("remove (issue #164, droit a l'effacement RGPD)", () => {
+    it('supprime le compte quand le mot de passe de confirmation est correct', async () => {
+      const passwordHash = await bcrypt.hash('MotDePasse123!', 4);
+      const user = { id: 'user-1', email: 'alice@example.com', passwordHash };
+      repository.findOneBy.mockResolvedValue(user);
+
+      await service.remove('user-1', 'MotDePasse123!');
+
+      expect(repository.remove).toHaveBeenCalledWith(user);
+    });
+
+    it('refuse la suppression si le mot de passe de confirmation est incorrect', async () => {
+      const passwordHash = await bcrypt.hash('MotDePasse123!', 4);
+      repository.findOneBy.mockResolvedValue({
+        id: 'user-1',
+        email: 'alice@example.com',
+        passwordHash,
+      });
+
+      await expect(
+        service.remove('user-1', 'MauvaisMotDePasse'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(repository.remove).not.toHaveBeenCalled();
+    });
+
+    it("leve une erreur si l'utilisateur n'existe plus (filet de securite, JwtStrategy verifie deja l'existence en amont)", async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.remove('user-inconnu', 'peu importe'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(repository.remove).not.toHaveBeenCalled();
     });
   });
 });

@@ -153,6 +153,16 @@ export function authPatch<T>(path: string, data: unknown): Promise<T> {
   return authRequest<T>(path, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
-export function authDelete<T>(path: string): Promise<T> {
-  return authRequest<T>(path, { method: 'DELETE' });
+/**
+ * `data` optionnel (issue #164) : DELETE /users/me exige une confirmation
+ * par mot de passe dans le corps de la requete - un DELETE avec corps est
+ * valide au sens HTTP (contrairement a une idee recue) et deja gere sans
+ * souci par `fetch`/le backend (ValidationPipe global, voir main.ts), donc
+ * pas besoin d'une fonction dediee en plus de authGet/authPost/authPatch.
+ */
+export function authDelete<T>(path: string, data?: unknown): Promise<T> {
+  return authRequest<T>(path, {
+    method: 'DELETE',
+    ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
+  });
 }
