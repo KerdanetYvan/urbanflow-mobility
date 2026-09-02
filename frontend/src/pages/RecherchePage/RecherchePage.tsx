@@ -17,6 +17,7 @@ import FormField from '../../components/FormField/FormField';
 import { SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
+import { getCurrentFollowedTrip } from '../../lib/followedTrip';
 import { formatCoordinates } from '../../lib/format';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import type { PlaceSuggestion } from '../../lib/places';
@@ -660,6 +661,49 @@ function RecherchePage() {
       handleQuickSearch(incoming.origin, incoming.destination),
     );
   }, [location.state]);
+
+  // Reprise automatique d'un trajet suivi (issue #18) : au tap sur une
+  // notification de perturbation, le service worker ouvre l'app sur
+  // "/recherche" (voir public/push-sw.js) sans etat de navigation ni
+  // parametre d'URL (aucune route /resultats dediee, meme contrainte que
+  // #174 ci-dessus) - cet effet retrouve le suivi actif via GET
+  // /trips/current et relance la meme recherche que
+  // TripFollowButton#toStartFollowingTripInput, pour atterrir directement
+  // sur l'ecran de resultats deja recalcule (docs/specs/
+  // f3-scoring-perturbations.md section 3.3 : "jamais un retour a l'ecran
+  // de recherche"). Pas de garde particuliere contre une double execution :
+  // un visiteur non authentifie n'a jamais de suivi (issue #18, section 3
+  // du spec de cadrage - suivi reserve aux comptes), getCurrentFollowedTrip
+  // degrade silencieusement (voir sa docstring) plutot que d'exiger un
+  // isAuthenticated ici.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    getCurrentFollowedTrip().then((followedTrip) => {
+      if (cancelled || !followedTrip) return;
+      queueMicrotask(() =>
+        handleQuickSearch(
+          {
+            label: followedTrip.originLabel ?? 'Origine',
+            lat: followedTrip.originLat,
+            lon: followedTrip.originLon,
+          },
+          {
+            label: followedTrip.destinationLabel ?? 'Destination',
+            lat: followedTrip.destinationLat,
+            lon: followedTrip.destinationLon,
+          },
+        ),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // handleQuickSearch volontairement absent des dependances - meme
+    // raisonnement que l'effet #174 ci-dessus (fonction recreee a chaque
+    // rendu, l'inclure ferait tourner cet effet a chaque rendu au lieu de
+    // seulement au changement de isAuthenticated).
+  }, [isAuthenticated]);
 
   /**
    * Construit les entrées rapides du dropdown d'un champ d'adresse (issue

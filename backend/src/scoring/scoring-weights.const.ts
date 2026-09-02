@@ -57,6 +57,24 @@ export const SCORING_WEIGHTS = {
    * 7.2), pas une preference enregistree.
    */
   WALKING_METER_WHEN_RAINING: 0.08,
+
+  /**
+   * Penalite fixe (pas par metre/segment) appliquee des qu'au moins un
+   * segment de l'itineraire est actuellement touche par une perturbation
+   * GTFS-Realtime (issue #18, docs/specs/f3-scoring-perturbations.md
+   * section 4.2 - "Perturbations GTFS-Realtime en cours", 20% du poids
+   * decrit par le PO, second critere le plus lourd apres la duree).
+   * Calibree a l'echelle de DURATION_PER_SECOND (1 pt/min) : 15 points
+   * equivaut a un allongement de 15 min du trajet, suffisant pour reléguer
+   * un itineraire perturbe derriere une alternative propre de duree
+   * comparable, sans l'exclure completement (jamais un filtre dur - meme
+   * principe que PREFERRED_MODE_BONUS_PER_SEGMENT : un ecran vide reste
+   * pire qu'un resultat imparfait). Flat plutot que multiplie par le nombre
+   * de segments perturbes : le signal "ce trajet est perturbe" compte, pas
+   * son intensite (que #14 ne sait de toute facon pas chiffrer, voir
+   * GtfsRealtimeClientService).
+   */
+  PERTURBATION_PENALTY: 15,
 } as const;
 
 // AccessibilityPreference.WHEELCHAIR_ACCESSIBLE n'a volontairement aucun

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import * as followedTripLib from '../../lib/followedTrip';
 import { formatTime } from '../../lib/format';
 import * as sharedMobilityLib from '../../lib/sharedMobility';
 import type {
@@ -7,6 +9,7 @@ import type {
   TripItinerary,
   TripSegment,
 } from '../../lib/trips';
+import * as useAuthLib from '../../lib/useAuth';
 import RecherchePageResults from './RecherchePageResults';
 
 // MapView (rendue par cet ecran) charge les stations en libre-service au
@@ -14,6 +17,15 @@ import RecherchePageResults from './RecherchePageResults';
 // reseau dans ce fichier de test, qui ne s'interesse pas a cette
 // fonctionnalite (meme raisonnement que RecherchePage.spec.tsx).
 vi.mock('../../lib/sharedMobility');
+// TripFollowButton (rendu par ItinerarySegments, issue #18) verifie le
+// suivi actif au montage - mocke pour la meme raison que sharedMobility
+// ci-dessus.
+vi.mock('../../lib/followedTrip');
+// useAuth mocke directement plutot qu'un vrai <AuthProvider> (qui lit
+// localStorage a son montage, hors-sujet pour ce fichier qui ne teste
+// aucun comportement lie a l'authentification elle-meme - voir
+// RecherchePage.spec.tsx pour les tests qui en ont reellement besoin).
+vi.mock('../../lib/useAuth');
 
 const ORIGIN = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
 const DESTINATION = { label: 'Hôtel de Ville', lat: 45.77, lon: 4.83 };
@@ -125,14 +137,19 @@ function renderResults(
   return {
     onEditSearch,
     ...render(
-      <RecherchePageResults
-        origin={ORIGIN}
-        destination={DESTINATION}
-        itineraries={itineraries}
-        fallback={fallback}
-        onEditSearch={onEditSearch}
-        accessibilityPreferences={accessibilityPreferences}
-      />,
+      // MemoryRouter (issue #18) : ItinerarySegments rend desormais
+      // TripFollowButton (useNavigate) - useAuth est mocke directement
+      // (voir vi.mock ci-dessus), pas besoin d'un vrai <AuthProvider>.
+      <MemoryRouter>
+        <RecherchePageResults
+          origin={ORIGIN}
+          destination={DESTINATION}
+          itineraries={itineraries}
+          fallback={fallback}
+          onEditSearch={onEditSearch}
+          accessibilityPreferences={accessibilityPreferences}
+        />
+      </MemoryRouter>,
     ),
   };
 }
@@ -156,6 +173,15 @@ describe('RecherchePageResults', () => {
     vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
       [],
     );
+    // Visiteur non connecte par defaut dans ces tests : getCurrentFollowedTrip
+    // n'est meme pas appele par TripFollowButton dans ce cas (voir son
+    // effet), mais un mock explicite evite toute ambiguite si un test
+    // authentifie l'utilisateur.
+    vi.mocked(useAuthLib.useAuth).mockReturnValue({
+      isAuthenticated: false,
+      setAuthenticated: vi.fn(),
+    });
+    vi.mocked(followedTripLib.getCurrentFollowedTrip).mockResolvedValue(null);
   });
 
   it("affiche une disposition en chargement (carte origine/destination + squelette) quand itineraries est null (issue #73)", () => {
@@ -202,6 +228,36 @@ describe('RecherchePageResults', () => {
   it("ne montre jamais de valeur de score (uniquement l'ordre recu du backend)", () => {
     renderResults([FAST_ITINERARY]);
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
+  });
+
+  describe('perturbation en cours (issue #18)', () => {
+    it("affiche le bouton \"Suivre ce trajet\" dans le detail de l'itineraire selectionne", () => {
+      renderResults([FAST_ITINERARY]);
+
+      expect(
+        screen.getAllByRole('button', { name: 'Suivre ce trajet' }).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it(
+      "affiche un marqueur \"Perturbation en cours\" (distinct des badges " +
+        'qualitatifs) quand disrupted est vrai',
+      () => {
+        renderResults([{ ...FAST_ITINERARY, disrupted: true }]);
+
+        expect(
+          screen.getAllByText('Perturbation en cours').length,
+        ).toBeGreaterThan(0);
+      },
+    );
+
+    it("n'affiche aucun marqueur de perturbation quand disrupted est absent", () => {
+      renderResults([FAST_ITINERARY]);
+
+      expect(
+        screen.queryByText('Perturbation en cours'),
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe('itineraires regroupes par prochain passage (issue #127/#173)', () => {

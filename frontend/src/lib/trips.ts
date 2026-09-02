@@ -23,6 +23,10 @@ export interface TripSegment {
   routeColor?: string;
   /** Couleur de texte associee a routeColor (GTFS route_text_color, hex SANS '#'). */
   routeTextColor?: string;
+  /** Identifiant GTFS brut de la ligne (route_id), issue #18 - jamais affiche a l'usager (routeName est le libelle), sert uniquement a demarrer un suivi de trajet (POST /trips/current, voir lib/followedTrip.ts). Absent pour un segment a pied. */
+  routeId?: string;
+  /** Identifiant GTFS brut de la course (trip_id), meme usage que routeId. Absent pour un segment a pied. */
+  tripId?: string;
   startTime: string;
   endTime: string;
   durationSeconds: number;
@@ -42,6 +46,8 @@ export interface TripItinerary {
   segments: TripSegment[];
   /** Horaires de depart (ISO 8601, tries) des itineraires strictement identiques regroupes sous ce resultat (issue #127) - voir backend/src/trips/trips.service.ts#groupByRoute. Absent si aucun regroupement n'a eu lieu pour cet itineraire (deja distinct). startTime correspond au premier element. */
   nextDepartures?: string[];
+  /** true si un segment est actuellement touche par une perturbation GTFS-Realtime (issue #18, ScoringService) - absent (pas juste false) sinon. Affiche le marqueur "Perturbation en cours", distinct des badges qualitatifs. */
+  disrupted?: boolean;
 }
 
 /**

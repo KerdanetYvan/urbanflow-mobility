@@ -199,9 +199,13 @@ export class TripsService {
    * Cle de regroupement d'un itineraire (voir groupByRoute) : suite
    * ordonnee de (mode, ligne, arret de depart, arret d'arrivee) par
    * segment - suffisant pour distinguer deux trajets reellement differents
-   * (itineraire alternatif, correspondance differente) sans dependre d'un
-   * identifiant GTFS route_id qu'OTP ne renvoie pas dans notre integration
-   * (voir OtpLeg).
+   * (itineraire alternatif, correspondance differente), et plus lisible en
+   * cas de debogage qu'une suite d'identifiants GTFS bruts. route_id/trip_id
+   * sont bien exposes par OTP (voir OtpLeg#routeId, issue #18, verifie
+   * contre le mapper REST reel d'OTP 2.5) mais servent a un usage different
+   * (TripSegment#routeId/tripId, recoupement avec les perturbations
+   * GTFS-Realtime) - pas de raison de les reutiliser ici, un identifiant
+   * technique ne rendrait pas cette cle plus fiable pour son propre usage.
    */
   private routeKey(itinerary: TripItinerary): string {
     return itinerary.segments
@@ -234,6 +238,8 @@ export class TripsService {
       // l'affichage, voir frontend/src/lib/color.ts).
       routeColor: leg.routeColor || undefined,
       routeTextColor: leg.routeTextColor || undefined,
+      routeId: this.stripOtpFeedPrefix(leg.routeId),
+      tripId: this.stripOtpFeedPrefix(leg.tripId),
       startTime: new Date(leg.startTime).toISOString(),
       endTime: new Date(leg.endTime).toISOString(),
       durationSeconds: Math.round((leg.endTime - leg.startTime) / 1000),
@@ -242,6 +248,22 @@ export class TripsService {
       to: { name: leg.to.name, lat: leg.to.lat, lon: leg.to.lon },
       geometry: this.mapGeometry(leg),
     };
+  }
+
+  /**
+   * Retire le prefixe "{feedId}:" qu'OTP ajoute a route_id/trip_id (voir
+   * OtpLeg#routeId, issue #18) pour obtenir l'identifiant brut, celui
+   * expose sans prefixe par le flux GTFS-Realtime de l'operateur (issue
+   * #14, GtfsRealtimeCacheService#findDisruptions). `undefined`/vide reste
+   * `undefined` (segment a pied) ; un identifiant sans ":" (jamais observe
+   * en pratique, mais pas exclu par le format) est renvoye tel quel plutot
+   * que de lever - un identifiant technique manque rarement d'etre exploite
+   * plutot que d'echouer bruyamment.
+   */
+  private stripOtpFeedPrefix(id: string | undefined): string | undefined {
+    if (!id) return undefined;
+    const separatorIndex = id.indexOf(':');
+    return separatorIndex === -1 ? id : id.slice(separatorIndex + 1);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { GtfsRealtimeCacheService } from '../gtfs-realtime/gtfs-realtime-cache.service';
 import { AccessibilityPreference } from '../profiles/accessibility-preference.enum';
 import { MobilityProfile } from '../profiles/mobility-profile.entity';
 import type {
@@ -15,37 +16,53 @@ import {
 /**
  * Classement pondere des itineraires (issue #16, partie 7.3 du dossier) :
  * calcule un score "cout" par itineraire (plus bas = meilleur) a partir de
- * SCORING_WEIGHTS, des preferences du profil de mobilite (si fourni) et de
- * la meteo en cours (issue #17). Seule dependance injectee : WeatherService
- * - conforme au diagramme de communication du dossier (partie 8.3), qui
- * place l'appel meteo depuis le service de scoring lui-meme, seul point de
- * contact avec les sources externes (meteo, GTFS-Realtime).
+ * SCORING_WEIGHTS, des preferences du profil de mobilite (si fourni), de la
+ * meteo en cours (issue #17) et des perturbations GTFS-Realtime en cours
+ * (issue #18). Deux dependances injectees, conformes au diagramme de
+ * communication du dossier (partie 8.3) qui place ces deux appels (meteo,
+ * GTFS-Realtime) depuis le service de scoring lui-meme : WeatherService et
+ * GtfsRealtimeCacheService (cache deja rafraichi en tache de fond par
+ * GtfsRealtimeModule, jamais interroge a la volee ici).
  */
 @Injectable()
 export class ScoringService {
-  constructor(private readonly weatherService: WeatherService) {}
+  constructor(
+    private readonly weatherService: WeatherService,
+    private readonly gtfsRealtimeCache: GtfsRealtimeCacheService,
+  ) {}
 
   /**
    * Trie les itineraires du meilleur au moins bon (score croissant). Ne
-   * mute jamais le tableau/les objets recus (nouveau tableau, tri stable) et
-   * n'ajoute aucun champ aux itineraires - la forme de TripItinerary reste
-   * inchangee, conformement au sequencement deja annonce cote frontend (voir
-   * TripsService/TripsController).
+   * mute jamais le tableau/les objets recus (nouveau tableau, itineraires
+   * copies) - seul ajout au passage : `disrupted: true` sur tout itineraire
+   * touche par une perturbation GTFS-Realtime en cours (issue #18, voir
+   * TripItinerary#disrupted), absent (pas juste `false`) sinon. Tri stable
+   * a egalite de score.
    *
    * Interroge la meteo une seule fois par appel (pas par itineraire) -
    * WeatherService la met deja en cache, mais autant eviter les appels
-   * redondants au sein d'un meme classement.
+   * redondants au sein d'un meme classement. GtfsRealtimeCacheService n'est
+   * lui jamais interroge en reseau (cache memoire local, voir sa docstring).
    */
   async rank(
     itineraries: TripItinerary[],
     profile: MobilityProfile | null,
   ): Promise<TripItinerary[]> {
     const weather = await this.weatherService.getCurrentConditions();
-    return [...itineraries].sort(
-      (a, b) =>
-        this.computeScore(a, profile, weather) -
-        this.computeScore(b, profile, weather),
-    );
+    return itineraries
+      .map((itinerary) => {
+        const disrupted = this.hasActiveDisruption(itinerary);
+        // Etale d'abord l'itineraire recu (jamais mute), `disrupted`
+        // ajoute seulement si vrai - voir TripItinerary#disrupted, pas de
+        // champ present-mais-false pour ne pas alourdir les itineraires
+        // (grande majorite) qui n'en ont pas besoin.
+        return disrupted ? { ...itinerary, disrupted } : { ...itinerary };
+      })
+      .sort(
+        (a, b) =>
+          this.computeScore(a, profile, weather) -
+          this.computeScore(b, profile, weather),
+      );
   }
 
   private computeScore(
@@ -81,6 +98,13 @@ export class ScoringService {
 
     if (profile) {
       score += this.preferredModeBonus(itinerary, profile);
+    }
+
+    // `disrupted` deja calcule par rank() (voir hasActiveDisruption) avant
+    // l'appel a computeScore - relu ici plutot que recalcule, un seul appel
+    // a hasActiveDisruption par itineraire et par classement.
+    if (itinerary.disrupted) {
+      score += SCORING_WEIGHTS.PERTURBATION_PENALTY;
     }
 
     return score;
@@ -137,6 +161,25 @@ export class ScoringService {
     );
     return (
       matchingSegments.length * SCORING_WEIGHTS.PREFERRED_MODE_BONUS_PER_SEGMENT
+    );
+  }
+
+  /**
+   * `true` si au moins un segment de transport en commun de l'itineraire
+   * est actuellement touche par une perturbation GTFS-Realtime (issue #18) -
+   * recoupe route_id/trip_id de chaque segment (TripSegment#routeId/tripId,
+   * issue #18) avec GtfsRealtimeCacheService#findDisruptions (issue #14).
+   * Un segment a pied n'a ni routeId ni tripId : `findDisruptions({})`
+   * renvoie deliberement `[]` sans routeId/tripId (voir sa docstring), donc
+   * jamais de faux positif sur ces segments.
+   */
+  private hasActiveDisruption(itinerary: TripItinerary): boolean {
+    return itinerary.segments.some(
+      (segment) =>
+        this.gtfsRealtimeCache.findDisruptions({
+          routeId: segment.routeId,
+          tripId: segment.tripId,
+        }).length > 0,
     );
   }
 }

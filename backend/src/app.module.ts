@@ -9,8 +9,10 @@ import { AuthModule } from './auth/auth.module';
 import { GbfsModule } from './gbfs/gbfs.module';
 import { GtfsModule } from './gtfs/gtfs.module';
 import { GtfsRealtimeModule } from './gtfs-realtime/gtfs-realtime.module';
+import { PerturbationsModule } from './perturbations/perturbations.module';
 import { PlacesModule } from './places/places.module';
 import { ProfilesModule } from './profiles/profiles.module';
+import { PushModule } from './push/push.module';
 import { TripsModule } from './trips/trips.module';
 import { UsersModule } from './users/users.module';
 
@@ -68,6 +70,8 @@ import { UsersModule } from './users/users.module';
     GtfsModule,
     GbfsModule,
     GtfsRealtimeModule,
+    PushModule,
+    PerturbationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -33,6 +33,21 @@ export interface OtpLeg {
    * routeColor (voir docs/specs/badges-lignes-transport.md section 8.6).
    */
   routeTextColor?: string;
+  /**
+   * Identifiant GTFS brut de la ligne (route_id), prefixe par l'id du feed
+   * OTP ("{feedId}:{route_id}", ex. "1:7-0001") - format confirme contre le
+   * mapper REST reel d'OTP 2.5 (FeedScopedIdMapper#mapToApi,
+   * ext/restapi/mapping/, `feedId + ":" + id`), pas encore verifie contre
+   * une instance OTP reelle de ce projet (aucun conteneur OTP disponible
+   * dans cette session, voir routing-engine/README.md pour le lancer). Le
+   * prefixe de feed est retire par TripsService#mapLeg avant d'exposer
+   * TripSegment#routeId, pour matcher directement le route_id brut (sans
+   * prefixe) expose par le flux GTFS-Realtime de l'operateur (issue #14).
+   * Absent pour un segment a pied.
+   */
+  routeId?: string;
+  /** Identifiant GTFS brut de la course (trip_id), meme prefixe/usage que routeId - voir TripSegment#tripId. Absent pour un segment a pied. */
+  tripId?: string;
   startTime: number;
   endTime: number;
   distance: number;
