@@ -8,6 +8,26 @@ updates:
     directory: '/backend'
     schedule:
       interval: 'weekly'
+    groups:
+      # Constat en session (PR #210/#212/#214, 2026-09) : Dependabot avait
+      # ouvert 3 PR separees pour @nestjs/cli, @nestjs/passport et
+      # @nestjs/core vers la v12, chacune passant sa propre CI alors que le
+      # depot compte 9 autres paquets @nestjs/* restes en v11 (peer
+      # dependencies) - merger l'une d'elles seule aurait desynchronise la
+      # famille (confirme : @nestjs/core seul en v12 casse deja le build,
+      # voir PR #214). Grouper permet a Dependabot de proposer une PR
+      # unique montant tous les paquets @nestjs/* ensemble au lieu de
+      # les eclater.
+      nestjs:
+        patterns:
+          - '@nestjs/*'
+        # Explicite plutot que de compter sur le defaut : c'est precisement
+        # la montee MAJOR qui doit rester groupee (une PR par paquet est deja
+        # acceptable pour de simples patchs/minors, chacun independant).
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
 
   - package-ecosystem: 'npm'
     directory: '/frontend'
