@@ -1,4 +1,4 @@
-import { apiPost } from './api';
+import { apiPost, authDelete } from './api';
 import { clearTokens, saveTokens, type TokenPair } from './authStorage';
 
 interface RegisteredUser {
@@ -50,4 +50,22 @@ export function resetPassword(
     token,
     newPassword,
   });
+}
+
+/**
+ * Suppression definitive du compte (issue #164, droit a l'effacement RGPD
+ * article 17) - DELETE /users/me, jamais DELETE /profiles/me
+ * (`lib/profile.ts#deleteProfile`, qui n'efface QUE le profil de mobilite,
+ * pas le compte lui-meme ni son historique/trajet suivi/abonnements push -
+ * voir backend/src/users/users.service.ts#remove pour la cascade complete).
+ * Le mot de passe confirme l'action cote backend (defense en profondeur,
+ * pas seulement une boite de dialogue cote client - voir ProfilPage.tsx).
+ * Leve une ApiError (401) si le mot de passe est incorrect.
+ *
+ * Nettoie les jetons locaux apres coup, comme logout() : le compte n'existe
+ * plus, il n'y a plus rien a rafraichir/reutiliser.
+ */
+export async function deleteAccount(password: string): Promise<void> {
+  await authDelete<void>('/users/me', { password });
+  clearTokens();
 }

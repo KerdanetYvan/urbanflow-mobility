@@ -2,11 +2,22 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
+import * as authLib from '../../lib/auth';
 import { AuthProvider } from '../../lib/AuthProvider';
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from '../../lib/authStorage';
 import * as placesLib from '../../lib/places';
 import * as profileLib from '../../lib/profile';
 import ProfilPage from './ProfilPage';
+
+// Seul deleteAccount() est mocke (issue #164) - logout() reste la vraie
+// implementation : le test de deconnexion existant (issue #65) verifie un
+// effet reel sur authStorage (getAccessToken/getRefreshToken), pas un appel
+// mocke.
+vi.mock('../../lib/auth', async () => {
+  const actual =
+    await vi.importActual<typeof import('../../lib/auth')>('../../lib/auth');
+  return { ...actual, deleteAccount: vi.fn() };
+});
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -409,5 +420,123 @@ describe('ProfilPage', () => {
         expect(profileLib.updateProfile).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe('suppression de compte (issue #164, droit a l\'effacement RGPD)', () => {
+    function mockExistingProfileForDeletion() {
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    it(
+      "affiche un panneau de confirmation (mot de passe) au clic sur " +
+        "'Supprimer mon compte', sans rien supprimer avant validation " +
+        '(jamais juste un confirm() navigateur)',
+      async () => {
+        mockExistingProfileForDeletion();
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(
+          await screen.findByRole('button', { name: 'Supprimer mon compte' }),
+        );
+
+        expect(screen.getByLabelText('Mot de passe (confirmation)')).toBeInTheDocument();
+        expect(authLib.deleteAccount).not.toHaveBeenCalled();
+      },
+    );
+
+    it(
+      "supprime le compte, redirige vers /recherche et invalide la session " +
+        'apres confirmation avec le mot de passe',
+      async () => {
+        saveTokens({ accessToken: 'fake-token', refreshToken: 'fake-refresh' });
+        mockExistingProfileForDeletion();
+        vi.mocked(authLib.deleteAccount).mockImplementation(async () => {
+          clearTokens();
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(
+          await screen.findByRole('button', { name: 'Supprimer mon compte' }),
+        );
+        await user.type(
+          screen.getByLabelText('Mot de passe (confirmation)'),
+          'MotDePasse123!',
+        );
+        await user.click(
+          screen.getByRole('button', { name: 'Supprimer définitivement' }),
+        );
+
+        await waitFor(() => {
+          expect(authLib.deleteAccount).toHaveBeenCalledWith('MotDePasse123!');
+        });
+        // Meme destination que la deconnexion (issue #65) : /recherche
+        // reste utilisable sans compte, voir handleAccountDeleted.
+        expect(navigateMock).toHaveBeenCalledWith('/recherche');
+        expect(getAccessToken()).toBeNull();
+        expect(getRefreshToken()).toBeNull();
+      },
+    );
+
+    it(
+      "affiche l'erreur renvoyee par l'API (mot de passe incorrect) et " +
+        'reste sur le panneau de confirmation, sans naviguer',
+      async () => {
+        mockExistingProfileForDeletion();
+        // 403, pas 401 (voir backend/src/users/users.service.ts#remove) :
+        // deleteAccount() (mocke ici) est cense propager le message tel
+        // quel, sans passer par le mecanisme de rafraichissement
+        // automatique de authRequest reserve au 401 (lib/api.ts).
+        vi.mocked(authLib.deleteAccount).mockRejectedValue(
+          new ApiError('Mot de passe incorrect', 403),
+        );
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(
+          await screen.findByRole('button', { name: 'Supprimer mon compte' }),
+        );
+        await user.type(
+          screen.getByLabelText('Mot de passe (confirmation)'),
+          'MauvaisMotDePasse',
+        );
+        await user.click(
+          screen.getByRole('button', { name: 'Supprimer définitivement' }),
+        );
+
+        expect(await screen.findByText('Mot de passe incorrect')).toBeInTheDocument();
+        expect(
+          screen.getByLabelText('Mot de passe (confirmation)'),
+        ).toBeInTheDocument();
+        expect(navigateMock).not.toHaveBeenCalledWith('/recherche');
+      },
+    );
+
+    it("'Annuler' referme le panneau de confirmation sans appeler deleteAccount", async () => {
+      mockExistingProfileForDeletion();
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Supprimer mon compte' }),
+      );
+      await user.click(screen.getByRole('button', { name: 'Annuler' }));
+
+      expect(
+        screen.queryByLabelText('Mot de passe (confirmation)'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Supprimer mon compte' }),
+      ).toBeInTheDocument();
+      expect(authLib.deleteAccount).not.toHaveBeenCalled();
+    });
   });
 });

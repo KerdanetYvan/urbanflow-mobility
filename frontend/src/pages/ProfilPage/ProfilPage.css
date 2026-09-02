@@ -111,6 +111,9 @@
 /* Separee visuellement du formulaire de preferences (bordure au-dessus) :
    la deconnexion n'est pas une action "profil", c'est une action "compte". */
 .profil-account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   margin-top: var(--space-6);
   padding-top: var(--space-5);
   border-top: 1px solid var(--color-border);
@@ -118,6 +121,48 @@
 
 .profil-logout {
   width: 100%;
+}
+
+/* Suppression de compte (issue #164) - bouton d'ouverture teinte en
+   "danger" (couleur de texte seulement, meme fond que le bouton secondaire
+   standard) : suffisamment distinct sans etre alarmant avant meme d'avoir
+   ete clique, la vraie mise en garde arrive au clic (voir
+   .profil-delete-confirm ci-dessous). */
+.btn.profil-delete-toggle {
+  width: 100%;
+  color: var(--color-error-text);
+  border-color: var(--color-error);
+}
+
+.profil-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.profil-delete-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.profil-delete-actions > .btn {
+  flex: 1;
+}
+
+/* Bouton de confirmation definitive - seul bouton "danger" plein de l'appli
+   (aucune variante Button dediee a ce jour, un seul usage ne justifie pas
+   d'etendre le composant partage - voir Button.tsx). Selecteur `.btn.xxx`
+   (specificite superieure a `.btn-primary` seul) : garantit la surcharge
+   quel que soit l'ordre de chargement des feuilles de style entre
+   Button.css et ce fichier. */
+.btn.profil-delete-confirm-btn {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.btn.profil-delete-confirm-btn:hover:not(:disabled) {
+  background: var(--color-error-text);
+  border-color: var(--color-error-text);
 }
 
 @media (min-width: 768px) {
