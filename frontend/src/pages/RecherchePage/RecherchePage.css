@@ -295,8 +295,10 @@
   flex-shrink: 0;
 }
 
-@media (min-width: 768px) {
-  .recherche-addresses {
-    gap: var(--space-3);
-  }
-}
+/* Ancien reglage desktop de .recherche-addresses (gap: var(--space-3) a
+   partir de 768px, hors ecran ci-dessus) retire (issue #233) : reliquat de
+   l'ancienne disposition en colonne, il reintroduisait a tort un espace de
+   12px entre le bouton d'inversion et la colonne origine/destination des
+   768px, alors que le nouveau design les veut colles a toute largeur -
+   trouve en verifiant le rendu au clavier/desktop (defaut Playwright
+   >= 768px), invisible sur les captures mobile prises jusque-la. */
