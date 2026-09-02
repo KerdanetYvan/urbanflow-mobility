@@ -1,12 +1,19 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { formatTime } from '../../lib/format';
+import * as sharedMobilityLib from '../../lib/sharedMobility';
 import type {
   TripFallback,
   TripItinerary,
   TripSegment,
 } from '../../lib/trips';
 import RecherchePageResults from './RecherchePageResults';
+
+// MapView (rendue par cet ecran) charge les stations en libre-service au
+// montage (issue #13) - mocke pour ne jamais dependre d'un vrai appel
+// reseau dans ce fichier de test, qui ne s'interesse pas a cette
+// fonctionnalite (meme raisonnement que RecherchePage.spec.tsx).
+vi.mock('../../lib/sharedMobility');
 
 const ORIGIN = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
 const DESTINATION = { label: 'Hôtel de Ville', lat: 45.77, lon: 4.83 };
@@ -145,6 +152,12 @@ function desktopCards(container: HTMLElement) {
 }
 
 describe('RecherchePageResults', () => {
+  beforeEach(() => {
+    vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
+      [],
+    );
+  });
+
   it("affiche une disposition en chargement (carte origine/destination + squelette) quand itineraries est null (issue #73)", () => {
     const { container } = renderResults(null);
 

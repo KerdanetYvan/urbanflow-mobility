@@ -3,11 +3,13 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
 import { formatDuration, formatTransfers } from '../../lib/format';
+import type { SharedMobilityStation } from '../../lib/sharedMobility';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
 import { chipLabel, tripModeChips } from '../../lib/tripModeChips';
 import { getModeStyle } from './modeStyles';
 import { getSegmentColor } from './segmentColor';
+import { useSharedMobilityStations } from './useSharedMobilityStations';
 import './MapView.css';
 
 /**
@@ -45,6 +47,28 @@ const TRANSFER_ICON = L.divIcon({
   iconSize: [12, 12],
   iconAnchor: [6, 6],
 });
+
+/**
+ * Icone d'une station/vehicule en libre-service (velos, trottinettes -
+ * issue #13). Dynamique (une par station, contrairement aux icones fixes
+ * ci-dessus) : le badge affiche le nombre de velos disponibles a l'instant,
+ * ne peut donc pas etre une constante calculee une seule fois au chargement
+ * du module. Couleur = disponibilite reelle (var(--color-success) au moins
+ * un velo louable, sinon var(--color-text-muted) - station fermee a la
+ * location OU a quai plein/vide) plutot qu'une seule couleur "station GBFS"
+ * fixe : c'est la disponibilite, pas la simple presence d'une station, qui
+ * interesse l'usager sur cette carte.
+ */
+function sharedMobilityIcon(station: SharedMobilityStation): L.DivIcon {
+  const isAvailable = station.isRenting && station.bikesAvailable > 0;
+  const fill = isAvailable ? 'var(--color-success)' : 'var(--color-text-muted)';
+  return L.divIcon({
+    className: 'mapview-marker',
+    html: `<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${fill}" stroke="#fff" stroke-width="2"/><text x="10" y="10" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="#fff">${station.bikesAvailable}</text></svg>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
 
 /**
  * Position de l'utilisateur en temps reel (issue #9) - un point pulsant
@@ -197,6 +221,13 @@ function MapView({
   variant = 'boxed',
   userPosition,
 }: MapViewProps) {
+  // Stations/vehicules en libre-service (issue #13) - couche independante
+  // de l'itineraire recherche, affichee en permanence (comme la carte
+  // elle-meme, #110) plutot que seulement pendant tel ou tel etat de
+  // recherche : elle aide a planifier le premier/dernier kilometre a pied,
+  // avant meme d'avoir lance une recherche.
+  const sharedMobilityStations = useSharedMobilityStations();
+
   const segments = itinerary?.segments ?? [];
   const hasItinerary = segments.length > 0;
   const hasBothPoints = Boolean(originProp && destinationProp);
@@ -385,6 +416,21 @@ function MapView({
             key={index}
             position={[point.lat, point.lon]}
             icon={TRANSFER_ICON}
+            interactive={false}
+            keyboard={false}
+          />
+        ))}
+        {/* Stations/vehicules en libre-service (issue #13) - le badge de
+            chaque marqueur porte deja le nombre de velos disponibles (voir
+            sharedMobilityIcon), pas besoin d'infobulle supplementaire.
+            interactive={false}/keyboard={false} : meme raisonnement que les
+            marqueurs ci-dessus, la carte entiere reste decorative (voir la
+            docstring de MapView, WCAG 1.1.1). */}
+        {sharedMobilityStations.map((station) => (
+          <Marker
+            key={station.id}
+            position={[station.lat, station.lon]}
+            icon={sharedMobilityIcon(station)}
             interactive={false}
             keyboard={false}
           />

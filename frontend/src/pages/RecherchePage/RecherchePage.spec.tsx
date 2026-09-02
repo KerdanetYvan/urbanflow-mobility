@@ -6,10 +6,16 @@ import { AuthProvider } from '../../lib/AuthProvider';
 import { clearTokens, saveTokens } from '../../lib/authStorage';
 import * as placesLib from '../../lib/places';
 import * as profileLib from '../../lib/profile';
+import * as sharedMobilityLib from '../../lib/sharedMobility';
 import * as tripsLib from '../../lib/trips';
 import RecherchePage from './RecherchePage';
 
 vi.mock('../../lib/places');
+// MapView (rendue en permanence sur cet ecran, issue #110) charge les
+// stations en libre-service au montage (issue #13) - mocke pour ne jamais
+// dependre d'un vrai appel reseau dans ce fichier de test, qui ne
+// s'interesse pas a cette fonctionnalite.
+vi.mock('../../lib/sharedMobility');
 // Mock partiel (meme motif que lib/profile ci-dessous et HistoriquePage.spec.tsx) :
 // entryToPlaces est une fonction pure reutilisee par RechercheQuickShortcuts,
 // un automock complet la remplacerait par un vi.fn() sans valeur de retour et
@@ -74,6 +80,9 @@ describe('RecherchePage', () => {
     // Valeur par defaut sans raccourci (issue #112) - les tests qui verifient
     // les raccourcis eux-memes ecrasent ce mock avec des entrees explicites.
     vi.mocked(tripsLib.getTripHistory).mockResolvedValue([]);
+    vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
+      [],
+    );
   });
 
   afterEach(() => {
