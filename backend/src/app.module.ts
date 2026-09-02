@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { GbfsModule } from './gbfs/gbfs.module';
 import { GtfsModule } from './gtfs/gtfs.module';
+import { GtfsRealtimeModule } from './gtfs-realtime/gtfs-realtime.module';
 import { PlacesModule } from './places/places.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { TripsModule } from './trips/trips.module';
@@ -66,6 +67,7 @@ import { UsersModule } from './users/users.module';
     PlacesModule,
     GtfsModule,
     GbfsModule,
+    GtfsRealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
