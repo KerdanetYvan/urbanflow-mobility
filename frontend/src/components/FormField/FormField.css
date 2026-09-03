@@ -9,6 +9,23 @@
   margin-bottom: var(--space-1);
 }
 
+/* Label masque visuellement mais toujours annonce par un lecteur d'ecran
+   (issue #233) - meme pattern deja utilise ailleurs dans l'app (ex.
+   .address-field-sr-only, .recherche-visually-hidden), duplique ici plutot
+   que factorise : ce projet n'a pas de feuille de style globale d'utilitaires
+   partagee entre composants. */
+.field-label-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .field-input-wrapper {
   position: relative;
 }

@@ -1,4 +1,19 @@
-import { useState, type FocusEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+} from 'react';
+import { createPortal } from 'react-dom';
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  shift,
+  size,
+} from '@floating-ui/dom';
 import FormField from '../FormField/FormField';
 import { BusIcon, HistoryIcon, MapPinIcon } from '../icons';
 import type { PlaceSuggestion } from '../../lib/places';
@@ -45,6 +60,12 @@ interface AddressFieldProps {
    * comportement historique inchangé (issue #166, spec section 6).
    */
   quickEntries?: AddressQuickEntry[];
+  /**
+   * Rendu compact (issue #233, champs origine/destination de /recherche) :
+   * transmis tel quel à `FormField` - voir son commentaire pour le detail
+   * (label toujours dans le DOM, juste masque visuellement).
+   */
+  hideLabel?: boolean;
 }
 
 /**
@@ -65,6 +86,21 @@ interface AddressFieldProps {
  * Dès qu'un caractère est saisi (champ non vide) sans atteindre le seuil du
  * géocodeur, le dropdown est fermé : ni entrées rapides (plus pertinentes),
  * ni suggestions (pas encore disponibles).
+ *
+ * Positionnement flottant (issue #233, retour utilisateur en session) : le
+ * dropdown était auparavant un simple `position: absolute; top: 100%`,
+ * imbriqué dans le DOM de la carte de recherche - dès qu'il dépassait la
+ * hauteur visible de celle-ci, il déclenchait un scroll INTERNE à la carte
+ * (`overflow-y: auto` sur le panneau, voir RecherchePageResults.css) plutôt
+ * que de s'afficher par-dessus. Il est désormais porté hors de ce flux via
+ * un React Portal (`createPortal` vers `document.body`) et positionné par
+ * `@floating-ui/dom` : `flip()` le bascule au-dessus du champ s'il n'y a
+ * pas assez de place en dessous, `shift()` le recale horizontalement plutôt
+ * que de déborder du viewport, `size()` calcule une largeur minimale (celle
+ * du champ, jamais plus étroit) et maximale (l'espace disponible jusqu'au
+ * bord du viewport - le dropdown peut s'élargir pour une suggestion plus
+ * longue que le champ, `.address-suggestion-label` ne tronque plus qu'en
+ * dernier recours si même cette largeur maximale ne suffit pas).
  */
 function AddressField({
   id,
@@ -75,6 +111,7 @@ function AddressField({
   onChange,
   onSelect,
   quickEntries,
+  hideLabel,
 }: AddressFieldProps) {
   // Focus quelque part DANS le champ (input ou une entrée rapide) : piloté par
   // les gestionnaires focus/blur du conteneur, qui se propagent depuis les
@@ -82,6 +119,12 @@ function AddressField({
   // décider de l'affichage des entrées rapides - les suggestions du géocodeur,
   // elles, restent pilotées par la seule prop `suggestions` comme avant.
   const [isFocused, setIsFocused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Callback ref plutôt qu'un useRef classique : le <ul> ne monte QUE quand
+  // le dropdown est ouvert (rendu conditionnel), il faut être notifié dès
+  // qu'il apparaît/disparaît pour (dés)activer le positionnement flottant
+  // (effet ci-dessous, dépendant de floatingEl).
+  const [floatingEl, setFloatingEl] = useState<HTMLUListElement | null>(null);
 
   const showSuggestions = suggestions.length > 0;
   const showQuickEntries =
@@ -89,23 +132,84 @@ function AddressField({
     isFocused &&
     value.trim() === '' &&
     (quickEntries?.length ?? 0) > 0;
+  const isOpen = showSuggestions || showQuickEntries;
+
+  // Positionne le dropdown porté en portal (voir le commentaire du composant
+  // ci-dessus pour le détail de chaque middleware). Repositionnement
+  // imperatif direct sur le style DOM (pas via un state React) - pattern
+  // recommandé par @floating-ui/dom : `autoUpdate` peut appeler ce callback
+  // à haute fréquence (scroll, resize), le faire passer par un re-rendu
+  // React à chaque fois serait couteux pour un simple changement de
+  // position/taille.
+  useEffect(() => {
+    const reference = containerRef.current;
+    if (!isOpen || !reference || !floatingEl) return;
+
+    function updatePosition() {
+      void computePosition(reference!, floatingEl!, {
+        placement: 'bottom-start',
+        middleware: [
+          offset(4),
+          flip({ padding: 8 }),
+          shift({ padding: 8 }),
+          size({
+            padding: 8,
+            apply({ availableWidth, availableHeight, rects }) {
+              Object.assign(floatingEl!.style, {
+                minWidth: `${rects.reference.width}px`,
+                maxWidth: `${Math.max(rects.reference.width, availableWidth)}px`,
+                // 22rem (352px a la racine par defaut) : meme plafond que
+                // l'ancien `max-height` fixe (AddressField.css), en plus
+                // du plafond dynamique lie a l'espace reellement dispo.
+                maxHeight: `${Math.min(availableHeight, 352)}px`,
+              });
+            },
+          }),
+        ],
+      }).then(({ x, y }) => {
+        Object.assign(floatingEl!.style, { left: `${x}px`, top: `${y}px` });
+      });
+    }
+
+    return autoUpdate(reference, floatingEl, updatePosition);
+  }, [isOpen, floatingEl]);
 
   /**
-   * Ferme le dropdown d'entrées rapides uniquement quand le focus quitte
-   * réellement le champ (ni l'input ni une entrée) - `relatedTarget` est le
-   * futur élément focus. Sans ce test, tabuler de l'input vers la première
-   * entrée refermerait la liste avant qu'on puisse l'atteindre.
+   * Fermeture "deliberee" (Echap, bouton "Fermer") : rend le focus au
+   * declencheur, comme demande par la spec section 3. Le clic exterieur
+   * (voir l'ecouteur ci-dessous) ne passe PAS par cette fonction - un clic
+   * en dehors a deja porte le focus sur sa propre cible (ex. le champ
+   * Destination), le lui reprendre de force romprait ce que l'utilisateur
+   * vient de faire ; seules Echap/"Fermer" n'ont pas de cible de focus
+   * concurrente a respecter.
+   */
+  function close() {
+    setIsFocused(false);
+  }
+
+  /**
+   * Ferme le dropdown uniquement quand le focus quitte reellement le champ
+   * ET le dropdown - `relatedTarget` est le futur element focus. Verifie
+   * les deux conteneurs (pas seulement `.address-field`, issue #233) : le
+   * dropdown vit desormais dans un portal vers `document.body`, donc hors
+   * du sous-arbre DOM de `.address-field` - sans ce second test, tabuler
+   * ou cliquer de l'input vers une suggestion refermerait le dropdown
+   * avant qu'on puisse l'atteindre.
    */
   function handleContainerBlur(event: FocusEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setIsFocused(false);
+    const next = event.relatedTarget as Node | null;
+    if (
+      !event.currentTarget.contains(next) &&
+      !floatingEl?.contains(next)
+    ) {
+      close();
     }
   }
 
   /** Échap referme le dropdown d'entrées rapides et ramène le focus dans l'input (spec section 2). */
   function handleContainerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape' && showQuickEntries) {
-      setIsFocused(false);
+      close();
       document.getElementById(id)?.focus();
     }
   }
@@ -113,6 +217,7 @@ function AddressField({
   return (
     <div
       className="address-field"
+      ref={containerRef}
       onFocus={() => setIsFocused(true)}
       onBlur={handleContainerBlur}
       onKeyDown={handleContainerKeyDown}
@@ -125,6 +230,7 @@ function AddressField({
         onChange={(event) => onChange(event.target.value)}
         error={error}
         autoComplete="off"
+        hideLabel={hideLabel}
       />
       <div aria-live="polite" className="address-field-sr-only">
         {showSuggestions
@@ -133,58 +239,65 @@ function AddressField({
             ? `${quickEntries!.length} raccourci(s) disponible(s)`
             : ''}
       </div>
-      {showSuggestions && (
-        <ul className="address-suggestions">
-          {suggestions.map((suggestion) => (
-            <li key={`${suggestion.lat}-${suggestion.lon}`}>
-              <button
-                type="button"
-                className="address-suggestion"
-                onClick={() => onSelect(suggestion)}
-              >
-                {/* Puce transport pour un arrêt (géocodeur OTP), épingle pour
-                    une adresse (Nominatim) ou un résultat sans `kind` connu
-                    (issue #168). */}
-                <span className="address-suggestion-icon" aria-hidden="true">
-                  {suggestion.kind === 'stop' ? <BusIcon /> : <MapPinIcon />}
-                </span>
-                <span className="address-suggestion-label">
-                  {suggestion.label}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {showQuickEntries && (
-        <ul className="address-suggestions address-quick-entries">
-          {quickEntries!.map((entry) => (
-            <li key={entry.key}>
-              <button
-                type="button"
-                className="address-quick-entry"
-                disabled={entry.disabled}
-                // Empêche le clic de retirer le focus de l'input : le dropdown
-                // reste ouvert le temps de l'action (utile pour la position
-                // GPS, qui passe l'entrée en "Localisation…" sans fermer la
-                // liste). N'affecte pas l'activation au clavier.
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={entry.onSelect}
-              >
-                <span className="address-quick-entry-icon" aria-hidden="true">
-                  {entry.icon === 'history' ? <HistoryIcon /> : <MapPinIcon />}
-                </span>
-                <span className="address-quick-entry-text">
-                  <span className="address-quick-entry-title">{entry.title}</span>
-                  <span className="address-quick-entry-subtitle">
-                    {entry.subtitle}
+      {showSuggestions &&
+        createPortal(
+          <ul className="address-suggestions" ref={setFloatingEl}>
+            {suggestions.map((suggestion) => (
+              <li key={`${suggestion.lat}-${suggestion.lon}`}>
+                <button
+                  type="button"
+                  className="address-suggestion"
+                  onClick={() => onSelect(suggestion)}
+                >
+                  {/* Puce transport pour un arrêt (géocodeur OTP), épingle pour
+                      une adresse (Nominatim) ou un résultat sans `kind` connu
+                      (issue #168). */}
+                  <span className="address-suggestion-icon" aria-hidden="true">
+                    {suggestion.kind === 'stop' ? <BusIcon /> : <MapPinIcon />}
                   </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <span className="address-suggestion-label">
+                    {suggestion.label}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
+      {showQuickEntries &&
+        createPortal(
+          <ul
+            className="address-suggestions address-quick-entries"
+            ref={setFloatingEl}
+          >
+            {quickEntries!.map((entry) => (
+              <li key={entry.key}>
+                <button
+                  type="button"
+                  className="address-quick-entry"
+                  disabled={entry.disabled}
+                  // Empêche le clic de retirer le focus de l'input : le dropdown
+                  // reste ouvert le temps de l'action (utile pour la position
+                  // GPS, qui passe l'entrée en "Localisation…" sans fermer la
+                  // liste). N'affecte pas l'activation au clavier.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={entry.onSelect}
+                >
+                  <span className="address-quick-entry-icon" aria-hidden="true">
+                    {entry.icon === 'history' ? <HistoryIcon /> : <MapPinIcon />}
+                  </span>
+                  <span className="address-quick-entry-text">
+                    <span className="address-quick-entry-title">{entry.title}</span>
+                    <span className="address-quick-entry-subtitle">
+                      {entry.subtitle}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
     </div>
   );
 }
