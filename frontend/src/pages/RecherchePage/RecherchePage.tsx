@@ -899,6 +899,23 @@ function RecherchePage() {
           </Alert>
         )}
 
+        {/* Erreur de géolocalisation (permission refusée, indisponible,
+            issue #166 spec section 4) - affichée ICI plutôt qu'au fil du
+            texte entre les champs Origine/Destination (retour utilisateur
+            en session, #233) : ceux-ci sont désormais collés l'un à
+            l'autre (aucune marge ne les sépare), un texte inséré entre les
+            deux casserait la disposition compacte et écarterait Destination
+            en la poussant vers le bas. Même composant Alert que l'erreur
+            générale juste au-dessus plutôt qu'une tooltip dédiée (pas de
+            composant tooltip dans l'app à ce jour, ni de besoin d'en
+            construire un pour ce seul cas) - "warning", pas "error" : la
+            recherche reste utilisable sans la position actuelle. */}
+        {positionError && (
+          <Alert variant="warning" title="Position actuelle indisponible">
+            {positionError}
+          </Alert>
+        )}
+
         <form
           onSubmit={(event) => void handleSubmit(event)}
           className="recherche-form"
@@ -921,9 +938,12 @@ function RecherchePage() {
 
             <div className="recherche-addresses-fields">
               {/* Wrapper dedie (issue #233) : porte le separateur interne
-                  avec la destination (border-bottom, voir CSS) - inclut
-                  volontairement l'erreur de geolocalisation eventuelle, qui
-                  reste ainsi rattachee visuellement au champ Origine. */}
+                  avec la destination (border-bottom, voir CSS). L'erreur de
+                  geolocalisation eventuelle est desormais affichee plus haut
+                  (Alert dediee, voir juste au-dessus du <form>) plutot
+                  qu'ici : un texte insere entre Origine et Destination
+                  casserait leur disposition collee (retour utilisateur en
+                  session). */}
               <div className="recherche-address-origin">
                 <AddressField
                   id="origin-address"
@@ -940,15 +960,6 @@ function RecherchePage() {
                     setOrigin({ query: place.label, selected: place })
                   }
                 />
-
-                {/* Erreur de géolocalisation (permission refusée, indisponible) :
-                    sous le champ, hors du dropdown (issue #166, spec section 4) -
-                    l'entrée "Ma position actuelle" du dropdown, elle, se referme
-                    dès que la valeur du champ change ou que l'utilisateur clique
-                    ailleurs. */}
-                {positionError && (
-                  <p className="recherche-position-error">{positionError}</p>
-                )}
               </div>
 
               <AddressField
