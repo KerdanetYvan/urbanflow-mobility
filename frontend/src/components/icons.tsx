@@ -198,3 +198,17 @@ export function BrandMarkIcon() {
     </svg>
   );
 }
+
+/**
+ * Entonnoir/filtre (issue #233, lot 2) - bouton declencheur de la modale de
+ * filtres (modes de transport + heure de depart) sur /recherche. Forme
+ * standard reconnaissable (meme silhouette que l'icone "filter" de Feather/
+ * Lucide) plutot qu'une reinvention maison.
+ */
+export function FunnelIcon() {
+  return (
+    <svg {...iconProps()}>
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+  );
+}

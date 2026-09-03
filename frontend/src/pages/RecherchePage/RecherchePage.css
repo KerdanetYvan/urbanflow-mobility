@@ -175,74 +175,121 @@
   border: 0;
 }
 
-/* Filtre des modes de transport (issue #108/#109, voir docs/specs/
-   filtre-modes-transport.md) : bouton dedie toujours visible qui ouvre un
-   panneau en popover ancre juste en dessous - meme motif visuel que
-   .address-suggestions (components/AddressField/AddressField.css, position
-   absolute dans un conteneur position relative, meme ombre/rayon), coherent
-   avec le seul autre popover deja present sur cet ecran. */
-.recherche-modes-filter {
-  position: relative;
-  margin-bottom: var(--space-4);
-}
-
-.recherche-modes-trigger {
-  width: 100%;
-}
-
-.recherche-modes-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  z-index: 20;
-  margin-top: var(--space-1);
-  padding: var(--space-3);
-  background: var(--color-bg);
+/* Ligne filtres + Rechercher (issue #233, lot 2) : meme motif "cadre
+   unique, cellules collees, separateur interne" que .recherche-addresses
+   plus haut - remplace l'ancien bouton dedie "Modes de transport" (issue
+   #108/#109) et la divulgation "Plus d'options" (issue #110/#111),
+   fusionnes dans une seule modale de filtres (voir .recherche-filters-*
+   ci-dessous). */
+.recherche-search-row {
+  display: flex;
+  flex-direction: row;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
-  max-height: 16rem;
-  overflow-y: auto;
+  overflow: hidden;
+  margin-top: var(--space-2);
 }
 
-/* Pas de double cadre : .recherche-fieldset a deja sa propre bordure
-   ailleurs (formulaire de profil, ProfilPage.css), mais le panneau ci-dessus
-   en pose deja une - la retirer ici evite un encadrement en boite dans la
-   boite. */
-.recherche-modes-panel .recherche-fieldset {
+/* Bouton declencheur (icone entonnoir seule) - "outline", jamais rempli
+   (retour utilisateur en session) : contrairement a .recherche-submit a
+   sa droite (action principale, .btn-primary plein), ce bouton reste
+   discret, coherent avec la hierarchie visuelle primaire/secondaire du
+   reste de l'app (voir Button.css). border-right seule bordure visible
+   (separateur avec .recherche-submit), pas de cadre complet propre - meme
+   logique que .recherche-swap plus haut. */
+.recherche-filters-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  min-width: var(--touch-target-min);
   border: none;
-  padding: 0;
-}
-
-.recherche-modes-panel .recherche-fieldset legend {
-  padding: 0;
-}
-
-.recherche-modes-close {
-  width: 100%;
-  margin-top: var(--space-3);
-}
-
-/* Divulgation "Plus d'options" (issue #110/#111) : uniquement la date/heure
-   de depart (les modes de transport en sont sortis, voir .recherche-modes-
-   filter ci-dessus, issue #108/#109), repliee par defaut pour reduire
-   l'emprise verticale du panneau flottant/bandeau. <details> natif,
-   pas de machinerie ARIA custom. */
-.recherche-more-options {
-  margin: 0 0 var(--space-4);
-}
-
-.recherche-more-options summary {
-  padding: var(--space-2) 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg);
   color: var(--color-primary-emphasis);
-  font-weight: var(--weight-semibold);
-  font-size: var(--text-sm);
   cursor: pointer;
 }
 
-.recherche-more-options[open] summary {
-  margin-bottom: var(--space-3);
+.recherche-filters-trigger:hover {
+  background: var(--color-bg-subtle);
+}
+
+/* Offset negatif : meme raison que .recherche-swap:focus-visible plus haut
+   (le parent .recherche-search-row applique overflow: hidden). */
+.recherche-filters-trigger:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: -2px;
+}
+
+/* Pastille du nombre de filtres actifs (issue #233) - aria-hidden cote
+   JSX : l'information equivalente est deja portee par le aria-label du
+   bouton ("Filtres (2)"), cette pastille est purement visuelle. */
+.recherche-filters-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-emphasis);
+  color: var(--color-on-primary);
+  font-size: 0.65rem;
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+
+/* .recherche-search-row applique deja le seul cadre visible (border +
+   border-radius) - .recherche-submit ne doit plus dessiner le sien
+   (surcharge de la regle plus bas, .field/.btn generique), sans quoi son
+   coin gauche resterait arrondi "dans" la cellule (petite encoche visuelle
+   contre le separateur du bouton filtre). Selecteur `.btn.xxx` (specificite
+   superieure a `.btn-primary` seul) : meme raison que .profil-delete-
+   confirm-btn (ProfilPage.css, issue #164). */
+.recherche-search-row .btn.recherche-submit {
+  border-radius: 0;
+  flex: 1;
+}
+
+/* Fond obscurci plein ecran (issue #233, lot 2) - z-index eleve : au-dessus
+   du panneau flottant (.resultats-panel-list etc., voir RecherchePageResults.css)
+   ET de la carte Leaflet, qui a son propre z-index natif. `align-items:
+   flex-end` par defaut (mobile-first) : feuille remontant du bas (retour
+   utilisateur en session, pattern "bottom sheet"), plus adapte a l'ecran
+   reduit qu'une boite centree flottant au milieu de la carte. Devient
+   centre a partir de 768px (voir media query en bas de fichier). */
+.recherche-filters-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.4);
+}
+
+.recherche-filters-dialog {
+  width: 100%;
+  max-width: 28rem;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  /* Coins hauts seulement (mobile, feuille remontant du bas) - les coins
+     bas sont hors ecran (collee au bord inferieur, voir le parent). */
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.recherche-filters-close {
+  width: 100%;
 }
 
 .recherche-fieldset {
@@ -273,26 +320,17 @@
   accent-color: var(--color-primary);
 }
 
-.recherche-submit {
+/* "Rechercher" vit desormais dans .recherche-search-row (issue #233, lot 2)
+   - largeur/radius geres par les regles de ce conteneur plus haut, plus
+   rien a ajouter ici pour ce bouton. */
+
+/* "Annuler" (issue #171/#172) : n'existe que dans la vue Edition depuis un
+   ecran resultats deja peuple - hors de .recherche-search-row (case
+   conditionnel, voir son commentaire dans RecherchePage.tsx), pleine
+   largeur pour rester coherent avec "Rechercher" juste au-dessus. */
+.recherche-cancel {
   width: 100%;
   margin-top: var(--space-2);
-}
-
-/* Conteneur "Rechercher" + "Annuler" (issue #171/#172) : "Annuler" n'existe
-   que dans la vue Edition depuis un ecran resultats deja peuple (voir
-   RecherchePage.tsx, renderRechercheForm) - absent au tout premier
-   chargement, .recherche-submit garde alors sa pleine largeur seule. */
-.recherche-form-actions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.recherche-form-actions .recherche-submit {
-  flex: 1;
-}
-
-.recherche-cancel {
-  flex-shrink: 0;
 }
 
 /* Ancien reglage desktop de .recherche-addresses (gap: var(--space-3) a
@@ -302,3 +340,19 @@
    768px, alors que le nouveau design les veut colles a toute largeur -
    trouve en verifiant le rendu au clavier/desktop (defaut Playwright
    >= 768px), invisible sur les captures mobile prises jusque-la. */
+
+/* Modale de filtres (issue #233, lot 2) : feuille remontant du bas par
+   defaut (mobile-first, voir .recherche-filters-backdrop/-dialog plus
+   haut) devient une boite centree classique a partir de 768px - assez
+   d'espace pour ne plus avoir besoin du pattern "bottom sheet", reserve
+   aux petits ecrans (retour utilisateur en session). */
+@media (min-width: 768px) {
+  .recherche-filters-backdrop {
+    align-items: center;
+  }
+
+  .recherche-filters-dialog {
+    max-height: 80vh;
+    border-radius: var(--radius-md);
+  }
+}

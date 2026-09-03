@@ -14,7 +14,7 @@ import AddressField, {
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { SwapIcon } from '../../components/icons';
+import { FunnelIcon, SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
 import { ApiError } from '../../lib/api';
 import { getCurrentFollowedTrip } from '../../lib/followedTrip';
@@ -96,109 +96,166 @@ interface AlertState {
   message: string;
 }
 
-interface TransportModesFilterProps {
+interface SearchFiltersModalProps {
   selectedModes: string[];
   onToggleMode: (mode: string) => void;
+  departureTime: string;
+  onDepartureTimeChange: (value: string) => void;
 }
 
+/** Selecteur simple, suffisant pour un focus trap - pas de dependance externe pour ca seul. */
+const FOCUSABLE_SELECTOR =
+  'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
+
 /**
- * Filtre des modes de transport pour cette recherche (issue #108/#109, voir
- * docs/specs/filtre-modes-transport.md) - extrait de "Plus d'options" vers
- * un bouton dedie toujours visible (section 2 de la spec), qui ouvre un
- * panneau en popover ancre juste en dessous (section 3). Reprend le
- * fieldset/les cases a cocher existants tels quels (section 4) - seul le
- * conteneur change, la logique de selection (selectedModes/toggleMode)
- * reste portee par RecherchePage.
+ * Modale de filtres de recherche (issue #233, lot 2) - point d'entree
+ * unique pour tout filtre (modes de transport, heure de depart, et tout
+ * futur filtre) - remplace l'ancien bouton dedie "Modes de transport"
+ * (issue #108/#109, popover ancre) ET la divulgation "Plus d'options"
+ * (issue #110/#111, qui ne contenait plus que l'heure de depart) :
+ * fusionnes ici a la demande de l'utilisateur en session, pour ne plus
+ * avoir deux points d'entree separes qui grossissent au fil des filtres
+ * ajoutes.
+ *
+ * <div role="dialog" aria-modal="true"> avec piege de focus manuel plutot
+ * que l'element <dialog> natif (showModal()/close()) : verifie en session
+ * que jsdom 29 (environnement de test de ce projet, voir vite.config.ts)
+ * n'implemente PAS HTMLDialogElement#showModal - l'utiliser aurait rendu
+ * toute cette modale non testable. Le piege de focus/Echap/clic sur le
+ * fond ci-dessous reprend et etend le motif deja utilise par l'ancien
+ * popover TransportModesFilter (deja teste avec succes sous jsdom), avec
+ * UNE difference deliberee : le clic sur le fond referme ET rend le focus
+ * au declencheur (contrairement a l'ancien popover, qui faisait exception
+ * pour un clic exterieur ayant deja porte le focus ailleurs) - une VRAIE
+ * modale avec un fond opaque n'a pas d'autre cible de focus concurrente
+ * derriere elle a respecter, comportement plus simple et coherent avec un
+ * <dialog> natif standard.
+ *
+ * Application en direct (retour utilisateur en session) : chaque case
+ * cochee/heure changee agit immediatement sur l'etat de RecherchePage,
+ * rien a "Appliquer" - fermer la modale ne fait que la fermer.
  */
-function TransportModesFilter({
+function SearchFiltersModal({
   selectedModes,
   onToggleMode,
-}: TransportModesFilterProps) {
+  departureTime,
+  onDepartureTimeChange,
+}: SearchFiltersModalProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  /**
-   * Fermeture "deliberee" (Echap, bouton "Fermer") : rend le focus au
-   * declencheur, comme demande par la spec section 3. Le clic exterieur
-   * (voir l'ecouteur ci-dessous) ne passe PAS par cette fonction - un clic
-   * en dehors a deja porte le focus sur sa propre cible (ex. le champ
-   * Destination), le lui reprendre de force romprait ce que l'utilisateur
-   * vient de faire ; seules Echap/"Fermer" n'ont pas de cible de focus
-   * concurrente a respecter.
-   */
-  function closeAndRefocusTrigger() {
+  // Nombre de filtres actifs (issue #233) : affiche en badge sur le bouton
+  // declencheur, seul indice visuel qu'un filtre est deja regle sans
+  // rouvrir la modale. Un mode = une unite, une heure de depart renseignee
+  // = une unite de plus (peu importe laquelle).
+  const activeCount = selectedModes.length + (departureTime ? 1 : 0);
+
+  function close() {
     setIsOpen(false);
     triggerRef.current?.focus();
   }
 
-  // Fermeture au clic exterieur et a la touche Echap (section 3 de la
-  // spec) - ecouteurs poses uniquement quand le panneau est ouvert, retires
-  // a la fermeture.
+  // Focus le premier element focusable a l'ouverture, piege Tab/Shift+Tab a
+  // l'interieur de la modale (WAI-ARIA APG, pattern "Dialog (Modal)") et
+  // referme a Echap - ecouteur pose uniquement quand la modale est ouverte.
   useEffect(() => {
     if (!isOpen) return;
 
-    function handlePointerDown(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      FOCUSABLE_SELECTOR,
+    );
+    focusable?.[0]?.focus();
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        closeAndRefocusTrigger();
+        close();
+        return;
+      }
+      if (event.key !== 'Tab' || !focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
-    document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
   return (
-    <div className="recherche-modes-filter" ref={containerRef}>
-      <Button
+    <>
+      <button
         type="button"
-        variant="secondary"
         ref={triggerRef}
-        className="recherche-modes-trigger"
-        aria-expanded={isOpen}
-        aria-controls="recherche-modes-panel"
-        onClick={() => setIsOpen((current) => !current)}
+        className="recherche-filters-trigger"
+        aria-haspopup="dialog"
+        aria-label={activeCount > 0 ? `Filtres (${activeCount})` : 'Filtres'}
+        onClick={() => setIsOpen(true)}
       >
-        {selectedModes.length > 0
-          ? `Modes de transport · ${selectedModes.length}`
-          : 'Modes de transport'}
-      </Button>
+        <FunnelIcon />
+        {activeCount > 0 && (
+          <span className="recherche-filters-badge" aria-hidden="true">
+            {activeCount}
+          </span>
+        )}
+      </button>
 
       {isOpen && (
-        <div id="recherche-modes-panel" className="recherche-modes-panel">
-          <fieldset className="recherche-fieldset">
-            <legend>Modes de transport pour cette recherche</legend>
-            {TRANSPORT_MODES.map((mode) => (
-              <label key={mode.value} className="recherche-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedModes.includes(mode.value)}
-                  onChange={() => onToggleMode(mode.value)}
-                />
-                {mode.label}
-              </label>
-            ))}
-          </fieldset>
-          <Button
-            type="button"
-            variant="secondary"
-            className="recherche-modes-close"
-            onClick={closeAndRefocusTrigger}
+        <div
+          className="recherche-filters-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+        >
+          <div
+            ref={dialogRef}
+            className="recherche-filters-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filtres de recherche"
           >
-            Fermer
-          </Button>
+            <fieldset className="recherche-fieldset">
+              <legend>Modes de transport pour cette recherche</legend>
+              {TRANSPORT_MODES.map((mode) => (
+                <label key={mode.value} className="recherche-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={selectedModes.includes(mode.value)}
+                    onChange={() => onToggleMode(mode.value)}
+                  />
+                  {mode.label}
+                </label>
+              ))}
+            </fieldset>
+
+            <FormField
+              id="departure-time"
+              label="Partir à"
+              type="datetime-local"
+              value={departureTime}
+              onChange={(event) => onDepartureTimeChange(event.target.value)}
+              helpText="Laisser vide pour partir maintenant."
+            />
+
+            <Button
+              type="button"
+              variant="secondary"
+              className="recherche-filters-close"
+              onClick={close}
+            >
+              Fermer
+            </Button>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -912,53 +969,45 @@ function RecherchePage() {
             </div>
           </div>
 
-          {/* Bouton dedie toujours visible (issue #108/#109, voir
-              docs/specs/filtre-modes-transport.md section 2) - extrait de
-              "Plus d'options" ci-dessous, qui ne conserve donc plus que la
-              date/heure de depart. */}
-          <TransportModesFilter
-            selectedModes={selectedModes}
-            onToggleMode={toggleMode}
-          />
-
-          {/* Champ secondaire replie par defaut (issue #110/#111) : deja
-              optionnel aujourd'hui (heure vide = "maintenant"), reduit
-              l'emprise verticale du panneau flottant/bandeau. <details>
-              natif - pas de machinerie ARIA custom, le role/l'etat sont
-              deja corrects nativement. */}
-          <details className="recherche-more-options">
-            <summary>Plus d'options</summary>
-
-            <FormField
-              id="departure-time"
-              label="Partir à"
-              type="datetime-local"
-              value={departureTime}
-              onChange={(event) => setDepartureTime(event.target.value)}
-              helpText="Laisser vide pour partir maintenant."
+          {/* Ligne filtres + Rechercher (issue #233, lot 2) : meme disposition
+              "cadre unique, cellules collees" que .recherche-addresses
+              ci-dessus - bouton filtre (icone entonnoir, ~10-20% de la
+              largeur) a gauche, "Rechercher" occupe le reste. Remplace
+              l'ancien bouton dedie "Modes de transport" (issue #108/#109)
+              ET la divulgation "Plus d'options" (issue #110/#111, qui ne
+              contenait plus que l'heure de depart) - fusionnes dans
+              SearchFiltersModal, point d'entree unique pour tout filtre
+              (actuel et futur). */}
+          <div className="recherche-search-row">
+            <SearchFiltersModal
+              selectedModes={selectedModes}
+              onToggleMode={toggleMode}
+              departureTime={departureTime}
+              onDepartureTimeChange={setDepartureTime}
             />
-          </details>
-
-          <div className="recherche-form-actions">
             <Button type="submit" className="recherche-submit">
               Rechercher
             </Button>
-            {/* "Annuler" (issue #171/#172) : ne revient PAS a une recherche
-                anterieure ni ne reinitialise les champs - referme
-                simplement la vue Edition sur la liste/le resume deja
-                affiches en dessous (isEditingSearch), sans reappeler
-                /trips. N'a de sens que si des resultats existent deja. */}
-            {showCancel && (
-              <Button
-                type="button"
-                variant="secondary"
-                className="recherche-cancel"
-                onClick={() => setIsEditingSearch(false)}
-              >
-                Annuler
-              </Button>
-            )}
           </div>
+
+          {/* "Annuler" (issue #171/#172) : ne revient PAS a une recherche
+              anterieure ni ne reinitialise les champs - referme simplement
+              la vue Edition sur la liste/le resume deja affiches en
+              dessous (isEditingSearch), sans reappeler /trips. N'a de sens
+              que si des resultats existent deja - reste hors de la ligne
+              filtres/Rechercher ci-dessus (toujours 2 cellules, jamais 3),
+              cas conditionnel plutot que la norme (retour utilisateur en
+              session, issue #233). */}
+          {showCancel && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="recherche-cancel"
+              onClick={() => setIsEditingSearch(false)}
+            >
+              Annuler
+            </Button>
+          )}
         </form>
       </div>
     );

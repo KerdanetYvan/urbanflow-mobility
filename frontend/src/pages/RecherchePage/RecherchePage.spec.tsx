@@ -498,49 +498,52 @@ describe('RecherchePage', () => {
     renderPage();
     expect(profileLib.getMyProfile).not.toHaveBeenCalled();
 
-    // Case derriere le filtre "Modes de transport" (issue #108/#109,
-    // ferme par defaut) : l'ouvrir avant de verifier son etat, comme le
-    // ferait un vrai utilisateur.
-    await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+    // Case derriere le bouton "Filtres" (issue #233, ferme par defaut) :
+    // l'ouvrir avant de verifier son etat, comme le ferait un vrai
+    // utilisateur.
+    await user.click(screen.getByRole('button', { name: 'Filtres' }));
 
     expect(screen.getByRole('checkbox', { name: 'Vélo' })).not.toBeChecked();
   });
 
-  describe('filtre des modes de transport (issue #108/#109)', () => {
-    it("n'affiche aucun compteur tant qu'aucun mode n'est coche", () => {
+  describe('modale de filtres - modes de transport + heure de depart (issue #108/#109, #233 lot 2)', () => {
+    it("n'affiche aucun badge tant qu'aucun filtre n'est actif", () => {
       renderPage();
 
-      const trigger = screen.getByRole('button', { name: 'Modes de transport' });
-      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      // Le badge (pastille avec le compte) est absent : le nom accessible
+      // du bouton reste "Filtres" seul, sans le suffixe "(N)".
+      expect(
+        screen.getByRole('button', { name: 'Filtres' }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole('checkbox', { name: 'Vélo' }),
       ).not.toBeInTheDocument();
     });
 
-    it('affiche le nombre de modes coches sur le bouton declencheur, mis a jour en direct', async () => {
+    it('affiche le nombre de filtres actifs sur le bouton declencheur, mis a jour en direct', async () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+      await user.click(screen.getByRole('button', { name: 'Filtres' }));
       await user.click(screen.getByRole('checkbox', { name: 'Vélo' }));
       await user.click(screen.getByRole('checkbox', { name: 'Bus' }));
 
       expect(
-        screen.getByRole('button', { name: 'Modes de transport · 2' }),
+        screen.getByRole('button', { name: 'Filtres (2)' }),
       ).toBeInTheDocument();
 
       await user.click(screen.getByRole('checkbox', { name: 'Vélo' }));
 
       expect(
-        screen.getByRole('button', { name: 'Modes de transport · 1' }),
+        screen.getByRole('button', { name: 'Filtres (1)' }),
       ).toBeInTheDocument();
     });
 
-    it('ferme le panneau et rend le focus au declencheur au clic sur "Fermer"', async () => {
+    it('ferme la modale et rend le focus au declencheur au clic sur "Fermer"', async () => {
       const user = userEvent.setup();
       renderPage();
 
-      const trigger = screen.getByRole('button', { name: 'Modes de transport' });
+      const trigger = screen.getByRole('button', { name: 'Filtres' });
       await user.click(trigger);
       await user.click(screen.getByRole('button', { name: 'Fermer' }));
 
@@ -550,11 +553,11 @@ describe('RecherchePage', () => {
       expect(trigger).toHaveFocus();
     });
 
-    it('ferme le panneau et rend le focus au declencheur a la touche Echap', async () => {
+    it('ferme la modale et rend le focus au declencheur a la touche Echap', async () => {
       const user = userEvent.setup();
       renderPage();
 
-      const trigger = screen.getByRole('button', { name: 'Modes de transport' });
+      const trigger = screen.getByRole('button', { name: 'Filtres' });
       await user.click(trigger);
       await user.keyboard('{Escape}');
 
@@ -565,35 +568,59 @@ describe('RecherchePage', () => {
     });
 
     it(
-      "ferme le panneau au clic exterieur, SANS reprendre le focus au " +
-        'declencheur (le clic a deja porte le focus sur sa propre cible)',
+      'ferme la modale et rend le focus au declencheur au clic sur le fond ' +
+        '(contrairement a l\'ancien popover : une VRAIE modale avec un fond ' +
+        "opaque n'a pas d'autre cible de focus a respecter derriere elle)",
       async () => {
         const user = userEvent.setup();
         renderPage();
 
-        await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
-        await user.click(screen.getByLabelText('Destination'));
+        const trigger = screen.getByRole('button', { name: 'Filtres' });
+        await user.click(trigger);
+        const dialog = screen.getByRole('dialog', {
+          name: 'Filtres de recherche',
+        });
+        // Clique le fond lui-meme (le parent de la boite de dialogue),
+        // jamais un descendant - voir handleBackdropClick dans
+        // RecherchePage.tsx, qui ne ferme que si event.target ===
+        // event.currentTarget. Aucun role/texte propre a interroger pour
+        // ce fond purement visuel : acces direct via .parentElement.
+        await user.click(dialog.parentElement as HTMLElement);
 
         expect(
           screen.queryByRole('checkbox', { name: 'Vélo' }),
         ).not.toBeInTheDocument();
-        expect(screen.getByLabelText('Destination')).toHaveFocus();
+        expect(trigger).toHaveFocus();
       },
     );
 
-    it('conserve la selection quand le panneau est referme puis rouvert', async () => {
+    it('conserve la selection quand la modale est refermee puis rouverte', async () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+      await user.click(screen.getByRole('button', { name: 'Filtres' }));
       await user.click(screen.getByRole('checkbox', { name: 'Tram' }));
       await user.keyboard('{Escape}');
 
-      await user.click(
-        screen.getByRole('button', { name: 'Modes de transport · 1' }),
-      );
+      await user.click(screen.getByRole('button', { name: 'Filtres (1)' }));
 
       expect(screen.getByRole('checkbox', { name: 'Tram' })).toBeChecked();
+    });
+
+    it('compte aussi une heure de depart renseignee dans le badge de filtres actifs', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole('button', { name: 'Filtres' }));
+      await user.type(
+        screen.getByLabelText('Partir à'),
+        '2026-09-10T08:00',
+      );
+      await user.keyboard('{Escape}');
+
+      expect(
+        screen.getByRole('button', { name: 'Filtres (1)' }),
+      ).toBeInTheDocument();
     });
 
     it('transmet les modes coches a GET /trips au lancement de la recherche (issue #87)', async () => {
@@ -604,9 +631,10 @@ describe('RecherchePage', () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: 'Modes de transport' }));
+      await user.click(screen.getByRole('button', { name: 'Filtres' }));
       await user.click(screen.getByRole('checkbox', { name: 'Bus' }));
       await user.click(screen.getByRole('checkbox', { name: 'Métro' }));
+      await user.keyboard('{Escape}');
 
       await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
       await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
