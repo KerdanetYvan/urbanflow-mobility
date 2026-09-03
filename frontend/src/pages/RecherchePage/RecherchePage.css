@@ -89,6 +89,24 @@
   border-radius: 0;
 }
 
+/* Coins arrondis sur les deux angles EXTERIEURS de la colonne (issue #233,
+   bug constate en session) : superieur droit pour Origine (premier champ),
+   inferieur droit pour Destination (dernier) - meme raison et meme rayon
+   que .recherche-swap ci-dessus (retrait de `overflow: hidden` sur
+   .recherche-addresses, qui decoupait auparavant ces coins automatiquement
+   sur la courbe du cadre commun). Les deux selecteurs se distinguent par
+   la structure DOM (voir RecherchePage.tsx) : Origine est le SEUL champ
+   imbrique dans .recherche-address-origin, Destination est l'unique
+   .address-field ENFANT DIRECT de .recherche-addresses-fields (celui
+   d'Origine est imbrique un niveau plus bas). */
+.recherche-address-origin .field input {
+  border-top-right-radius: var(--radius-md);
+}
+
+.recherche-addresses-fields > .address-field .field input {
+  border-bottom-right-radius: var(--radius-md);
+}
+
 /* Box-shadow INSET plutot que le glow par defaut de .field input
    (FormField.css, qui deborde vers l'exterieur) - conserve meme apres le
    retrait de `overflow: hidden` sur .recherche-addresses (voir son
@@ -123,9 +141,18 @@
    (retour utilisateur en session) : un rem fixe plutot qu'un pourcentage
    pour rester lisible/cliquable meme sur les tres petits ecrans, ou un
    pourcentage deviendrait trop etroit pour la cible tactile minimale.
-   Plus de cadre propre (border/border-radius retires, voir le commentaire
-   de .recherche-addresses ci-dessus) - seule une bordure DROITE subsiste,
-   separateur avec la colonne origine/destination. */
+   Plus de cadre propre (border/border-radius uniforme retires, voir le
+   commentaire de .recherche-addresses ci-dessus) - seule une bordure
+   DROITE subsiste, separateur avec la colonne origine/destination.
+   border-top/bottom-left-radius (issue #233, bug constate en session) :
+   depuis le retrait de `overflow: hidden` sur .recherche-addresses (pour
+   ne plus rogner le dropdown de suggestions), ces coins ne sont plus
+   automatiquement decoupes sur la courbe du cadre exterieur - il faut
+   desormais que CE bouton arrondisse lui-meme ses deux coins gauches
+   (les seuls qui coincident avec un coin exterieur du cadre commun) au
+   meme rayon que .recherche-addresses, sans quoi son angle droit
+   "depasse" visuellement de la bordure arrondie du parent. Coins droits
+   volontairement non arrondis : internes, contre le separateur. */
 .recherche-swap {
   display: flex;
   align-items: center;
@@ -135,6 +162,8 @@
   min-width: var(--touch-target-min);
   border: none;
   border-right: 1px solid var(--color-border);
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text);
   cursor: pointer;
