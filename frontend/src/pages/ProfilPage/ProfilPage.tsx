@@ -31,8 +31,8 @@ const EMPTY_ADDRESS: AddressFieldState = { query: '', selected: null };
 
 type Feedback = { variant: 'success' | 'error'; message: string };
 
-/** Etape courante de l'onboarding (issue #106/#107) - voir ProfileOnboarding. */
-type OnboardingStep = 1 | 2;
+/** Etape courante de l'onboarding (issue #106/#107, etape 3 ajoutee #236) - voir ProfileOnboarding. */
+type OnboardingStep = 1 | 2 | 3;
 
 interface ProfileOnboardingProps {
   /** Appele une fois le profil cree (avec ou sans preference cochee) - navigue vers /recherche, voir ProfilPage. */
@@ -43,19 +43,43 @@ interface ProfileOnboardingProps {
  * Sequence d'onboarding affichee a la place du formulaire vide quand
  * l'utilisateur n'a pas encore de profil (issue #106/#107,
  * docs/specs/onboarding-profil-redirection.md section 3) - remplace
- * l'ancien formulaire unique sans guidance par 2 etapes, une par groupe de
- * preferences deja existant (modes de transport, puis accessibilite),
- * chacune individuellement franchissable sans rien cocher ("Passer").
+ * l'ancien formulaire unique sans guidance par 3 etapes, une par groupe de
+ * champs deja present dans le formulaire d'edition :
+ *   1. Modes de transport preferes ;
+ *   2. Preferences d'accessibilite ;
+ *   3. Adresses domicile / travail (ajout issue #236 - l'onboarding sert a
+ *      guider l'utilisateur sur TOUT ce que la page profil permet de
+ *      renseigner ; il sautait jusqu'ici ces deux adresses).
+ * Chaque etape est individuellement franchissable sans rien saisir
+ * ("Passer") - aucun de ces champs n'est obligatoire dans le formulaire
+ * d'edition non plus.
  *
- * Un seul appel reseau pour toute la sequence : createProfile() a l'etape 2
- * ("Passer" ou "Terminer"), exactement le meme qu'avant pour le formulaire
- * non-onboarding - aucune evolution de ProfileInput necessaire, les
- * preferences non cochees restent de simples tableaux vides.
+ * Un seul appel reseau pour toute la sequence : createProfile() a l'etape 3
+ * ("Passer" ou "Terminer"), avec le meme payload que le bouton "Enregistrer"
+ * du formulaire non-onboarding (adresses omises si non resolues) - aucune
+ * evolution de ProfileInput necessaire.
  */
 function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
   const [step, setStep] = useState<OnboardingStep>(1);
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
   const [selectedAccessibilityPreferences, setSelectedAccessibilityPreferences] = useState<string[]>([]);
+  // Domicile/travail (issue #236) - memes etats et memes hooks de
+  // suggestions que le formulaire d'edition ci-dessous (ProfilPage), un par
+  // adresse.
+  const [homeAddress, setHomeAddress] = useState<AddressFieldState>(EMPTY_ADDRESS);
+  const [workAddress, setWorkAddress] = useState<AddressFieldState>(EMPTY_ADDRESS);
+  const homeSuggestions = useAddressSuggestions(
+    homeAddress.query,
+    homeAddress.selected?.label ?? null,
+  );
+  const workSuggestions = useAddressSuggestions(
+    workAddress.query,
+    workAddress.selected?.label ?? null,
+  );
+  const [addressErrors, setAddressErrors] = useState<{
+    home?: string;
+    work?: string;
+  }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,20 +100,34 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
   }
 
   /**
-   * Cree le profil et termine la sequence (issue #106/#107). Recoit les
-   * valeurs explicitement plutot que de relire l'etat courant : "Passer"
-   * sur l'etape 2 doit ignorer une eventuelle selection deja cochee sur
-   * cette meme etape (repli explicite sur un tableau vide, voir son
-   * gestionnaire ci-dessous), ce qu'une lecture directe de l'etat React ne
-   * garantirait pas (mise a jour asynchrone).
+   * Cree le profil et termine la sequence (issue #106/#107, adresses #236).
+   * Recoit toutes les valeurs explicitement plutot que de relire l'etat
+   * courant : "Passer" sur l'etape 3 doit ignorer une adresse eventuellement
+   * deja saisie sur cette meme etape (les gestionnaires passent alors
+   * `null`), ce qu'une lecture directe de l'etat React ne garantirait pas
+   * (mise a jour asynchrone). Les adresses non resolues sont omises du
+   * payload, exactement comme le bouton "Enregistrer" du formulaire
+   * d'edition (pas de semantique "effacer via null" cote backend, voir son
+   * commentaire).
    */
-  async function finish(modes: string[], accessibilityPreferences: string[]) {
+  async function finish(
+    modes: string[],
+    accessibilityPreferences: string[],
+    home: PlaceSuggestion | null,
+    work: PlaceSuggestion | null,
+  ) {
     setError(null);
     setIsSaving(true);
     try {
       await createProfile({
         preferredTransportModes: modes,
         accessibilityPreferences,
+        ...(home
+          ? { homeLabel: home.label, homeLat: home.lat, homeLon: home.lon }
+          : {}),
+        ...(work
+          ? { workLabel: work.label, workLat: work.lat, workLon: work.lon }
+          : {}),
       });
       onComplete();
     } catch (err) {
@@ -101,9 +139,37 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
     }
   }
 
+  /**
+   * "Terminer" de l'etape 3 : valide les adresses avant l'appel reseau.
+   * Une adresse tapee mais jamais choisie dans la liste d'autocompletion
+   * est traitee comme non resolue (meme regle que ProfilPage#handleSubmit et
+   * RecherchePage) - on bloque et on affiche l'erreur sous le champ. Un
+   * champ totalement vide n'est pas une erreur : il signifie "ne rien
+   * enregistrer pour cette adresse".
+   */
+  function finishWithAddresses() {
+    const errors: { home?: string; work?: string } = {};
+    if (homeAddress.query.trim() && !homeAddress.selected) {
+      errors.home =
+        'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.';
+    }
+    if (workAddress.query.trim() && !workAddress.selected) {
+      errors.work =
+        'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.';
+    }
+    setAddressErrors(errors);
+    if (errors.home || errors.work) return;
+    void finish(
+      selectedModes,
+      selectedAccessibilityPreferences,
+      homeAddress.selected,
+      workAddress.selected,
+    );
+  }
+
   return (
     <div className="onboarding">
-      <p className="onboarding-step-indicator">Étape {step} sur 2</p>
+      <p className="onboarding-step-indicator">Étape {step} sur 3</p>
 
       {error && (
         <Alert variant="error" title="Erreur">
@@ -111,7 +177,7 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
         </Alert>
       )}
 
-      {step === 1 ? (
+      {step === 1 && (
         <div className="onboarding-step">
           <h2>Modes de transport préférés</h2>
           <p>
@@ -148,7 +214,9 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
             </Button>
           </div>
         </div>
-      ) : (
+      )}
+
+      {step === 2 && (
         <div className="onboarding-step">
           <h2>Préférences d'accessibilité</h2>
           <p>
@@ -182,15 +250,76 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
               type="button"
               variant="secondary"
               disabled={isSaving}
-              onClick={() => void finish(selectedModes, [])}
+              onClick={() => {
+                setSelectedAccessibilityPreferences([]);
+                setStep(3);
+              }}
             >
               Passer
             </Button>
+            <Button type="button" disabled={isSaving} onClick={() => setStep(3)}>
+              Continuer
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="onboarding-step">
+          <h2>Domicile et travail</h2>
+          <p>
+            Renseignez votre domicile et votre lieu de travail pour les
+            retrouver en un geste comme point de départ d'une recherche.
+            Facultatif, modifiable à tout moment depuis votre profil.
+          </p>
+          <div className="profil-addresses-fields">
+            <AddressField
+              id="onboarding-home-address"
+              label="Domicile"
+              value={homeAddress.query}
+              suggestions={homeSuggestions}
+              error={addressErrors.home}
+              onChange={(value) =>
+                setHomeAddress({ query: value, selected: null })
+              }
+              onSelect={(place) =>
+                setHomeAddress({ query: place.label, selected: place })
+              }
+            />
+            <AddressField
+              id="onboarding-work-address"
+              label="Travail"
+              value={workAddress.query}
+              suggestions={workSuggestions}
+              error={addressErrors.work}
+              onChange={(value) =>
+                setWorkAddress({ query: value, selected: null })
+              }
+              onSelect={(place) =>
+                setWorkAddress({ query: place.label, selected: place })
+              }
+            />
+          </div>
+          <div className="onboarding-actions">
+            <button
+              type="button"
+              className="onboarding-previous"
+              onClick={() => setStep(2)}
+              disabled={isSaving}
+            >
+              ← Précédent
+            </button>
             <Button
               type="button"
+              variant="secondary"
               disabled={isSaving}
-              onClick={() => void finish(selectedModes, selectedAccessibilityPreferences)}
+              onClick={() =>
+                void finish(selectedModes, selectedAccessibilityPreferences, null, null)
+              }
             >
+              Passer
+            </Button>
+            <Button type="button" disabled={isSaving} onClick={finishWithAddresses}>
               {isSaving ? 'Enregistrement…' : 'Terminer'}
             </Button>
           </div>
