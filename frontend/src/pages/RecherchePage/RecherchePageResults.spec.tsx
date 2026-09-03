@@ -208,9 +208,14 @@ describe('RecherchePageResults', () => {
     it("affiche le bouton \"Suivre ce trajet\" dans le detail de l'itineraire selectionne", () => {
       renderResults([FAST_ITINERARY]);
 
+      // getAllBy (pas getBy) : le detail existe en double dans le DOM
+      // (copie mobile inline + copie desktop en panneau, issue #234) - seule
+      // une media query CSS decide laquelle est visible, jsdom ne
+      // l'applique pas en test (meme raisonnement que pour la liste
+      // ailleurs dans ce fichier).
       expect(
-        screen.getByRole('button', { name: 'Suivre ce trajet' }),
-      ).toBeInTheDocument();
+        screen.getAllByRole('button', { name: 'Suivre ce trajet' }).length,
+      ).toBeGreaterThan(0);
     });
 
     it(
@@ -219,7 +224,9 @@ describe('RecherchePageResults', () => {
       () => {
         renderResults([{ ...FAST_ITINERARY, disrupted: true }]);
 
-        expect(screen.getByText('Perturbation en cours')).toBeInTheDocument();
+        expect(
+          screen.getAllByText('Perturbation en cours').length,
+        ).toBeGreaterThan(0);
       },
     );
 
@@ -584,7 +591,54 @@ describe('RecherchePageResults', () => {
       renderResults([FAST_ITINERARY]);
       expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
     });
+
+    it('un espace separe le bouton "Rechercher" de ce qui suit (retour utilisateur en session)', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+      expect(
+        container.querySelector('.recherche-panel-form-results'),
+      ).toBeInTheDocument();
+    });
   });
+
+  describe(
+    "detail de l'itineraire selectionne en desktop : panneau separe, pas " +
+      'dans la carte de recherche (issue #234, retour utilisateur en session)',
+    () => {
+      it('le panneau detail (.resultats-detail-panel) existe hors de la carte de recherche', () => {
+        const { container } = renderResults([FAST_ITINERARY]);
+
+        const form = container.querySelector(
+          '.recherche-panel-form',
+        ) as HTMLElement;
+        const detailPanel = container.querySelector(
+          '.resultats-detail-panel',
+        ) as HTMLElement;
+        expect(detailPanel).toBeInTheDocument();
+        expect(form.contains(detailPanel)).toBe(false);
+      });
+
+      it("n'affiche aucun panneau detail tant qu'aucun itineraire n'est disponible", () => {
+        const { container: loading } = renderResults(null);
+        expect(
+          loading.querySelector('.resultats-detail-panel'),
+        ).not.toBeInTheDocument();
+
+        const { container: empty } = renderResults([]);
+        expect(
+          empty.querySelector('.resultats-detail-panel'),
+        ).not.toBeInTheDocument();
+      });
+
+      it("le panneau detail reflete l'itineraire selectionne, comme la copie mobile", () => {
+        const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+
+        const detailPanel = container.querySelector(
+          '.resultats-detail-panel',
+        ) as HTMLElement;
+        expect(within(detailPanel).getByText('Bus C1')).toBeInTheDocument();
+      });
+    },
+  );
 
   describe('repli/deploiement de la carte en mobile (data-sheet-state)', () => {
     function panelForm(container: HTMLElement) {

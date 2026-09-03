@@ -2,18 +2,24 @@
  * Disposition "carte plein ecran" (v2, decidee en session le 2026-08-03,
  * rapprochee des applications de cartographie grand public type Google
  * Maps) : la carte occupe tout l'ecran en fond (.resultats-shell,
- * .resultats-map-bg). Une seule carte flottante par-dessus (issue #234,
- * revu apres retour utilisateur en session) : celle du formulaire de
- * recherche (.recherche-panel-form, partagee avec RecherchePage.tsx pour
- * l'ecran "formulaire" du tout premier chargement) - liste puis detail de
- * l'itineraire selectionne s'y ajoutent simplement a la suite, sous le
- * bouton "Rechercher", dans le meme corps defilant
- * (.recherche-panel-form-body). Plus de second panneau/bandeau dedie aux
- * resultats (l'ancien duo ".resultats-panels" desktop /
- * ".resultats-sheet" mobile 3 etats, retire) : desktop et mobile
- * partagent desormais exactement la meme disposition, seule la regle
- * .recherche-panel-form change selon le breakpoint (voir la media query en
- * bas de fichier).
+ * .resultats-map-bg). Formulaire + liste des itineraires dans une seule
+ * carte flottante (issue #234, revu deux fois apres retour utilisateur en
+ * session) : celle du formulaire de recherche (.recherche-panel-form,
+ * partagee avec RecherchePage.tsx pour l'ecran "formulaire" du tout premier
+ * chargement) - la liste s'y ajoute simplement a la suite, sous le bouton
+ * "Rechercher", dans le meme corps defilant (.recherche-panel-form-body).
+ * Plus de panneau "liste" separe ni de bandeau mobile a 3 etats (l'ancien
+ * duo ".resultats-panels" desktop / ".resultats-sheet" mobile, retire) :
+ * desktop et mobile partagent cette disposition, seule la regle
+ * .recherche-panel-form change selon le breakpoint.
+ *
+ * Le DETAIL de l'itineraire selectionne, lui, ne rejoint PAS cette carte en
+ * desktop (2e retour utilisateur) : assez de place pour l'afficher a part,
+ * dans un panneau flottant independant a DROITE de la carte
+ * (.resultats-detail-panel, voir la media query en bas de fichier). En
+ * mobile, ou cette place n'existe pas, il reste affiche a la suite de la
+ * liste, dans la carte de recherche (.resultats-detail--inline). Voir le
+ * commentaire de .resultats-detail-heading plus bas pour le detail.
  *
  * Classes conservees "resultats-*" (issue #73, fusion de RecherchePage et
  * ResultatsPage en un seul ecran) : renommer une centaine de selecteurs
@@ -203,11 +209,9 @@
 }
 
 /* "Voir le detail" : reste visible sur tous les breakpoints (issue #234) -
-   auparavant masque en desktop, ou cliquer une carte ouvrait un panneau
-   dedie en permanence visible a cote (retire, voir le commentaire d'en-
-   tete) ; desormais cliquer une carte affiche son detail juste en dessous
-   de la liste, quelle que soit la taille d'ecran - le texte reste donc
-   pertinent partout. */
+   cliquer une carte affiche/actualise toujours son detail quelque part
+   (en dessous en mobile, dans un panneau a droite en desktop - voir plus
+   bas), le texte reste donc pertinent partout. */
 .resultats-card-action {
   width: 100%;
   color: var(--color-primary-emphasis);
@@ -215,22 +219,48 @@
   font-weight: var(--weight-semibold);
 }
 
-/* --- Detail segment par segment de l'itineraire selectionne, affiche a la
-   suite de la liste dans la meme carte (issue #234) --- */
-
-/* Separateur visuel avec la liste au-dessus : sans lui, le detail se
-   confondrait avec la derniere carte-itineraire (meme fond, pas de cadre
-   propre). */
-.resultats-detail {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
+/* Espace entre le bouton "Rechercher" (fin du formulaire) et ce qui suit -
+   squelette de chargement, message d'etat vide ou liste des itineraires
+   (issue #234, retour utilisateur en session : ce contenu collait
+   directement au bouton sans lui). */
+.recherche-panel-form-results {
+  margin-top: var(--space-5);
 }
+
+/* --- Detail segment par segment de l'itineraire selectionne (issue #234).
+   Contenu partage entre deux emplacements (voir `detailContent`,
+   RecherchePageResults.tsx) : a la suite de la liste, DANS la carte de
+   recherche en mobile (.resultats-detail--inline, pas de place pour un
+   panneau separe) ; dans son propre panneau flottant a DROITE de la carte
+   en desktop (.resultats-detail-panel plus bas, retour utilisateur en
+   session - assez de place pour les montrer cote a cote). Une seule des
+   deux copies est visible a la fois, seule une media query CSS en decide
+   (regles ci-dessous puis dans le bloc desktop en bas de fichier). --- */
 
 .resultats-detail-heading {
   margin: 0 0 var(--space-3);
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
+}
+
+/* Copie mobile, empilee sous la liste dans la meme carte (visible par
+   defaut, mobile-first) : separateur visuel avec la liste au-dessus, sans
+   quoi le detail se confondrait avec la derniere carte-itineraire (meme
+   fond, pas de cadre propre). Masquee a partir de 768px (voir plus bas) :
+   c'est alors .resultats-detail-panel qui prend le relais. */
+.resultats-detail--inline {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Copie desktop : panneau flottant independant, masque par defaut
+   (mobile-first) - n'existe qu'a partir de 768px, voir la media query en
+   bas de fichier pour son positionnement (a droite de .recherche-panel-form)
+   et son habillage (fond/cadre/ombre, memes valeurs que .recherche-panel-form
+   en desktop). */
+.resultats-detail-panel {
+  display: none;
 }
 
 /* Prochains passages d'un resultat regroupe (issue #127) - deplace ici
@@ -450,5 +480,36 @@
 
   .recherche-panel-form-body {
     padding: var(--space-4);
+  }
+
+  /* Copie mobile du detail (empilee sous la liste, voir la regle de base
+     plus haut) : masquee a partir d'ici, le panneau flottant ci-dessous
+     prend le relais. */
+  .resultats-detail--inline {
+    display: none;
+  }
+
+  /* Copie desktop du detail (issue #234, retour utilisateur en session) :
+     panneau flottant independant a DROITE de la carte de recherche - meme
+     largeur/habillage que l'ancien .resultats-panel-detail (disposition
+     "panneaux cote a cote" d'avant #171/#172), repositionne en absolu
+     plutot qu'en enfant flex d'un conteneur commun (.recherche-panel-form
+     n'est plus dans ce conteneur, voir le commentaire d'en-tete du
+     fichier). Decalage a gauche calcule a partir de la largeur + position
+     de .recherche-panel-form ci-dessus (22rem + var(--space-5)) plus un
+     espacement (var(--space-4)) entre les deux panneaux. */
+  .resultats-detail-panel {
+    display: block;
+    position: absolute;
+    left: calc(var(--space-5) + 22rem + var(--space-4));
+    bottom: var(--space-5);
+    z-index: 1;
+    width: 20rem;
+    max-height: calc(100% - var(--space-8));
+    overflow-y: auto;
+    padding: var(--space-4);
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
   }
 }

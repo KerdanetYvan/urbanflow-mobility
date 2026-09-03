@@ -358,22 +358,36 @@ interface RecherchePageResultsProps {
  * /resultats perd le contexte", voir docs/specs/
  * refonte-visuelle-mobile-desktop.md section 2.1).
  *
- * Carte de recherche persistante (issue #234, revu apres retour utilisateur
- * en session - l'ancienne disposition "panneaux flottants desktop +
- * bandeau 3 etats mobile", qui affichait un second panneau EN PLUS du
- * formulaire, a ete abandonnee) : UNE SEULE carte flottante, celle du
- * formulaire de recherche (`.recherche-panel-form`, meme classe et meme
+ * Carte de recherche persistante (issue #234, revu deux fois apres retour
+ * utilisateur en session - l'ancienne disposition "panneaux flottants
+ * desktop + bandeau 3 etats mobile", qui affichait un second panneau EN
+ * PLUS du formulaire, a ete abandonnee) : UNE SEULE carte flottante, celle
+ * du formulaire de recherche (`.recherche-panel-form`, meme classe et meme
  * comportement que sur l'ecran "formulaire" du tout premier chargement,
- * RecherchePage.tsx) - les resultats (liste, puis detail de l'itineraire
- * selectionne) viennent simplement s'ajouter A LA SUITE du formulaire, sous
- * le bouton "Rechercher", dans le meme corps defilant
- * (`.recherche-panel-form-body`). Desktop et mobile partagent donc
- * desormais exactement la meme disposition (la carte se repositionne en
- * panneau flottant bas-gauche en desktop, reste un bandeau repliable en
- * mobile - voir RecherchePageResults.css, regles deja existantes pour
+ * RecherchePage.tsx) - la LISTE des itineraires vient s'ajouter A LA SUITE
+ * du formulaire, sous le bouton "Rechercher", dans le meme corps defilant
+ * (`.recherche-panel-form-body`, avec un espace visible entre le bouton et
+ * la liste). Desktop et mobile partagent cette meme disposition pour le
+ * formulaire + la liste (la carte se repositionne en panneau flottant
+ * bas-gauche en desktop, reste un bandeau repliable en mobile - voir
+ * RecherchePageResults.css, regles deja existantes pour
  * `.recherche-panel-form`) : plus de panneau "liste" separe, plus de
- * bandeau mobile a 3 etats (SheetState, CompactPreview - retires). La carte
- * de fond plein ecran (MapView, variant="fullBleed") reste inchangee.
+ * bandeau mobile a 3 etats (SheetState, CompactPreview - retires).
+ *
+ * Le DETAIL de l'itineraire selectionne fait exception (2e retour
+ * utilisateur) : il ne rejoint PAS la carte de recherche en desktop - assez
+ * de place pour l'afficher a cote, dans son propre panneau flottant
+ * (`.resultats-detail-panel`) a DROITE de la carte, comme dans la toute
+ * premiere version de cet ecran (issue #110/#111). En mobile, ou cette
+ * place n'existe pas, il reste affiche a la suite de la liste, dans la
+ * meme carte (`.resultats-detail`, classe partagee par les deux
+ * emplacements pour le contenu, `--inline` ne changeant que sa visibilite
+ * par breakpoint). Voir `detailContent` plus bas, construit une seule fois
+ * et rendu aux deux emplacements - seule une media query CSS decide lequel
+ * est visible a un instant donne (jamais les deux en meme temps a l'ecran).
+ *
+ * La carte de fond plein ecran (MapView, variant="fullBleed") reste
+ * inchangee.
  *
  * `sheetState` ci-dessous ne pilote que le repli/deploiement mobile de
  * cette carte (2 etats, comme `formSheetState` de RecherchePage.tsx pour
@@ -462,45 +476,55 @@ function RecherchePageResults({
 
   // --- Contenu affiche a la suite du formulaire, dans le meme corps
   // defilant (issue #234) : squelette de chargement, message d'etat vide,
-  // ou liste + detail de l'itineraire selectionne. ---
-  let resultsSection: ReactNode;
+  // ou liste des itineraires. Le detail de l'itineraire selectionne est
+  // calcule a part (detailContent ci-dessous) : il ne vit PAS dans cette
+  // meme carte en desktop (retour utilisateur en session) - voir plus bas. ---
+  let listSection: ReactNode;
+  let selectedItinerary: TripItinerary | null = null;
   if (itineraries === null) {
     // Recherche en cours (issue #73, spec 2.4) : aucun itineraire recu pour
     // l'instant.
-    resultsSection = <Skeleton count={3} />;
+    listSection = <Skeleton count={3} />;
   } else if (itineraries.length === 0) {
     // Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
     // une erreur. Le repli a pied (fallback: 'walk-only') N'arrive PAS ici :
     // dans ce cas itineraries contient le trajet a pied, on passe donc par
     // la branche ci-dessous (avec le bandeau explicatif de ResultsList).
-    resultsSection = <EmptyResults />;
+    listSection = <EmptyResults />;
   } else {
-    const selectedItinerary = itineraries[selectedIndex] as TripItinerary;
-    resultsSection = (
-      <>
-        <ResultsList
-          itineraries={itineraries}
-          selectedIndex={selectedIndex}
-          onSelect={selectItinerary}
-          geolocationMessage={geolocationMessage(geolocation.status)}
-          itineraryBadges={itineraryBadges}
-          fallback={fallback}
-          fromCache={fromCache}
-        />
-        {/* Detail de l'itineraire selectionne (issue #234) : affiche a la
-            suite de la liste dans la meme carte, plutot que dans un panneau
-            desktop separe ou un etat "detail" dedie du bandeau mobile -
-            toujours le meme itineraire (le premier par defaut), quel que
-            soit l'ecran. */}
-        <div className="resultats-detail">
-          <h2 className="resultats-detail-heading">
-            Détail du trajet sélectionné
-          </h2>
-          <ItinerarySegments itinerary={selectedItinerary} />
-        </div>
-      </>
+    selectedItinerary = itineraries[selectedIndex] as TripItinerary;
+    listSection = (
+      <ResultsList
+        itineraries={itineraries}
+        selectedIndex={selectedIndex}
+        onSelect={selectItinerary}
+        geolocationMessage={geolocationMessage(geolocation.status)}
+        itineraryBadges={itineraryBadges}
+        fallback={fallback}
+        fromCache={fromCache}
+      />
     );
   }
+
+  // Detail de l'itineraire selectionne (issue #234, revu en session apres
+  // retour utilisateur) : `null` tant qu'aucune liste n'est affichee.
+  // Reutilise TEL QUEL a deux endroits differents ci-dessous - a l'interieur
+  // de la carte de recherche en mobile (`.resultats-detail`, pas de place
+  // pour un panneau separe) ET dans un panneau flottant independant a
+  // DROITE de la carte en desktop (`.resultats-detail-panel`, assez de
+  // place pour les montrer cote a cote) - seule une media query CSS decide
+  // laquelle des deux copies est visible a un instant donne (voir
+  // RecherchePageResults.css). Rendre le meme element deux fois est sans
+  // risque ici : chaque emplacement est un parent totalement distinct dans
+  // l'arbre, React y monte deux instances independantes.
+  const detailContent = selectedItinerary && (
+    <>
+      <h2 className="resultats-detail-heading">
+        Détail du trajet sélectionné
+      </h2>
+      <ItinerarySegments itinerary={selectedItinerary} />
+    </>
+  );
 
   return (
     <div className="resultats-shell">
@@ -551,9 +575,31 @@ function RecherchePageResults({
 
         <div className="recherche-panel-form-body">
           {renderSearchForm()}
-          {resultsSection}
+          {/* Espace visible avec le bouton "Rechercher" au-dessus (retour
+              utilisateur en session) : sans lui, la premiere carte-
+              itineraire (ou le squelette/message d'etat vide) collait
+              directement au bouton. */}
+          <div className="recherche-panel-form-results">
+            {listSection}
+            {/* Detail EN PLUS de la liste, dans la meme carte : uniquement
+                en mobile (pas de place pour un panneau separe) - masque a
+                partir de 768px, voir RecherchePageResults.css. */}
+            {detailContent && (
+              <div className="resultats-detail resultats-detail--inline">
+                {detailContent}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Detail de l'itineraire selectionne, a DROITE de la carte de
+          recherche (issue #234, retour utilisateur en session) - desktop
+          uniquement (masque par defaut, affiche a partir de 768px comme
+          panneau flottant independant, voir RecherchePageResults.css). */}
+      {detailContent && (
+        <div className="resultats-detail-panel">{detailContent}</div>
+      )}
     </div>
   );
 }
