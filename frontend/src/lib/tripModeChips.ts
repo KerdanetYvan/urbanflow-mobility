@@ -39,8 +39,8 @@ export type TripModeChip =
 
 /**
  * Deduit, a partir des segments d'un itineraire, la liste ordonnee des
- * puces de mode a afficher sur sa carte-resume (ItineraryCard), son apercu
- * compact (CompactPreview) ou la legende de MapView (issue #129).
+ * puces de mode a afficher sur sa carte-resume (ItineraryCard) ou la
+ * legende de MapView (issue #129).
  *
  * Deduplique par (mode, libelle) pour les modes de ligne : deux segments Bus 24
  * consecutifs (ex. correspondance sans changement de ligne) ne produisent
