@@ -184,7 +184,11 @@
 .recherche-search-row {
   display: flex;
   flex-direction: row;
-  border: 1px solid var(--color-border);
+  /* --color-primary-emphasis (ambre), pas --color-border (retour utilisateur
+     en session) : distingue cette ligne d'action de .recherche-addresses
+     plus haut (bordure neutre), coherent avec le bouton "Rechercher" plein
+     qu'elle contient deja. */
+  border: 1px solid var(--color-primary-emphasis);
   border-radius: var(--radius-md);
   overflow: hidden;
   margin-top: var(--space-2);
@@ -205,7 +209,9 @@
   width: 3.5rem;
   min-width: var(--touch-target-min);
   border: none;
-  border-right: 1px solid var(--color-border);
+  /* Ambre, coherente avec le cadre de .recherche-search-row ci-dessus (meme
+     raison : retour utilisateur en session). */
+  border-right: 1px solid var(--color-primary-emphasis);
   background: var(--color-bg);
   color: var(--color-primary-emphasis);
   cursor: pointer;
