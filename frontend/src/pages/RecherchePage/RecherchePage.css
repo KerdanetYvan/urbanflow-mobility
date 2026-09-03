@@ -257,6 +257,15 @@
    superieure a `.btn-primary` seul) : meme raison que .profil-delete-
    confirm-btn (ProfilPage.css, issue #164). */
 .recherche-search-row .btn.recherche-submit {
+  /* border-radius seul ne suffisait pas (retour utilisateur en session) :
+     .btn (Button.css) pose deja `border: 1px solid transparent` - jamais
+     visible sur un bouton isole (fond de page derriere, meme couleur des
+     deux cotes), mais ici le 1px transparent laisse voir EN TRANSPARENCE
+     le fond de .recherche-search-row (blanc) juste a l'interieur du
+     remplissage orange du bouton - fine bordure blanche parasite entre le
+     remplissage et le cadre ambre. border: none supprime l'espace alloue
+     a cette bordure, le remplissage va jusqu'au bord reel du bouton. */
+  border: none;
   border-radius: 0;
   flex: 1;
 }
