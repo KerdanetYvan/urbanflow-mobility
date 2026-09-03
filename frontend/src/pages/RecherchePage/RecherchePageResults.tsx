@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
+import { useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import Alert from '../../components/Alert/Alert';
 import Badge from '../../components/Badge/Badge';
 import LineBadge from '../../components/LineBadge/LineBadge';
@@ -21,23 +21,7 @@ import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation
 import { computeItineraryBadges, type ItineraryBadges } from './itineraryBadges';
 import './RecherchePageResults.css';
 
-/**
- * Etats du bandeau mobile (v2 de #36, disposition "carte plein ecran +
- * panneau flottant", decidee en session le 2026-08-03) :
- * - collapsed : juste la poignee + un apercu du trajet selectionne, carte
- *   entierement visible.
- * - list : la liste complete des itineraires (ou le formulaire en vue
- *   Edition, voir isEditingSearch plus bas - issue #171/#172), carte
- *   partiellement visible.
- * - detail : le detail segment par segment du trajet selectionne, carte
- *   presque entierement masquee.
- * Non pertinent en desktop (voir RecherchePageResults.css) : liste et
- * detail y sont deux panneaux flottants toujours visibles simultanement.
- */
-type SheetState = 'collapsed' | 'list' | 'detail';
-
-/** Distance verticale minimale (px) pour qu'un geste tactile sur la
- * poignee du bandeau soit traite comme un glissement plutot qu'un tap. */
+/** Meme seuil que RecherchePage (poignee de .recherche-panel-form) - voir le commentaire associe la-bas. */
 const SWIPE_THRESHOLD_PX = 40;
 
 /**
@@ -56,36 +40,6 @@ function geolocationMessage(status: GeolocationStatus): string | undefined {
     return 'Votre position en temps réel est indisponible pour le moment.';
   }
   return undefined;
-}
-
-interface SearchContextProps {
-  origin: PlaceSuggestion;
-  destination: PlaceSuggestion;
-  onEditSearch: () => void;
-}
-
-/**
- * Contexte de la recherche ("De X à Y") + action d'edition. Depuis la
- * fusion des panneaux (issue #171/#172, docs/specs/
- * fusion-recherche-resultats.md), "Modifier la recherche" ne navigue plus
- * vers un autre ecran : onEditSearch bascule isEditingSearch a true chez
- * RecherchePage, qui rebascule ce meme panneau vers sa vue Edition, sans
- * perdre la liste/le detail affiches juste avant (voir plus bas).
- */
-function SearchContext({ origin, destination, onEditSearch }: SearchContextProps) {
-  return (
-    <p className="resultats-context">
-      De {origin.label} à {destination.label}
-      {' · '}
-      <button
-        type="button"
-        className="resultats-link-button"
-        onClick={onEditSearch}
-      >
-        Modifier la recherche
-      </button>
-    </p>
-  );
 }
 
 interface ItineraryCardProps {
@@ -171,11 +125,8 @@ function ItineraryCard({ itinerary, isSelected, onSelect, badge }: ItineraryCard
 
 interface ResultsListProps {
   itineraries: TripItinerary[];
-  origin: PlaceSuggestion;
-  destination: PlaceSuggestion;
   selectedIndex: number;
   onSelect: (index: number) => void;
-  onEditSearch: () => void;
   /** Message a afficher si la position en temps reel (issue #9) n'est pas disponible - voir geolocationMessage(). */
   geolocationMessage?: string;
   /** Badge qualitatif par index d'itineraire (issue #126/#169) - au plus un par carte, voir itineraryBadges.ts. */
@@ -187,17 +138,16 @@ interface ResultsListProps {
 }
 
 /**
- * Contenu partage entre le panneau flottant "liste" (desktop) et l'etat
- * "list" du bandeau (mobile) - evite de dupliquer la logique de rendu de la
- * liste, seul le conteneur autour differe selon la disposition.
+ * Liste des itineraires, affichee a la suite du formulaire de recherche
+ * dans la meme carte persistante (issue #234) - plus de panneau ou de
+ * bandeau separe pour la porter (l'ancienne disposition "carte plein ecran
+ * + panneaux flottants" a ete abandonnee au profit d'une seule carte, voir
+ * le commentaire de RecherchePageResults ci-dessous pour le detail).
  */
 function ResultsList({
   itineraries,
-  origin,
-  destination,
   selectedIndex,
   onSelect,
-  onEditSearch,
   geolocationMessage,
   itineraryBadges,
   fallback,
@@ -205,7 +155,6 @@ function ResultsList({
 }: ResultsListProps) {
   return (
     <>
-      <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
       {fromCache && (
         // Mode degrade (issue #10) : ces resultats viennent du cache local,
         // pas d'une reponse fraiche - horaires/perturbations potentiellement
@@ -262,21 +211,15 @@ function ResultsList({
   );
 }
 
-interface EmptyResultsProps {
-  origin: PlaceSuggestion;
-  destination: PlaceSuggestion;
-  onEditSearch: () => void;
-}
-
 /**
- * État vide (aucun itinéraire, pas même à pied) rendu DANS le panneau
- * fusionné (issue #190) - la carte plein écran reste en fond avec les
- * marqueurs origine/destination, plus de page `.resultats-page` séparée.
- * Partagé entre le panneau desktop et le bandeau mobile, comme ResultsList.
+ * État vide (aucun itinéraire, pas même à pied) rendu à la suite du
+ * formulaire de recherche, dans la meme carte persistante (issue #190,
+ * revu par #234).
  *
- * L'action de recours est le "Modifier la recherche" de `SearchContext`
- * ci-dessus (édition en place, décision #190) - pas de second bouton
- * redondant dans le message.
+ * L'action de recours est directement les champs de recherche, juste
+ * au-dessus (issue #234) - plus de bouton "Modifier la recherche" dédié
+ * (`SearchContext`, retiré) : modifier l'origine, la destination ou l'heure
+ * se fait sur place, sans action intermédiaire.
  *
  * Le repli "prochain créneau" (issue #91) et le repli à pied (#190) ne
  * passent PAS par ici : dans ces deux cas `itineraries` est non vide (le
@@ -285,22 +228,15 @@ interface EmptyResultsProps {
  * état vide n'apparaît que lorsqu'il n'y a vraiment rien, même plus tard,
  * même à pied.
  */
-function EmptyResults({ origin, destination, onEditSearch }: EmptyResultsProps) {
+function EmptyResults() {
   return (
-    <>
-      <SearchContext
-        origin={origin}
-        destination={destination}
-        onEditSearch={onEditSearch}
-      />
-      <div className="resultats-empty">
-        <p>Aucun itinéraire trouvé pour ce trajet, même à pied.</p>
-        <p>
-          Essayez d’élargir la plage horaire, ou de modifier l’origine ou la
-          destination.
-        </p>
-      </div>
-    </>
+    <div className="resultats-empty">
+      <p>Aucun itinéraire trouvé pour ce trajet, même à pied.</p>
+      <p>
+        Essayez d’élargir la plage horaire, ou de modifier l’origine ou la
+        destination.
+      </p>
+    </div>
   );
 }
 
@@ -382,79 +318,6 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
   );
 }
 
-/**
- * Resume compact d'un itineraire, affiche dans la poignee du bandeau mobile
- * quand il est replie ("collapsed") - pas un <button> (deja imbrique dans
- * celui de la poignee), juste du texte + icones decoratives.
- */
-function CompactPreview({ itinerary }: { itinerary: TripItinerary }) {
-  const chips = tripModeChips(itinerary);
-  return (
-    <span className="resultats-sheet-preview">
-      <span className="resultats-sheet-preview-modes" aria-hidden="true">
-        {chips.map((chip) =>
-          chip.kind === 'line' ? (
-            <LineBadge
-              key={`${chip.mode}:${chip.label}`}
-              mode={chip.mode}
-              label={chip.label}
-              color={chip.color}
-              textColor={chip.textColor}
-            />
-          ) : (
-            <span key={chip.mode}>{getTripModeIcon(chip.mode)}</span>
-          ),
-        )}
-      </span>
-      <span className="resultats-sheet-preview-time">
-        {formatTime(itinerary.startTime)} → {formatTime(itinerary.endTime)} ·{' '}
-        {formatDuration(itinerary.durationSeconds)}
-      </span>
-    </span>
-  );
-}
-
-interface EditPanelProps {
-  sheetState: 'collapsed' | 'expanded';
-  onToggle: () => void;
-  onTouchStart: (event: TouchEvent<HTMLButtonElement>) => void;
-  onTouchEnd: (event: TouchEvent<HTMLButtonElement>) => void;
-  children: ReactNode;
-}
-
-/**
- * Panneau/bandeau de la vue Edition (issue #171/#172) : meme classe
- * (.recherche-panel-form, voir RecherchePageResults.css) et meme mecanique
- * a 2 etats que le formulaire du tout premier chargement
- * (RecherchePage.tsx, screen.kind === 'formulaire') - au lieu de dupliquer
- * cette poignee/ce conteneur ici avec un state local independant, l'etat
- * (sheetState) et les gestionnaires de glissement sont recus en props,
- * portes par RecherchePage (formSheetState) : un seul et meme bandeau,
- * qu'il s'agisse du premier chargement ou d'une edition en place.
- */
-function EditPanel({ sheetState, onToggle, onTouchStart, onTouchEnd, children }: EditPanelProps) {
-  return (
-    <div className="recherche-panel-form" data-sheet-state={sheetState}>
-      <button
-        type="button"
-        className="recherche-panel-form-handle"
-        onClick={onToggle}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        aria-expanded={sheetState === 'expanded'}
-      >
-        <span className="resultats-sheet-handle-bar" aria-hidden="true" />
-        {sheetState === 'collapsed' && (
-          <span className="recherche-panel-form-handle-label">
-            Modifier la recherche
-          </span>
-        )}
-      </button>
-      {children}
-    </div>
-  );
-}
-
 interface RecherchePageResultsProps {
   origin: PlaceSuggestion;
   destination: PlaceSuggestion;
@@ -463,7 +326,7 @@ interface RecherchePageResultsProps {
   /**
    * Repli renvoye par GET /trips (issue #190). `walk-only` : `itineraries`
    * contient le trajet a pied propose faute de transport en commun, affiche
-   * dans le panneau fusionne avec un bandeau explicatif. Absent avec
+   * a la suite du formulaire avec un bandeau explicatif. Absent avec
    * `itineraries` vide = etat vide "sec" (message generique).
    */
   fallback?: TripFallback;
@@ -475,27 +338,16 @@ interface RecherchePageResultsProps {
    * bandeau de repli ci-dessus (fallback).
    */
   fromCache?: boolean;
-  /** Bascule vers la vue Edition du panneau fusionne (issue #171/#172) - ne demonte plus cet ecran. */
-  onEditSearch: () => void;
   /** Preferences d'accessibilite du profil connecte (issue #126), voir frontend/src/lib/profile.ts. Absent/vide = profil incomplet ou recherche anonyme (issue #64) - seul le badge "meilleur choix global" s'affiche alors. */
   accessibilityPreferences?: string[];
   /**
-   * Vue Edition active (issue #171/#172, docs/specs/
-   * fusion-recherche-resultats.md section 2) : remplace la liste/le detail
-   * par le formulaire (renderEditForm) dans le MEME panneau, sans demonter
-   * ce composant - selectedIndex/sheetState (liste/detail) ci-dessous
-   * restent donc intacts au retour ("Annuler").
+   * Contenu du formulaire de recherche (RecherchePage.tsx,
+   * renderRechercheForm), affiche en tete de la carte persistante
+   * ci-dessous, avant les resultats (issue #234). Fonction plutot qu'un
+   * noeud direct : evite de reconstruire l'element a chaque rendu de ce
+   * composant pour rien.
    */
-  isEditingSearch?: boolean;
-  /** Referme la vue Edition sans relancer de recherche (bouton "Annuler" du formulaire, ou touche Echap). */
-  onCancelEdit?: () => void;
-  /** Etat du bandeau/panneau d'edition (2 etats, voir EditPanel) - porte par RecherchePage (formSheetState), partage avec le formulaire du tout premier chargement. */
-  editSheetState?: 'collapsed' | 'expanded';
-  onEditSheetToggle?: () => void;
-  onEditSheetTouchStart?: (event: TouchEvent<HTMLButtonElement>) => void;
-  onEditSheetTouchEnd?: (event: TouchEvent<HTMLButtonElement>) => void;
-  /** Contenu du formulaire (RecherchePage.tsx, renderRechercheForm) - fonction plutot que noeud direct : evite de construire deux fois le meme element React pour rien si jamais ce composant se re-rendait sans que isEditingSearch ne change. */
-  renderEditForm?: () => ReactNode;
+  renderSearchForm: () => ReactNode;
 }
 
 /**
@@ -506,35 +358,45 @@ interface RecherchePageResultsProps {
  * /resultats perd le contexte", voir docs/specs/
  * refonte-visuelle-mobile-desktop.md section 2.1).
  *
- * Disposition "carte plein ecran" (v2, decidee en session le 2026-08-03,
- * rapprochee des applications de cartographie grand public type Google
- * Maps) : la carte du trajet selectionne (MapView, variant="fullBleed")
- * occupe tout l'ecran en fond, les resultats sont affiches par-dessus dans
- * des panneaux flottants - deux panneaux cote a cote en desktop (liste +
- * detail), un bandeau ("bottom sheet") a 3 etats en mobile (voir
- * SheetState). La navigation principale de l'application (AppLayout) reste
- * visible au-dessus en desktop, mais est volontairement recouverte par le
- * bandeau en mobile (ecran de tache immersif) - voir les z-index dans
- * AppLayout.css et RecherchePageResults.css.
+ * Carte de recherche persistante (issue #234, revu deux fois apres retour
+ * utilisateur en session - l'ancienne disposition "panneaux flottants
+ * desktop + bandeau 3 etats mobile", qui affichait un second panneau EN
+ * PLUS du formulaire, a ete abandonnee) : UNE SEULE carte flottante, celle
+ * du formulaire de recherche (`.recherche-panel-form`, meme classe et meme
+ * comportement que sur l'ecran "formulaire" du tout premier chargement,
+ * RecherchePage.tsx) - la LISTE des itineraires vient s'ajouter A LA SUITE
+ * du formulaire, sous le bouton "Rechercher", dans le meme corps defilant
+ * (`.recherche-panel-form-body`, avec un espace visible entre le bouton et
+ * la liste). Desktop et mobile partagent cette meme disposition pour le
+ * formulaire + la liste (la carte se repositionne en panneau flottant
+ * bas-gauche en desktop, reste un bandeau repliable en mobile - voir
+ * RecherchePageResults.css, regles deja existantes pour
+ * `.recherche-panel-form`) : plus de panneau "liste" separe, plus de
+ * bandeau mobile a 3 etats (SheetState, CompactPreview - retires).
  *
- * Vue Edition (issue #171/#172, docs/specs/fusion-recherche-resultats.md) :
- * quand isEditingSearch est vrai, les panneaux liste+detail (desktop) et le
- * bandeau resultats (mobile) laissent place a un unique panneau formulaire
- * (EditPanel, classe .recherche-panel-form partagee avec RecherchePage.tsx).
- * Ce composant (RecherchePageResults) reste lui-meme monte pendant toute
- * l'edition - selectedIndex/sheetState (donc l'itineraire selectionne et
- * l'etat liste/detail du bandeau mobile) sont conserves en memoire, "Annuler"
- * les retrouve donc sans re-appel a /trips. Le DOM de la liste/du detail
- * n'est en revanche pas conserve a l'identique (retire du rendu plutot que
- * seulement masque en CSS, pour eviter d'avoir a la fois la liste ET le
- * formulaire montes avec des id de champ potentiellement dupliques) : un
- * defilement en cours dans la liste ne survit donc pas a un aller-retour
- * Modifier/Annuler, seule la selection elle-meme (aria-current) survit.
+ * Le DETAIL de l'itineraire selectionne fait exception (2e retour
+ * utilisateur) : il ne rejoint PAS la carte de recherche en desktop - assez
+ * de place pour l'afficher a cote, dans son propre panneau flottant
+ * (`.resultats-detail-panel`) a DROITE de la carte, comme dans la toute
+ * premiere version de cet ecran (issue #110/#111). En mobile, ou cette
+ * place n'existe pas, il reste affiche a la suite de la liste, dans la
+ * meme carte (`.resultats-detail`, classe partagee par les deux
+ * emplacements pour le contenu, `--inline` ne changeant que sa visibilite
+ * par breakpoint). Voir `detailContent` plus bas, construit une seule fois
+ * et rendu aux deux emplacements - seule une media query CSS decide lequel
+ * est visible a un instant donne (jamais les deux en meme temps a l'ecran).
+ *
+ * La carte de fond plein ecran (MapView, variant="fullBleed") reste
+ * inchangee.
+ *
+ * `sheetState` ci-dessous ne pilote que le repli/deploiement mobile de
+ * cette carte (2 etats, comme `formSheetState` de RecherchePage.tsx pour
+ * l'ecran "formulaire" - jamais montes en meme temps, donc pas besoin de
+ * partager cet etat entre les deux fichiers).
  *
  * L'etat vide (aucun itineraire) et l'etat "recherche en cours" (itineraries
- * null) n'utilisent pas la disposition immersive plein ecran pour le
- * premier (pas de trajet a tracer), mais la reprennent en chargement pour
- * le second (carte avec origine/destination seules, voir MapView).
+ * null) reprennent la meme carte plein ecran (MapView avec origine/
+ * destination seules pendant le chargement, voir MapView).
  *
  * Note de sequencement Sprint 2 / Sprint 3 (section 3.4 du spec #25) : cet
  * ecran n'a aucune dependance visuelle au service de scoring (#16) - la
@@ -547,24 +409,20 @@ function RecherchePageResults({
   itineraries,
   fallback,
   fromCache,
-  onEditSearch,
   accessibilityPreferences,
-  isEditingSearch = false,
-  onCancelEdit,
-  editSheetState = 'expanded',
-  onEditSheetToggle,
-  onEditSheetTouchStart,
-  onEditSheetTouchEnd,
-  renderEditForm,
+  renderSearchForm,
 }: RecherchePageResultsProps) {
   // Itineraire selectionne par defaut : le premier de la liste (deja en tete
   // du tri backend).
   const [selectedIndex, setSelectedIndex] = useState(0);
-  // Etat du bandeau mobile, ignore en desktop (voir RecherchePageResults.css)
-  // - "list" par defaut : la liste des resultats est ce qu'on veut voir en
-  // premier apres une recherche, ni trop replie (invisible), ni trop
-  // deploye (masquerait la carte inutilement avant toute selection).
-  const [sheetState, setSheetState] = useState<SheetState>('list');
+  // Repli/deploiement de la carte en mobile (ignore en desktop, voir
+  // RecherchePageResults.css) - "expanded" par defaut : la carte est ce que
+  // l'utilisateur regarde juste apres avoir lance une recherche. Meme
+  // mecanique a 2 etats que formSheetState (RecherchePage.tsx), dupliquee
+  // plutot que partagee (les deux ecrans ne sont jamais montes ensemble).
+  const [sheetState, setSheetState] = useState<'collapsed' | 'expanded'>(
+    'expanded',
+  );
   const touchStartY = useRef<number | null>(null);
   // Hook appele inconditionnellement (regle des Hooks React), avant les
   // retours anticipes ci-dessous. Activee des que la carte est sur le point
@@ -575,44 +433,24 @@ function RecherchePageResults({
   // Calcule une seule fois les badges qualitatifs (issue #126) - hook
   // appele inconditionnellement (regle des Hooks React), avant les retours
   // anticipes ci-dessous, meme si `itineraries` est encore null (auquel cas
-  // il n'y a aucun badge a calculer). Transmis identique aux deux rendus de
-  // ResultsList (panneau desktop et bandeau mobile) pour eviter de refaire
-  // le calcul deux fois.
+  // il n'y a aucun badge a calculer).
   const itineraryBadges = useMemo(
     () => computeItineraryBadges(itineraries ?? [], accessibilityPreferences ?? []),
     [itineraries, accessibilityPreferences],
   );
 
-  // Touche Echap referme la vue Edition (issue #171/#172), meme motif que
-  // TransportModesFilter (RecherchePage.tsx) - ecouteur pose uniquement
-  // pendant l'edition, retire des qu'elle se referme.
-  useEffect(() => {
-    if (!isEditingSearch || !onCancelEdit) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onCancelEdit?.();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isEditingSearch, onCancelEdit]);
-
   function selectItinerary(index: number) {
     setSelectedIndex(index);
-    // Sur mobile, choisir un trajet ouvre directement son detail plutot que
-    // de laisser l'utilisateur remonter chercher une action separee.
-    setSheetState('detail');
   }
 
   /**
-   * Poignee tapee/cliquee : deploie la liste depuis "collapsed" (seule
-   * direction possible depuis le niveau le plus bas), sinon replie d'un
-   * niveau ("detail" -> "list" -> "collapsed").
+   * Poignee tapee/cliquee : bascule simplement entre les 2 etats (meme
+   * logique que RecherchePage.tsx, handleFormHandleClick).
    */
   function handleHandleClick() {
-    setSheetState((current) => {
-      if (current === 'collapsed') return 'list';
-      if (current === 'detail') return 'list';
-      return 'collapsed';
-    });
+    setSheetState((current) =>
+      current === 'collapsed' ? 'expanded' : 'collapsed',
+    );
   }
 
   function handleHandleTouchStart(event: TouchEvent<HTMLButtonElement>) {
@@ -621,9 +459,8 @@ function RecherchePageResults({
 
   /**
    * Glissement simple sur la poignee (etats discrets, pas de suivi du doigt
-   * en temps reel - decision prise en session le 2026-08-03) : un seuil de
-   * distance suffit a distinguer un tap d'un glissement, pas besoin de
-   * suivre le geste image par image pour un projet a delai serre.
+   * en temps reel) : un seuil de distance suffit a distinguer un tap d'un
+   * glissement. Meme logique que RecherchePage.tsx, handleFormHandleTouchEnd.
    */
   function handleHandleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
     if (touchStartY.current === null) return;
@@ -634,217 +471,134 @@ function RecherchePageResults({
     // Empeche le clic synthetique qui suivrait sur mobile (touchend puis
     // click) de re-appliquer une transition contradictoire.
     event.preventDefault();
-    if (delta > 0) {
-      // Glissement vers le bas : repli d'un niveau.
-      setSheetState((current) => (current === 'detail' ? 'list' : 'collapsed'));
-    } else {
-      // Glissement vers le haut : ouverture d'un niveau (seulement utile
-      // depuis "collapsed", sans effet sinon).
-      setSheetState((current) => (current === 'collapsed' ? 'list' : current));
-    }
+    setSheetState(delta > 0 ? 'collapsed' : 'expanded');
   }
 
-  /**
-   * Panneau/bandeau d'edition (issue #171/#172) : rendu une seule fois (pas
-   * une copie desktop + une copie mobile comme ResultsList/ItinerarySegments
-   * ci-dessous) - EditPanel se repositionne lui-meme en bandeau bas ou en
-   * panneau flottant haut-gauche via CSS (meme mecanique que le formulaire
-   * du tout premier chargement). Dupliquer le formulaire cote a cote (comme
-   * la liste) creerait des id de champ en double dans le DOM (AddressField
-   * `id="origin-address"`, deja cible par document.getElementById dans
-   * RecherchePage.tsx) - a eviter, contrairement a la liste/au detail qui
-   * n'ont pas cette contrainte.
-   */
-  const editPanel =
-    isEditingSearch && renderEditForm ? (
-      <EditPanel
-        sheetState={editSheetState}
-        onToggle={onEditSheetToggle ?? (() => {})}
-        onTouchStart={onEditSheetTouchStart ?? (() => {})}
-        onTouchEnd={onEditSheetTouchEnd ?? (() => {})}
-      >
-        {renderEditForm()}
-      </EditPanel>
-    ) : null;
-
-  // --- Recherche en cours (issue #73, spec 2.4) : aucun itineraire recu
-  // pour l'instant, carte avec origine/destination seules + squelette. ---
+  // --- Contenu affiche a la suite du formulaire, dans le meme corps
+  // defilant (issue #234) : squelette de chargement, message d'etat vide,
+  // ou liste des itineraires. Le detail de l'itineraire selectionne est
+  // calcule a part (detailContent ci-dessous) : il ne vit PAS dans cette
+  // meme carte en desktop (retour utilisateur en session) - voir plus bas. ---
+  let listSection: ReactNode;
+  let selectedItinerary: TripItinerary | null = null;
   if (itineraries === null) {
-    return (
-      <div className="resultats-shell">
-        <h1 className="resultats-visually-hidden">Résultats</h1>
-        <div className="resultats-map-bg">
-          <MapView
-            origin={origin}
-            destination={destination}
-            variant="fullBleed"
-            userPosition={geolocation.position}
-          />
-        </div>
-        {editPanel ?? (
-          <>
-            <div className="resultats-panels">
-              <div className="resultats-panel resultats-panel-list">
-                <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-                <Skeleton count={3} />
-              </div>
-            </div>
-            <div className="resultats-sheet" data-sheet-state="list">
-              <div className="resultats-sheet-handle">
-                <span className="resultats-sheet-handle-bar" aria-hidden="true" />
-              </div>
-              <div className="resultats-sheet-body">
-                <SearchContext origin={origin} destination={destination} onEditSearch={onEditSearch} />
-                <Skeleton count={3} />
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+    // Recherche en cours (issue #73, spec 2.4) : aucun itineraire recu pour
+    // l'instant.
+    listSection = <Skeleton count={3} />;
+  } else if (itineraries.length === 0) {
+    // Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
+    // une erreur. Le repli a pied (fallback: 'walk-only') N'arrive PAS ici :
+    // dans ce cas itineraries contient le trajet a pied, on passe donc par
+    // la branche ci-dessous (avec le bandeau explicatif de ResultsList).
+    listSection = <EmptyResults />;
+  } else {
+    selectedItinerary = itineraries[selectedIndex] as TripItinerary;
+    listSection = (
+      <ResultsList
+        itineraries={itineraries}
+        selectedIndex={selectedIndex}
+        onSelect={selectItinerary}
+        geolocationMessage={geolocationMessage(geolocation.status)}
+        itineraryBadges={itineraryBadges}
+        fallback={fallback}
+        fromCache={fromCache}
+      />
     );
   }
 
-  // --- Etat vide (section 4 de la spec) : aucun itineraire trouve n'est pas
-  // une erreur, pas d'Alert ici. Depuis #190, il est rendu DANS le panneau
-  // fusionne (meme coquille que "recherche en cours" ci-dessus : carte plein
-  // ecran en fond avec origine/destination, panneau desktop + bandeau mobile)
-  // plutot que dans une page `.resultats-page` a part. "Modifier la recherche"
-  // bascule en vue Edition en place (onEditSearch), coherent avec le reste du
-  // panneau fusionne. Le repli a pied (fallback: 'walk-only') N'arrive PAS
-  // ici : dans ce cas itineraries contient le trajet a pied, on passe donc au
-  // rendu resultats normal ci-dessous (avec le bandeau explicatif de
-  // ResultsList). ---
-  if (itineraries.length === 0) {
-    return (
-      <div className="resultats-shell">
-        <h1 className="resultats-visually-hidden">Résultats</h1>
-        <div className="resultats-map-bg">
-          <MapView
-            origin={origin}
-            destination={destination}
-            variant="fullBleed"
-            userPosition={geolocation.position}
-          />
-        </div>
-        {editPanel ?? (
-          <>
-            <div className="resultats-panels">
-              <div className="resultats-panel resultats-panel-list">
-                <EmptyResults
-                  origin={origin}
-                  destination={destination}
-                  onEditSearch={onEditSearch}
-                />
-              </div>
-            </div>
-            <div className="resultats-sheet" data-sheet-state="list">
-              <div className="resultats-sheet-handle">
-                <span
-                  className="resultats-sheet-handle-bar"
-                  aria-hidden="true"
-                />
-              </div>
-              <div className="resultats-sheet-body">
-                <EmptyResults
-                  origin={origin}
-                  destination={destination}
-                  onEditSearch={onEditSearch}
-                />
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  const selectedItinerary = itineraries[selectedIndex] as TripItinerary;
+  // Detail de l'itineraire selectionne (issue #234, revu en session apres
+  // retour utilisateur) : `null` tant qu'aucune liste n'est affichee.
+  // Reutilise TEL QUEL a deux endroits differents ci-dessous - a l'interieur
+  // de la carte de recherche en mobile (`.resultats-detail`, pas de place
+  // pour un panneau separe) ET dans un panneau flottant independant a
+  // DROITE de la carte en desktop (`.resultats-detail-panel`, assez de
+  // place pour les montrer cote a cote) - seule une media query CSS decide
+  // laquelle des deux copies est visible a un instant donne (voir
+  // RecherchePageResults.css). Rendre le meme element deux fois est sans
+  // risque ici : chaque emplacement est un parent totalement distinct dans
+  // l'arbre, React y monte deux instances independantes.
+  const detailContent = selectedItinerary && (
+    <>
+      <h2 className="resultats-detail-heading">
+        Détail du trajet sélectionné
+      </h2>
+      <ItinerarySegments itinerary={selectedItinerary} />
+    </>
+  );
 
   return (
     <div className="resultats-shell">
-      {/* Titre de page toujours present pour les lecteurs d'ecran (une
-          seule instance, contrairement au reste ci-dessous qui differe
-          entre desktop et mobile) - pas affiche visuellement, la
-          disposition "carte plein ecran" ne laisse pas de place a un grand
-          titre de page comme dans la v1 de cet ecran. */}
+      {/* Titre de page toujours present pour les lecteurs d'ecran - pas
+          affiche visuellement, la disposition "carte plein ecran" ne laisse
+          pas de place a un grand titre de page comme dans la v1 de cet
+          ecran. */}
       <h1 className="resultats-visually-hidden">Résultats</h1>
 
       <div className="resultats-map-bg">
-        <MapView
-          itinerary={selectedItinerary}
-          variant="fullBleed"
-          userPosition={geolocation.position}
-        />
+        {itineraries !== null && itineraries.length > 0 ? (
+          <MapView
+            itinerary={itineraries[selectedIndex]}
+            variant="fullBleed"
+            userPosition={geolocation.position}
+          />
+        ) : (
+          <MapView
+            origin={origin}
+            destination={destination}
+            variant="fullBleed"
+            userPosition={geolocation.position}
+          />
+        )}
       </div>
 
-      {editPanel ?? (
-        <>
-          {/* Panneaux flottants (desktop uniquement, voir la media query dans
-              RecherchePageResults.css - masques en dessous de 768px). */}
-          <div className="resultats-panels">
-            <div className="resultats-panel resultats-panel-list">
-              <ResultsList
-                itineraries={itineraries}
-                origin={origin}
-                destination={destination}
-                selectedIndex={selectedIndex}
-                onSelect={selectItinerary}
-                onEditSearch={onEditSearch}
-                geolocationMessage={geolocationMessage(geolocation.status)}
-                itineraryBadges={itineraryBadges}
-                fallback={fallback}
-                fromCache={fromCache}
-              />
-            </div>
-            <div className="resultats-panel resultats-panel-detail">
-              <ItinerarySegments itinerary={selectedItinerary} />
-            </div>
-          </div>
+      {/* Carte de recherche persistante (issue #234) : formulaire, puis
+          resultats a sa suite - voir le commentaire de RecherchePageResults
+          ci-dessus. Meme classes que l'ecran "formulaire" de RecherchePage
+          (`.recherche-panel-form`), deja stylees pour les deux dispositions
+          (bandeau repliable en mobile, panneau flottant en desktop). */}
+      <div className="recherche-panel-form" data-sheet-state={sheetState}>
+        <button
+          type="button"
+          className="recherche-panel-form-handle"
+          onClick={handleHandleClick}
+          onTouchStart={handleHandleTouchStart}
+          onTouchEnd={handleHandleTouchEnd}
+          aria-expanded={sheetState === 'expanded'}
+        >
+          <span className="resultats-sheet-handle-bar" aria-hidden="true" />
+          {sheetState === 'collapsed' && (
+            <span className="recherche-panel-form-handle-label">
+              Rechercher un trajet
+            </span>
+          )}
+        </button>
 
-          {/* Bandeau mobile a 3 etats (masque a partir de 768px). */}
-          <div className="resultats-sheet" data-sheet-state={sheetState}>
-            <button
-              type="button"
-              className="resultats-sheet-handle"
-              onClick={handleHandleClick}
-              onTouchStart={handleHandleTouchStart}
-              onTouchEnd={handleHandleTouchEnd}
-              aria-expanded={sheetState !== 'collapsed'}
-            >
-              <span className="resultats-sheet-handle-bar" aria-hidden="true" />
-              {sheetState === 'collapsed' && (
-                <CompactPreview itinerary={selectedItinerary} />
-              )}
-            </button>
-
-            <div className="resultats-sheet-body">
-              {sheetState === 'detail' ? (
-                <div className="resultats-sheet-detail">
-                  <button
-                    type="button"
-                    className="resultats-sheet-back"
-                    onClick={() => setSheetState('list')}
-                  >
-                    ← Tous les trajets
-                  </button>
-                  <ItinerarySegments itinerary={selectedItinerary} />
-                </div>
-              ) : (
-                <ResultsList
-                  itineraries={itineraries}
-                  origin={origin}
-                  destination={destination}
-                  selectedIndex={selectedIndex}
-                  onSelect={selectItinerary}
-                  onEditSearch={onEditSearch}
-                  geolocationMessage={geolocationMessage(geolocation.status)}
-                  itineraryBadges={itineraryBadges}
-                  fromCache={fromCache}
-                />
-              )}
-            </div>
+        <div className="recherche-panel-form-body">
+          {renderSearchForm()}
+          {/* Espace visible avec le bouton "Rechercher" au-dessus (retour
+              utilisateur en session) : sans lui, la premiere carte-
+              itineraire (ou le squelette/message d'etat vide) collait
+              directement au bouton. */}
+          <div className="recherche-panel-form-results">
+            {listSection}
+            {/* Detail EN PLUS de la liste, dans la meme carte : uniquement
+                en mobile (pas de place pour un panneau separe) - masque a
+                partir de 768px, voir RecherchePageResults.css. */}
+            {detailContent && (
+              <div className="resultats-detail resultats-detail--inline">
+                {detailContent}
+              </div>
+            )}
           </div>
-        </>
+        </div>
+      </div>
+
+      {/* Detail de l'itineraire selectionne, a DROITE de la carte de
+          recherche (issue #234, retour utilisateur en session) - desktop
+          uniquement (masque par defaut, affiche a partir de 768px comme
+          panneau flottant independant, voir RecherchePageResults.css). */}
+      {detailContent && (
+        <div className="resultats-detail-panel">{detailContent}</div>
       )}
     </div>
   );

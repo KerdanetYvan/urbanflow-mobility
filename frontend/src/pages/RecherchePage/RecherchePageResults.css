@@ -2,41 +2,30 @@
  * Disposition "carte plein ecran" (v2, decidee en session le 2026-08-03,
  * rapprochee des applications de cartographie grand public type Google
  * Maps) : la carte occupe tout l'ecran en fond (.resultats-shell,
- * .resultats-map-bg), les resultats flottent par-dessus - deux panneaux
- * cote a cote en desktop (.resultats-panels), un bandeau a 3 etats en
- * mobile (.resultats-sheet). Ecrit mobile-first comme le reste du projet :
- * .resultats-sheet est la regle de base, .resultats-panels prend le relais
- * a partir de 768px (voir la media query en bas de fichier).
+ * .resultats-map-bg). Formulaire + liste des itineraires dans une seule
+ * carte flottante (issue #234, revu deux fois apres retour utilisateur en
+ * session) : celle du formulaire de recherche (.recherche-panel-form,
+ * partagee avec RecherchePage.tsx pour l'ecran "formulaire" du tout premier
+ * chargement) - la liste s'y ajoute simplement a la suite, sous le bouton
+ * "Rechercher", dans le meme corps defilant (.recherche-panel-form-body).
+ * Plus de panneau "liste" separe ni de bandeau mobile a 3 etats (l'ancien
+ * duo ".resultats-panels" desktop / ".resultats-sheet" mobile, retire) :
+ * desktop et mobile partagent cette disposition, seule la regle
+ * .recherche-panel-form change selon le breakpoint.
+ *
+ * Le DETAIL de l'itineraire selectionne, lui, ne rejoint PAS cette carte en
+ * desktop (2e retour utilisateur) : assez de place pour l'afficher a part,
+ * dans un panneau flottant independant a DROITE de la carte
+ * (.resultats-detail-panel, voir la media query en bas de fichier). En
+ * mobile, ou cette place n'existe pas, il reste affiche a la suite de la
+ * liste, dans la carte de recherche (.resultats-detail--inline). Voir le
+ * commentaire de .resultats-detail-heading plus bas pour le detail.
  *
  * Classes conservees "resultats-*" (issue #73, fusion de RecherchePage et
  * ResultatsPage en un seul ecran) : renommer une centaine de selecteurs
  * n'apporte rien et ajoute du risque, le prefixe reste comprehensible
  * ("disposition resultats", que ce soit en chargement ou peuplee).
  */
-
-.resultats-context {
-  margin: var(--space-2) 0 var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-/* Le lien "Modifier la recherche"/"Nouvelle recherche" est un <button>
-   (issue #73 : plus de route /resultats a quitter, changement d'etat
-   interne - voir RecherchePageResults.tsx, SearchContext) stylise pour
-   rester visuellement identique a l'ancien <Link>. */
-.resultats-link-button {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-primary-emphasis);
-  font: inherit;
-  cursor: pointer;
-}
-
-.resultats-link-button:hover,
-.resultats-link-button:focus-visible {
-  text-decoration: underline;
-}
 
 /* Position en temps reel indisponible (issue #9, permission refusee ou
    navigateur incompatible) - texte secondaire simple, meme registre que
@@ -48,10 +37,9 @@
   font-size: var(--text-sm);
 }
 
-/* Etat vide (aucun itineraire, pas meme a pied) - contenu du panneau
-   fusionne depuis #190 (plus une page a part) : le panneau/bandeau porte
-   deja le fond, le cadre et le defilement, ce bloc n'a qu'a espacer son
-   texte. */
+/* Etat vide (aucun itineraire, pas meme a pied) - contenu affiche a la
+   suite du formulaire (issue #190, revu par #234) : la carte porte deja le
+   fond, le cadre et le defilement, ce bloc n'a qu'a espacer son texte. */
 .resultats-empty {
   color: var(--color-text);
 }
@@ -62,8 +50,8 @@
 
 /* Bandeau du repli a pied (issue #190) : la "liste" affichee en dessous
    n'est pas un resultat en transport en commun mais l'itineraire a pied
-   propose faute de mieux - on l'annonce clairement, registre "information"
-   (meme couleur d'accent que .resultats-link-button). */
+   propose faute de mieux - on l'annonce clairement (meme couleur d'accent
+   que les autres rappels informatifs de cette carte). */
 .resultats-fallback-note {
   margin: 0 0 var(--space-3);
   color: var(--color-primary-emphasis);
@@ -94,10 +82,10 @@
   overflow: hidden;
   /* Mobile : .app-layout reserve `--space-8` en bas pour sa nav fixe (voir
      AppLayout.css), ce qui raccourcit .app-content d'autant. Un bord bas
-     negatif compense cette reserve pour que le bandeau puisse quand meme
-     recouvrir la nav (ecran de tache immersif, coherent avec le fait que
-     "Resultats" n'apparait deja pas dans la nav principale) - sans ce
-     correctif, le bandeau s'arreterait juste au-dessus d'elle. */
+     negatif compense cette reserve pour que la carte de recherche puisse
+     quand meme recouvrir la nav (ecran de tache immersif, coherent avec le
+     fait que "Resultats" n'apparait deja pas dans la nav principale) - sans
+     ce correctif, elle s'arreterait juste au-dessus d'elle. */
   bottom: calc(var(--space-8) * -1);
   /* Doit couvrir la nav mobile fixe (.app-nav, z-index 10, voir
      AppLayout.css) - seul element positionne avec lequel cette coquille
@@ -130,35 +118,10 @@
   height: 100%;
 }
 
-/* --- Panneaux flottants (desktop uniquement, voir media query) --- */
-
-/* Bug corrige (issue #111) : cette enveloppe flex position:absolute (rendue
-   uniquement en desktop, voir display:none puis display:flex plus bas) ne
-   doit jamais capter d'evenements pointeur/molette elle-meme - avant ce
-   correctif, sa boite reelle (calcul flex/max-height:100% contre un
-   ancetre a hauteur non explicite) depassait le rendu visuel des panneaux
-   et bloquait le pan/zoom de la carte sur toute la hauteur de l'ecran,
-   au-dela de leur emprise reelle. pointer-events:auto reapplique sur
-   .resultats-panel (les boites reellement visibles) : seule leur emprise
-   effective bloque desormais la carte, jamais plus. */
-.resultats-panels {
-  display: none;
-  pointer-events: none;
-}
-
-.resultats-panel {
-  pointer-events: auto;
-  background: var(--color-bg);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
-  padding: var(--space-4);
-  overflow-y: auto;
-}
-
 /* Squelette de chargement : composant partage (issue #162), voir
    components/Skeleton/Skeleton.css. */
 
-/* --- Cartes-itineraire (liste, partagee panneau desktop + bandeau mobile) --- */
+/* --- Cartes-itineraire (liste, affichee a la suite du formulaire) --- */
 
 .resultats-list {
   display: flex;
@@ -245,6 +208,10 @@
   font-size: var(--text-sm);
 }
 
+/* "Voir le detail" : reste visible sur tous les breakpoints (issue #234) -
+   cliquer une carte affiche/actualise toujours son detail quelque part
+   (en dessous en mobile, dans un panneau a droite en desktop - voir plus
+   bas), le texte reste donc pertinent partout. */
 .resultats-card-action {
   width: 100%;
   color: var(--color-primary-emphasis);
@@ -252,7 +219,49 @@
   font-weight: var(--weight-semibold);
 }
 
-/* --- Detail segment par segment (partage panneau desktop + bandeau mobile) --- */
+/* Espace entre le bouton "Rechercher" (fin du formulaire) et ce qui suit -
+   squelette de chargement, message d'etat vide ou liste des itineraires
+   (issue #234, retour utilisateur en session : ce contenu collait
+   directement au bouton sans lui). */
+.recherche-panel-form-results {
+  margin-top: var(--space-5);
+}
+
+/* --- Detail segment par segment de l'itineraire selectionne (issue #234).
+   Contenu partage entre deux emplacements (voir `detailContent`,
+   RecherchePageResults.tsx) : a la suite de la liste, DANS la carte de
+   recherche en mobile (.resultats-detail--inline, pas de place pour un
+   panneau separe) ; dans son propre panneau flottant a DROITE de la carte
+   en desktop (.resultats-detail-panel plus bas, retour utilisateur en
+   session - assez de place pour les montrer cote a cote). Une seule des
+   deux copies est visible a la fois, seule une media query CSS en decide
+   (regles ci-dessous puis dans le bloc desktop en bas de fichier). --- */
+
+.resultats-detail-heading {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+/* Copie mobile, empilee sous la liste dans la meme carte (visible par
+   defaut, mobile-first) : separateur visuel avec la liste au-dessus, sans
+   quoi le detail se confondrait avec la derniere carte-itineraire (meme
+   fond, pas de cadre propre). Masquee a partir de 768px (voir plus bas) :
+   c'est alors .resultats-detail-panel qui prend le relais. */
+.resultats-detail--inline {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Copie desktop : panneau flottant independant, masque par defaut
+   (mobile-first) - n'existe qu'a partir de 768px, voir la media query en
+   bas de fichier pour son positionnement (a droite de .recherche-panel-form)
+   et son habillage (fond/cadre/ombre, memes valeurs que .recherche-panel-form
+   en desktop). */
+.resultats-detail-panel {
+  display: none;
+}
 
 /* Prochains passages d'un resultat regroupe (issue #127) - deplace ici
    depuis la carte compacte de la liste (issue #173) : traitement discret,
@@ -297,74 +306,11 @@
   font-size: var(--text-sm);
 }
 
-/* --- Bandeau mobile a 3 etats (collapsed/list/detail) --- */
-
-.resultats-sheet {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  display: grid;
-  background: var(--color-bg);
-  border-top-left-radius: var(--radius-md);
-  border-top-right-radius: var(--radius-md);
-  box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
-  /* Deux pistes de grille : la poignee (`auto`, toujours a sa hauteur
-     naturelle) puis le corps, dont la hauteur porte l'etat visuel du
-     bandeau (replie / liste / detail). Seule la 2e valeur change d'un
-     etat a l'autre - animer `grid-template-rows` plutot que `height`
-     (issue #181, finding "layout-transition" du detecteur Impeccable :
-     `transition: height` anime une propriete de layout, thrash/jank par
-     frame). `grid-template-rows` garde le corps a la taille exacte de la
-     portion visible, donc le defilement interne reste complet dans l'etat
-     "liste" - ce qu'un simple glissement `transform` casserait (bas de
-     liste rejete sous l'ecran, injoignable). */
-  grid-template-rows: auto 0;
-  transition: grid-template-rows 0.22s ease-out;
-  overflow: hidden;
-}
-
-/* La 2e piste = hauteur cible du bandeau (repli / 60vh / 88vh, valeurs
-   d'avant #181) moins la poignee : le corps occupe pile la portion
-   visible, le bord haut du bandeau tombe a la meme place qu'avant. */
-.resultats-sheet[data-sheet-state='collapsed'] {
-  grid-template-rows: auto 0;
-}
-
-.resultats-sheet[data-sheet-state='list'] {
-  grid-template-rows: auto calc(60vh - 4.5rem);
-}
-
-.resultats-sheet[data-sheet-state='detail'] {
-  grid-template-rows: auto calc(88vh - 4.5rem);
-}
-
-.resultats-sheet-handle {
-  /* 1re piste (`auto`) de la grille .resultats-sheet : la poignee garde
-     toujours sa hauteur naturelle, seul le corps sous elle s'ouvre/se
-     ferme. */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--touch-target-min);
-  padding: var(--space-2) var(--space-4);
-  background: none;
-  border: none;
-  color: var(--color-text);
-  cursor: pointer;
-  /* Empeche le geste de glissement (voir onTouchStart/onTouchEnd) de
-     declencher en plus un defilement/zoom du navigateur sur cette zone. */
-  touch-action: none;
-}
-
-.resultats-sheet-handle:focus-visible {
-  outline: 2px solid var(--color-primary-emphasis);
-  outline-offset: -2px;
-}
-
+/* Barre de la poignee (mobile) : forme visuelle partagee par les deux
+   panneaux qui utilisent la mecanique "poignee + glissement" -
+   .recherche-panel-form-handle ci-dessous (RecherchePage.tsx ET
+   RecherchePageResults.tsx, meme carte reutilisee) - une seule regle, pas
+   de duplication entre les deux fichiers. */
 .resultats-sheet-handle-bar {
   width: 2.5rem;
   height: 0.25rem;
@@ -372,52 +318,14 @@
   background: var(--color-border);
 }
 
-.resultats-sheet-preview {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-}
-
-.resultats-sheet-preview-modes {
-  display: flex;
-  gap: var(--space-1);
-  color: var(--color-text-muted);
-}
-
-.resultats-sheet-body {
-  /* 2e piste de la grille .resultats-sheet (voir plus haut) : le corps
-     s'etire pour occuper toute la piste (align-self: stretch par defaut).
-     min-height: 0 leve le minimum implicite d'un item de grille, sans quoi
-     le corps refuserait de descendre sous la hauteur de son contenu et
-     overflow-y n'aurait rien a faire defiler. */
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0 var(--space-4) var(--space-4);
-}
-
-.resultats-sheet-back {
-  display: inline-block;
-  margin-bottom: var(--space-3);
-  padding: var(--space-2) 0;
-  background: none;
-  border: none;
-  color: var(--color-primary-emphasis);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-
-/* --- Panneau formulaire (issues #110/#111, #171/#172) : bandeau mobile a 2
-   etats par defaut (mobile-first) ; devient un panneau flottant en
-   desktop, voir la media query plus bas. Partage par RecherchePage.tsx
-   (etat "formulaire", tout premier chargement) ET RecherchePageResults.tsx
-   (vue Edition en place, voir EditPanel) - un seul panneau, quel que soit
-   le fichier qui le monte a un instant donne (jamais les deux a la fois).
-   Reutilise le motif visuel de .resultats-sheet ci-dessus (poignee +
-   glissement) sans en dependre en JS - mecanique a 2 etats seulement (pas
-   3, pas de "detail" pour un formulaire), portee par RecherchePage.tsx
-   (formSheetState) quel que soit l'endroit ou le panneau est rendu. --- */
+/* --- Carte du formulaire de recherche (issues #110/#111, #171/#172, revue
+   par #234) : bandeau mobile a 2 etats par defaut (mobile-first) ; devient
+   un panneau flottant en desktop, voir la media query plus bas. Partagee
+   par RecherchePage.tsx (etat "formulaire", tout premier chargement) ET
+   RecherchePageResults.tsx (une fois une recherche aboutie, resultats
+   ajoutes a la suite du formulaire dans le meme corps) - une seule carte a
+   la fois, quel que soit le fichier qui la monte (les deux ecrans ne sont
+   jamais affiches ensemble). --- */
 
 .recherche-panel-form {
   position: absolute;
@@ -433,33 +341,34 @@
   box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
   /* Hauteur intrinseque au contenu plutot que fixee a 70vh (ferme #160,
      docs/specs/fusion-recherche-resultats.md section 3.2) : le bandeau
-     n'occupe que ce dont son contenu a besoin (peu, "Plus d'options"
-     replie par defaut), laissant la carte majoritairement visible au
-     premier chargement - max-height reste un garde-fou sur petit ecran
-     en paysage, jamais une hauteur cible imposee par defaut. Le bandeau
-     garde cette hauteur quel que soit l'etat ; c'est `transform:
-     translateY` qui le fait coulisser hors de l'ecran quand il est
-     replie (issue #181, meme finding "layout-transition" que
-     .resultats-sheet : animer `height` - a fortiori vers une hauteur
-     intrinseque non interpolable - provoque un reflow par frame,
+     n'occupe que ce dont son contenu a besoin, laissant la carte
+     majoritairement visible tant qu'aucun resultat n'est encore affiche -
+     max-height reste un garde-fou (sur petit ecran en paysage, ou une fois
+     des resultats ajoutes a la suite du formulaire), jamais une hauteur
+     cible imposee par defaut. Le bandeau garde cette hauteur quel que soit
+     l'etat ; c'est `transform: translateY` qui le fait coulisser hors de
+     l'ecran quand il est replie (issue #181, finding "layout-transition"
+     du detecteur Impeccable : animer `height` - a fortiori vers une
+     hauteur intrinseque non interpolable - provoque un reflow par frame,
      `transform` est composite et interpole proprement).
 
-     Pourquoi `transform` ici et `grid-template-rows` sur .resultats-sheet :
-     ce panneau n'a que 2 etats (ouvert / replie), et replie il masque
+     Pourquoi `transform` ici plutot que `grid-template-rows` (technique
+     utilisee par l'ancien bandeau resultats a 3 etats, retire) : cette
+     carte n'a que 2 etats (ouverte / repliee), et repliee elle masque
      entierement son corps (`visibility: hidden` ci-dessous, retire du
      parcours clavier). Aucun etat intermediaire "partiellement visible +
-     defilable", donc le glissement `transform` ne peut pas rendre du
-     contenu injoignable - le piege qui, lui, imposait `grid-template-rows`
-     sur le bandeau resultats. */
+     defilable", donc le glissement `transform` ne peut jamais rendre du
+     contenu injoignable. */
   max-height: 70vh;
   transition: transform 0.22s ease-out;
   overflow: hidden;
 }
 
-/* Replie : on translate le bandeau de toute sa hauteur moins la portion
-   a garder visible (la poignee, 4.5rem). `100%` en translateY se rapporte
-   a la hauteur reelle du bandeau, donc la poignee reste seule visible
-   quel que soit le volume du formulaire. */
+/* Repliee : on translate la carte de toute sa hauteur moins la portion a
+   garder visible (la poignee, 4.5rem). `100%` en translateY se rapporte a
+   la hauteur reelle de la carte, donc la poignee reste seule visible quel
+   que soit son volume de contenu (formulaire seul, ou formulaire +
+   resultats). */
 .recherche-panel-form[data-sheet-state='collapsed'] {
   transform: translateY(calc(100% - 4.5rem));
 }
@@ -468,13 +377,13 @@
   transform: translateY(0);
 }
 
-/* Corps du formulaire retire du parcours de tabulation et de l'arbre
-   d'accessibilite quand le bandeau est replie (meme intention que
-   l'ancienne regle `display: none`), mais en `visibility: hidden` : le
-   corps continue ainsi d'occuper sa hauteur dans le flux, et c'est cette
-   hauteur qui donne au bandeau la course necessaire pour coulisser via
-   `transform`. Non peint et deborde sous la poignee, il est de toute
-   facon invisible et masque par `overflow: hidden`. */
+/* Corps retire du parcours de tabulation et de l'arbre d'accessibilite
+   quand la carte est repliee (meme intention que l'ancienne regle
+   `display: none`), mais en `visibility: hidden` : le corps continue ainsi
+   d'occuper sa hauteur dans le flux, et c'est cette hauteur qui donne a la
+   carte la course necessaire pour coulisser via `transform`. Non peint et
+   deborde sous la poignee, il est de toute facon invisible et masque par
+   `overflow: hidden`. */
 .recherche-panel-form[data-sheet-state='collapsed']
   .recherche-panel-form-body {
   visibility: hidden;
@@ -493,9 +402,8 @@
   border: none;
   color: var(--color-text);
   cursor: pointer;
-  /* Empeche le glissement (voir onTouchStart/onTouchEnd, RecherchePage.tsx)
-     de declencher en plus un defilement/zoom du navigateur sur cette zone -
-     meme motif que .resultats-sheet-handle. */
+  /* Empeche le glissement (voir onTouchStart/onTouchEnd) de declencher en
+     plus un defilement/zoom du navigateur sur cette zone. */
   touch-action: none;
 }
 
@@ -509,6 +417,10 @@
   font-weight: var(--weight-semibold);
 }
 
+/* Corps de la carte : formulaire (renderSearchForm), puis, une fois une
+   recherche aboutie, les resultats a sa suite (RecherchePageResults.tsx,
+   issue #234) - flex:1/min-height:0/overflow-y:auto le rendent scrollable
+   independamment de la poignee, quel que soit le volume de contenu. */
 .recherche-panel-form-body {
   flex: 1;
   min-height: 0; /* necessaire pour qu'overflow-y fonctionne dans un flex item */
@@ -517,58 +429,20 @@
 }
 
 /* Respect de prefers-reduced-motion (meme motif que MapView.css /
-   Skeleton.css) : le changement d'etat des deux bandeaux reste
-   instantane pour qui a demande a reduire les animations - le
-   "glissement" `transform` est un pur agrement visuel. */
+   Skeleton.css) : le changement d'etat de la carte reste instantane pour
+   qui a demande a reduire les animations - le "glissement" `transform` est
+   un pur agrement visuel. */
 @media (prefers-reduced-motion: reduce) {
-  .resultats-sheet,
   .recherche-panel-form {
     transition: none;
   }
 }
 
 @media (min-width: 768px) {
-  .resultats-sheet {
-    display: none;
-  }
-
-  /* "Voir le détail" (issue #170) : masqué en desktop - cliquer la carte
-     ouvre déjà le détail dans le panneau de droite en permanence visible,
-     ce texte suggérait à tort une action séparée. Conservé en mobile, où
-     aucun panneau latéral n'est visible en continu. Déjà aria-hidden : ce
-     masquage est purement visuel, sans impact lecteur d'écran. */
-  .resultats-card-action {
-    display: none;
-  }
-
-  .resultats-panels {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--space-4);
-    position: absolute;
-    left: var(--space-5);
-    bottom: var(--space-5);
-    z-index: 1;
-    max-width: calc(100% - var(--space-8));
-    max-height: calc(100% - var(--space-8));
-  }
-
-  .resultats-panel-list {
-    width: 22rem;
-    max-height: 100%;
-  }
-
-  .resultats-panel-detail {
-    width: 20rem;
-    max-height: 100%;
-  }
-
   /* Panneau flottant plutot que bandeau du bas (issues #110/#111,
-     #171/#172) : bas-gauche, meme position/largeur que .resultats-panel-list
-     ci-dessus (au lieu du haut-gauche d'avant #171) - le panneau ne saute
-     plus de position au moment ou les premiers resultats arrivent, que ce
-     soit au tout premier chargement ou en edition en place depuis les
-     resultats (docs/specs/fusion-recherche-resultats.md section 3.1). */
+     #171/#172) : bas-gauche, meme position en formulaire seul ou une fois
+     des resultats ajoutes a sa suite (issue #234) - la carte ne saute
+     jamais de position au moment ou les premiers resultats arrivent. */
   .recherche-panel-form {
     left: var(--space-5);
     right: auto;
@@ -582,14 +456,14 @@
 
   /* Meme specificite que les regles [data-sheet-state='collapsed'/'expanded']
      ci-dessus (attribut + classe) : gagne par ordre de cascade (declaree
-     apres) sans avoir besoin de !important - le panneau ne coulisse jamais
+     apres) sans avoir besoin de !important - la carte ne coulisse jamais
      en desktop, quel que soit l'etat (non pertinent, pas de repli
-     possible), il reste a sa hauteur naturelle et en place. */
+     possible), elle reste a sa hauteur naturelle et en place. */
   .recherche-panel-form[data-sheet-state] {
     transform: none;
   }
 
-  /* Pas de repli en desktop (assez de place pour le panneau entier) - la
+  /* Pas de repli en desktop (assez de place pour la carte entiere) - la
      poignee/le geste de glissement n'ont de sens qu'en bandeau mobile. */
   .recherche-panel-form-handle {
     display: none;
@@ -606,5 +480,36 @@
 
   .recherche-panel-form-body {
     padding: var(--space-4);
+  }
+
+  /* Copie mobile du detail (empilee sous la liste, voir la regle de base
+     plus haut) : masquee a partir d'ici, le panneau flottant ci-dessous
+     prend le relais. */
+  .resultats-detail--inline {
+    display: none;
+  }
+
+  /* Copie desktop du detail (issue #234, retour utilisateur en session) :
+     panneau flottant independant a DROITE de la carte de recherche - meme
+     largeur/habillage que l'ancien .resultats-panel-detail (disposition
+     "panneaux cote a cote" d'avant #171/#172), repositionne en absolu
+     plutot qu'en enfant flex d'un conteneur commun (.recherche-panel-form
+     n'est plus dans ce conteneur, voir le commentaire d'en-tete du
+     fichier). Decalage a gauche calcule a partir de la largeur + position
+     de .recherche-panel-form ci-dessus (22rem + var(--space-5)) plus un
+     espacement (var(--space-4)) entre les deux panneaux. */
+  .resultats-detail-panel {
+    display: block;
+    position: absolute;
+    left: calc(var(--space-5) + 22rem + var(--space-4));
+    bottom: var(--space-5);
+    z-index: 1;
+    width: 20rem;
+    max-height: calc(100% - var(--space-8));
+    overflow-y: auto;
+    padding: var(--space-4);
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
   }
 }

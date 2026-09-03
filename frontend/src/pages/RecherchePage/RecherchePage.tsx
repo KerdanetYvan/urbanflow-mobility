@@ -52,11 +52,13 @@ const SWIPE_THRESHOLD_PX = 40;
  * refonte-visuelle-mobile-desktop.md section 2.2) : un seul ecran, une
  * seule route (/recherche), plutot que deux routes reliees par une
  * navigation avec etat React Router (ancien comportement, issue #35/#36).
- * Machine a etats a 3 valeurs : le formulaire (etat initial et retour
- * uniquement si aucune recherche n'a encore abouti - voir isEditingSearch
- * ci-dessous pour la modification d'une recherche existante), la recherche
- * en cours (reponse pas encore recue), les resultats (itineraires recus,
- * eventuellement une liste vide).
+ * Machine a etats a 3 valeurs : le formulaire (etat initial, avant la toute
+ * premiere recherche reussie), la recherche en cours (reponse pas encore
+ * recue), les resultats (itineraires recus, eventuellement une liste vide).
+ * Modifier une recherche existante (issue #234) ne bascule plus vers un
+ * etat/une vue distincte : la carte de recherche reste affichee telle
+ * quelle, les resultats viennent simplement s'ajouter a sa suite, sous le
+ * bouton "Rechercher" - voir RecherchePageResults.
  */
 type Screen =
   | { kind: 'formulaire' }
@@ -319,17 +321,32 @@ function deriveRecentAddresses(
  * /recherche, machine a etats interne (voir le type Screen ci-dessus)
  * plutot que deux routes reliees par navigation avec etat React Router.
  * L'etat du formulaire (origine/destination/heure/modes) n'est JAMAIS
- * reinitialise entre les etats - c'est ce qui permet de le pre-remplir
- * gratuitement au retour depuis les resultats ("Modifier la recherche",
- * voir RecherchePageResults).
+ * reinitialise entre les etats - c'est ce qui permet aux champs de rester
+ * pre-remplis alors qu'ils s'affichent en permanence a cote des resultats
+ * (issue #234, voir RecherchePageResults).
  *
  * Panneau formulaire fusionne avec le panneau resultats (issue #171/#172,
- * docs/specs/fusion-recherche-resultats.md) : "Modifier la recherche" ne
- * fait plus revenir a l'etat Screen "formulaire" (qui demonterait toute la
- * disposition resultats) - isEditingSearch bascule seulement le contenu du
- * MEME panneau (RecherchePageResults) vers la vue Edition, sans perdre la
- * liste ni la selection en cours. Screen reste "formulaire" uniquement pour
- * le tout premier chargement, avant la toute premiere recherche reussie.
+ * docs/specs/fusion-recherche-resultats.md - **revu par #234**, voir sa
+ * propre note ci-dessous) : les champs de recherche restent affiches en
+ * permanence au-dessus de la liste de resultats (RecherchePageResults),
+ * plutot que masques derriere une bascule Edition/Resume qui demandait un
+ * aller-retour ("Modifier la recherche" puis "Rechercher") juste pour
+ * ajuster un critere. Screen reste "formulaire" uniquement pour le tout
+ * premier chargement, avant la toute premiere recherche reussie - une fois
+ * des resultats obtenus, le MEME formulaire (renderRechercheForm) est
+ * transmis a RecherchePageResults, qui l'affiche desormais en plus de la
+ * liste plutot qu'a sa place.
+ *
+ * Issue #234 (retour testeur, sprint Stretch) : la bascule Edition/Resume
+ * (isEditingSearch, bouton "Annuler", SearchContext "De X a Y · Modifier")
+ * introduite par #171/#172 est retiree - elle visait a reduire les
+ * allers-retours entre formulaire et resultats, mais le detour "Resume ->
+ * Modifier -> Edition -> Rechercher -> Resume" restait ressenti comme une
+ * etape superflue qui genait l'iteration rapide (comparer plusieurs trajets
+ * proches, ajuster l'heure de depart). Champs toujours visibles = plus
+ * aucune bascule necessaire, sur desktop ET mobile (decision de session,
+ * l'emprise du bloc compact issu de #233 restant supportable meme sur
+ * petit ecran).
  *
  * Utilisable sans compte (issue #64) : un usager de passage doit pouvoir
  * lancer une recherche sans etre bloque par un mur de connexion. Les modes
@@ -348,12 +365,6 @@ function RecherchePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [screen, setScreen] = useState<Screen>({ kind: 'formulaire' });
-  // Bascule Edition/Resume du panneau fusionne (issue #171/#172) : n'a de
-  // sens que lorsque screen.kind !== 'formulaire' (transmis a
-  // RecherchePageResults ci-dessous) - au tout premier chargement, la vue
-  // Edition est deja affichee via la branche formulaire, pas besoin de ce
-  // drapeau.
-  const [isEditingSearch, setIsEditingSearch] = useState(false);
 
   const [origin, setOrigin] = useState<AddressFieldState>(EMPTY_ADDRESS);
   const [destination, setDestination] =
@@ -382,11 +393,12 @@ function RecherchePage() {
   }>({});
   const [alert, setAlert] = useState<AlertState | null>(null);
   // Bandeau mobile du panneau formulaire (issue #110/#111, carte permanente)
-  // - 2 etats seulement (contrairement au bandeau resultats a 3 etats,
-  // RecherchePageResults) : "deplie" par defaut, le formulaire est ce que
-  // l'utilisateur doit remplir en premier en arrivant sur l'ecran. Pilote a
-  // la fois le formulaire du tout premier chargement (ci-dessous) et la vue
-  // Edition en place depuis les resultats (transmis a RecherchePageResults).
+  // - 2 etats (replie/deplie) : "deplie" par defaut, le formulaire est ce que
+  // l'utilisateur doit remplir en premier en arrivant sur l'ecran. Ne pilote
+  // QUE l'ecran "formulaire" ci-dessous (tout premier chargement) -
+  // RecherchePageResults gere son propre etat equivalent une fois une
+  // recherche lancee (meme mecanique a 2 etats, dupliquee plutot que
+  // partagee : les deux ecrans ne sont jamais montes en meme temps).
   const [formSheetState, setFormSheetState] = useState<
     'collapsed' | 'expanded'
   >('expanded');
@@ -537,7 +549,7 @@ function RecherchePage() {
     setFormSheetState('expanded');
   }
 
-  /** Poignee tapee/cliquee : bascule simplement entre les 2 etats (contrairement au bandeau resultats a 3 etats). */
+  /** Poignee tapee/cliquee : bascule simplement entre les 2 etats. */
   function handleFormHandleClick() {
     setFormSheetState((current) =>
       current === 'collapsed' ? 'expanded' : 'collapsed',
@@ -548,7 +560,7 @@ function RecherchePage() {
     formTouchStartY.current = event.touches[0].clientY;
   }
 
-  /** Meme logique de glissement que RecherchePageResults, simplifiee a 2 etats. */
+  /** Meme logique de glissement que RecherchePageResults (2 etats, meme seuil). */
   function handleFormHandleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
     if (formTouchStartY.current === null) return;
     const delta = event.changedTouches[0].clientY - formTouchStartY.current;
@@ -566,10 +578,7 @@ function RecherchePage() {
    * retour au formulaire avec message d'erreur. Partagee par handleSubmit
    * (apres validation du formulaire) et handleQuickSearch (issue #112,
    * raccourcis de recherche rapide) qui n'a pas besoin de cette validation -
-   * une entree d'historique est deja une recherche valide passee. Sort
-   * aussi de la vue Edition (issue #171/#172) : une recherche - qu'elle
-   * vienne d'une premiere soumission ou d'une modification en place -
-   * affiche toujours la vue Resume + liste une fois terminee.
+   * une entree d'historique est deja une recherche valide passee.
    */
   async function performSearch(
     originPlace: PlaceSuggestion,
@@ -581,7 +590,6 @@ function RecherchePage() {
     // RecherchePageResults) - remplace l'ancien bouton "Recherche…"/
     // isSearching, la page entiere devient l'indicateur de chargement.
     setScreen({ kind: 'recherche', origin: originPlace, destination: destinationPlace });
-    setIsEditingSearch(false);
 
     try {
       const result = await searchTrips({
@@ -705,9 +713,9 @@ function RecherchePage() {
   /**
    * Relance une recherche à partir d'un couple origine/destination déjà
    * résolu, sans repasser par la validation de handleSubmit : met à jour les
-   * champs affichés (cohérent avec "Modifier la recherche", voir
-   * RecherchePageResults - l'utilisateur doit retrouver ces valeurs s'il
-   * revient au formulaire) puis appelle directement performSearch. Utilisée
+   * champs affichés (toujours visibles à côté des résultats, issue #234 -
+   * l'utilisateur doit y retrouver ces valeurs) puis appelle directement
+   * performSearch. Utilisée
    * par la relance depuis l'écran /historique (issue #174, effet ci-dessous)
    * - c'était aussi le clic sur un raccourci de recherche rapide (issue #112)
    * avant que celui-ci ne soit retiré au profit du dropdown unifié (#166).
@@ -874,18 +882,25 @@ function RecherchePage() {
   }
 
   /**
-   * Contenu du panneau formulaire (issue #171/#172) : factorise en une
-   * seule fonction plutot que duplique, puisqu'il est desormais rendu a
-   * deux endroits distincts - la branche "formulaire" ci-dessous (tout
-   * premier chargement, screen.kind === 'formulaire') ET, via
-   * renderEditForm passe a RecherchePageResults, la vue Edition en place
-   * une fois des resultats obtenus. `showCancel` n'affiche le bouton
-   * "Annuler" que dans ce second cas : revenir au formulaire "plein" n'a
-   * rien a annuler (rien n'existait avant).
+   * Contenu du formulaire de recherche (issue #171/#172, revu par #234) :
+   * factorise en une seule fonction plutot que duplique, puisqu'il est
+   * rendu a deux endroits distincts - la branche "formulaire" ci-dessous
+   * (tout premier chargement, screen.kind === 'formulaire') ET, via
+   * renderSearchForm transmis a RecherchePageResults, en tete de la meme
+   * carte persistante une fois une recherche aboutie (issue #234 : la carte
+   * de recherche reste affichee telle quelle, les resultats viennent
+   * simplement s'ajouter a sa suite, sous le bouton "Rechercher" - plus de
+   * bouton "Annuler" ni de bascule Edition/Resume).
+   *
+   * Ne pose plus elle-meme le conteneur `.recherche-panel-form-body` (issue
+   * #234) : chaque appelant l'ouvre desormais lui-meme, pour pouvoir y
+   * ajouter du contenu APRES ce formulaire (les resultats, cote
+   * RecherchePageResults) plutot que d'etre force a l'isoler dans sa propre
+   * boite.
    */
-  function renderRechercheForm(showCancel: boolean): ReactNode {
+  function renderRechercheForm(): ReactNode {
     return (
-      <div className="recherche-panel-form-body">
+      <>
         {!isAuthenticated && (
           <p className="recherche-guest-hint">
             <Link to="/connexion">Connectez-vous</Link> pour retrouver
@@ -1001,35 +1016,18 @@ function RecherchePage() {
             </Button>
           </div>
 
-          {/* "Annuler" (issue #171/#172) : ne revient PAS a une recherche
-              anterieure ni ne reinitialise les champs - referme simplement
-              la vue Edition sur la liste/le resume deja affiches en
-              dessous (isEditingSearch), sans reappeler /trips. N'a de sens
-              que si des resultats existent deja - reste hors de la ligne
-              filtres/Rechercher ci-dessus (toujours 2 cellules, jamais 3),
-              cas conditionnel plutot que la norme (retour utilisateur en
-              session, issue #233). */}
-          {showCancel && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="recherche-cancel"
-              onClick={() => setIsEditingSearch(false)}
-            >
-              Annuler
-            </Button>
-          )}
         </form>
-      </div>
+      </>
     );
   }
 
   // Etats "recherche" (chargement) et "resultats" (issue #73) : delegue a
   // RecherchePageResults, qui reprend l'ancienne disposition de
-  // ResultatsPage/#36 - voir le type Screen en tete de fichier. Le panneau
-  // formulaire (isEditingSearch/renderEditForm) est transmis pour que
-  // "Modifier la recherche" bascule en place plutot que de demonter tout
-  // cet ecran (issue #171/#172).
+  // ResultatsPage/#36 - voir le type Screen en tete de fichier. Le
+  // formulaire (renderSearchForm) est transmis pour rester en tete de la
+  // meme carte persistante, les resultats venant s'ajouter a sa suite
+  // (issue #234) - plus de bascule Edition/Resume (voir le commentaire de
+  // RecherchePage ci-dessus).
   if (screen.kind !== 'formulaire') {
     return (
       <RecherchePageResults
@@ -1038,18 +1036,8 @@ function RecherchePage() {
         itineraries={screen.kind === 'resultats' ? screen.itineraries : null}
         fallback={screen.kind === 'resultats' ? screen.fallback : undefined}
         fromCache={screen.kind === 'resultats' ? screen.fromCache : undefined}
-        onEditSearch={() => {
-          setIsEditingSearch(true);
-          setFormSheetState('expanded');
-        }}
         accessibilityPreferences={accessibilityPreferences}
-        isEditingSearch={isEditingSearch}
-        onCancelEdit={() => setIsEditingSearch(false)}
-        editSheetState={formSheetState}
-        onEditSheetToggle={handleFormHandleClick}
-        onEditSheetTouchStart={handleFormHandleTouchStart}
-        onEditSheetTouchEnd={handleFormHandleTouchEnd}
-        renderEditForm={() => renderRechercheForm(true)}
+        renderSearchForm={renderRechercheForm}
       />
     );
   }
@@ -1093,7 +1081,7 @@ function RecherchePage() {
           )}
         </button>
 
-        {renderRechercheForm(false)}
+        <div className="recherche-panel-form-body">{renderRechercheForm()}</div>
       </div>
     </div>
   );

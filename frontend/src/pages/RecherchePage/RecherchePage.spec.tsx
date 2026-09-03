@@ -206,16 +206,11 @@ describe('RecherchePage', () => {
         destinationLon: HOTEL_DE_VILLE.lon,
       });
     });
-    // Le formulaire disparait au profit de la disposition resultats (meme
-    // ecran, pas de navigation - voir RecherchePageResults).
-    expect(screen.queryByLabelText('Origine')).not.toBeInTheDocument();
-    // Le texte "De X à Y" est reparti sur plusieurs noeuds texte (JSX) :
-    // on verifie le contenu textuel complet du <p>, pas un noeud isole.
-    expect(
-      (
-        await screen.findAllByRole('button', { name: 'Modifier la recherche' })
-      )[0].closest('p'),
-    ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
+    // Le formulaire de recherche reste affiche EN PLUS de la disposition
+    // resultats (issue #234) - meme ecran, pas de navigation, plus jamais
+    // remplace par un resume (voir RecherchePageResults).
+    expect(await screen.findByLabelText('Origine')).toBeInTheDocument();
+    expect(screen.getByLabelText('Destination')).toBeInTheDocument();
   });
 
   it("propage le fallback 'prochain creneau' de /trips jusqu'a la disposition resultats (issue #91)", async () => {
@@ -303,26 +298,25 @@ describe('RecherchePage', () => {
         await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
         await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
         await user.click(screen.getByRole('button', { name: 'Rechercher' }));
-        await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+        await screen.findAllByRole('button', { name: /min/ });
 
         // Deuxieme recherche, meme trajet, echoue faute de connexion (fetch
-        // rejette sans jamais joindre le backend - pas une ApiError).
+        // rejette sans jamais joindre le backend - pas une ApiError). Le
+        // formulaire etant deja affiche en permanence au-dessus des
+        // resultats (issue #234), relancer la recherche ne demande plus de
+        // clic intermediaire "Modifier la recherche".
         vi.mocked(tripsLib.searchTrips).mockRejectedValueOnce(
           new TypeError('Failed to fetch'),
-        );
-        await user.click(
-          screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
         );
         await user.click(screen.getByRole('button', { name: 'Rechercher' }));
 
         expect(
           await screen.findAllByText('Résultats hors ligne'),
         ).not.toHaveLength(0);
-        // Toujours sur l'ecran resultats (pas de retour au formulaire) - le
-        // cache a pris le relais.
-        expect(
-          screen.getAllByRole('button', { name: 'Modifier la recherche' }).length,
-        ).toBeGreaterThan(0);
+        // Toujours sur l'ecran resultats (pas de retour au formulaire "seul")
+        // - le cache a pris le relais, les champs restent affiches comme
+        // toujours.
+        expect(screen.getByLabelText('Origine')).toBeInTheDocument();
       },
     );
 
@@ -375,13 +369,10 @@ describe('RecherchePage', () => {
         await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
         await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
         await user.click(screen.getByRole('button', { name: 'Rechercher' }));
-        await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+        await screen.findAllByRole('button', { name: /min/ });
 
         vi.mocked(tripsLib.searchTrips).mockRejectedValueOnce(
           new ApiError('Moteur de calcul indisponible', 503),
-        );
-        await user.click(
-          screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
         );
         await user.click(screen.getByRole('button', { name: 'Rechercher' }));
 
@@ -395,7 +386,7 @@ describe('RecherchePage', () => {
     );
   });
 
-  it("'Modifier la recherche' revient au formulaire avec les criteres preremplis (issue #73)", async () => {
+  it("les criteres de recherche restent affiches et pre-remplis une fois les resultats obtenus (issue #234)", async () => {
     vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
       Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
     );
@@ -409,17 +400,15 @@ describe('RecherchePage', () => {
     await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
     await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
     await user.click(screen.getByRole('button', { name: 'Rechercher' }));
-    await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+    await screen.findAllByRole('button', { name: /min/ });
 
-    await user.click(
-      screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
-    );
-
+    // Plus besoin de cliquer "Modifier la recherche" (retire, issue #234) :
+    // les champs sont deja la, deja pre-remplis, directement modifiables.
     expect(screen.getByLabelText('Origine')).toHaveValue('Gare Part-Dieu');
     expect(screen.getByLabelText('Destination')).toHaveValue('Hôtel de Ville');
   });
 
-  describe('vue Edition en place depuis les resultats (issue #171/#172)', () => {
+  describe('modifier une recherche depuis les resultats (issue #234)', () => {
     async function searchAndReachResults(user: ReturnType<typeof userEvent.setup>) {
       vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
         Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
@@ -433,64 +422,58 @@ describe('RecherchePage', () => {
       await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
       await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
       await user.click(screen.getByRole('button', { name: 'Rechercher' }));
-      await screen.findAllByRole('button', { name: 'Modifier la recherche' });
+      await screen.findAllByRole('button', { name: /min/ });
     }
 
-    it("'Annuler' referme la vue Edition sans relancer /trips, la liste des resultats est retrouvee telle quelle", async () => {
-      const user = userEvent.setup();
-      await searchAndReachResults(user);
-      expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1);
+    it(
+      'modifier un champ puis re-soumettre relance directement la ' +
+        'recherche, sans aucune etape intermediaire (retour testeur : ' +
+        "l'ancien detour Resume -> Modifier -> Edition -> Rechercher -> " +
+        'Resume genait l\'iteration rapide)',
+      async () => {
+        const user = userEvent.setup();
+        await searchAndReachResults(user);
+        expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1);
 
-      await user.click(
-        screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
-      );
-      // La vue Edition affiche bien les champs, mais la liste de resultats
-      // n'est plus dans le document tant qu'on est en edition (voir
-      // RecherchePageResults.tsx) - pas de disparition silencieuse d'un
-      // resultat existant, juste un panneau qui remplace l'autre.
-      expect(screen.getByLabelText('Origine')).toBeInTheDocument();
-      expect(
-        screen.queryAllByRole('button', { name: /min/ }),
-      ).toHaveLength(0);
+        // Champs ET liste de resultats visibles SIMULTANEMENT - plus de
+        // bouton "Modifier la recherche" a chercher/cliquer avant de
+        // pouvoir toucher aux champs (voir RecherchePageResults.tsx).
+        // getAllByRole (pas getByRole) : la liste est dupliquee entre le
+        // panneau desktop et le bandeau mobile (seule une media query CSS
+        // decide laquelle est visible, non appliquee sous jsdom) -
+        // contrairement au formulaire, qui lui reste une instance unique.
+        expect(screen.getByLabelText('Origine')).toBeInTheDocument();
+        expect(
+          screen.getAllByRole('button', { name: /min/ }).length,
+        ).toBeGreaterThan(0);
 
-      await user.click(screen.getByRole('button', { name: 'Annuler' }));
+        await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
 
-      // Retour a la liste sans nouvel appel reseau : "Annuler" ne
-      // resoumet jamais la recherche.
-      expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1);
-      expect(screen.queryByLabelText('Origine')).not.toBeInTheDocument();
-      expect(
-        (await screen.findAllByRole('button', { name: /min/ })).length,
-      ).toBeGreaterThan(0);
-    });
+        await waitFor(() => {
+          expect(tripsLib.searchTrips).toHaveBeenCalledTimes(2);
+        });
+        // Toujours affiches apres la nouvelle recherche - jamais retires du
+        // rendu (contrairement a l'ancienne vue Edition, #171/#172, qui
+        // demontait la liste le temps de l'edition).
+        expect(screen.getByLabelText('Origine')).toBeInTheDocument();
+        expect(
+          (await screen.findAllByRole('button', { name: /min/ })).length,
+        ).toBeGreaterThan(0);
+      },
+    );
 
-    it("le bouton 'Annuler' n'apparait pas au tout premier chargement (rien a annuler)", () => {
-      renderPage();
-      expect(
-        screen.queryByRole('button', { name: 'Annuler' }),
-      ).not.toBeInTheDocument();
-    });
-
-    it('soumettre le formulaire depuis la vue Edition relance la recherche et revient a la vue Resume', async () => {
-      const user = userEvent.setup();
-      await searchAndReachResults(user);
-
-      await user.click(
-        screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
-      );
-      await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
-      await user.click(screen.getByRole('button', { name: 'Rechercher' }));
-
-      await waitFor(() => {
-        expect(tripsLib.searchTrips).toHaveBeenCalledTimes(2);
-      });
-      // Retour automatique a la vue Resume + liste, sans clic supplementaire.
-      expect(screen.queryByLabelText('Origine')).not.toBeInTheDocument();
-      expect(
-        (await screen.findAllByRole('button', { name: 'Modifier la recherche' }))
-          .length,
-      ).toBeGreaterThan(0);
-    });
+    it(
+      "ne propose plus de bouton 'Annuler' (issue #234, retire avec la " +
+        "vue Edition qu'il servait a fermer)",
+      async () => {
+        const user = userEvent.setup();
+        await searchAndReachResults(user);
+        expect(
+          screen.queryByRole('button', { name: 'Annuler' }),
+        ).not.toBeInTheDocument();
+      },
+    );
   });
 
   it('ne pre-remplit pas les modes de transport pour un utilisateur non connecte', async () => {
@@ -837,10 +820,12 @@ describe('RecherchePage', () => {
         });
       });
       expect(
-        (
-          await screen.findAllByRole('button', { name: 'Modifier la recherche' })
-        )[0].closest('p'),
-      ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
+        (await screen.findAllByRole('button', { name: /min/ })).length,
+      ).toBeGreaterThan(0);
+      expect(screen.getByLabelText('Origine')).toHaveValue('Gare Part-Dieu');
+      expect(screen.getByLabelText('Destination')).toHaveValue(
+        'Hôtel de Ville',
+      );
     });
 
     it("ne relance rien quand la page est ouverte sans etat de navigation", () => {

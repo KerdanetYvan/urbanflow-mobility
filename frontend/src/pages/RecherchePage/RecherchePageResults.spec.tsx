@@ -128,46 +128,39 @@ const TWO_BUS_LINES_ITINERARY: TripItinerary = {
   ] satisfies TripSegment[],
 };
 
+/**
+ * Formulaire de test par defaut (issue #234) : un simple champ repere,
+ * suffisant pour verifier que RecherchePageResults l'affiche bien (une
+ * seule fois, en tete de la carte persistante) - le contenu reel du
+ * formulaire est teste par RecherchePage.spec.tsx, pas ici
+ * (RecherchePageResults ne connait le formulaire qu'a travers cette
+ * fonction, fournie par son parent).
+ */
+const DEFAULT_SEARCH_FORM = () => <input aria-label="Origine (test)" />;
+
 function renderResults(
   itineraries: TripItinerary[] | null,
-  onEditSearch = vi.fn(),
+  renderSearchForm = DEFAULT_SEARCH_FORM,
   accessibilityPreferences?: string[],
   fallback?: TripFallback,
   fromCache?: boolean,
 ) {
-  return {
-    onEditSearch,
-    ...render(
-      // MemoryRouter (issue #18) : ItinerarySegments rend desormais
-      // TripFollowButton (useNavigate) - useAuth est mocke directement
-      // (voir vi.mock ci-dessus), pas besoin d'un vrai <AuthProvider>.
-      <MemoryRouter>
-        <RecherchePageResults
-          origin={ORIGIN}
-          destination={DESTINATION}
-          itineraries={itineraries}
-          fallback={fallback}
-          fromCache={fromCache}
-          onEditSearch={onEditSearch}
-          accessibilityPreferences={accessibilityPreferences}
-        />
-      </MemoryRouter>,
-    ),
-  };
-}
-
-/**
- * Les deux dispositions (panneaux flottants desktop, bandeau mobile)
- * rendent chacune leur propre copie de la liste/du detail - seule une
- * media query CSS decide laquelle est visible, jsdom ne l'applique pas en
- * test. On se limite donc volontairement au panneau desktop
- * (`.resultats-panel-list`) pour les assertions generiques sur le contenu,
- * et on teste le bandeau mobile separement, explicitement, plus bas.
- */
-function desktopCards(container: HTMLElement) {
-  const panel = container.querySelector('.resultats-panel-list');
-  if (!panel) throw new Error('.resultats-panel-list introuvable');
-  return within(panel as HTMLElement).getAllByRole('button', { name: /min/ });
+  return render(
+    // MemoryRouter (issue #18) : ItinerarySegments rend desormais
+    // TripFollowButton (useNavigate) - useAuth est mocke directement
+    // (voir vi.mock ci-dessus), pas besoin d'un vrai <AuthProvider>.
+    <MemoryRouter>
+      <RecherchePageResults
+        origin={ORIGIN}
+        destination={DESTINATION}
+        itineraries={itineraries}
+        fallback={fallback}
+        fromCache={fromCache}
+        accessibilityPreferences={accessibilityPreferences}
+        renderSearchForm={renderSearchForm}
+      />
+    </MemoryRouter>,
+  );
 }
 
 describe('RecherchePageResults', () => {
@@ -189,38 +182,17 @@ describe('RecherchePageResults', () => {
   it("affiche une disposition en chargement (carte origine/destination + squelette) quand itineraries est null (issue #73)", () => {
     const { container } = renderResults(null);
 
-    // Le texte "De X à Y" est reparti sur plusieurs noeuds texte (JSX) :
-    // on verifie le contenu textuel complet du <p>, pas un noeud isole.
-    expect(
-      screen
-        .getAllByRole('button', { name: 'Modifier la recherche' })[0]
-        .closest('p'),
-    ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
+    // Carte de recherche persistante (issue #234), affichee des l'etat de
+    // chargement.
+    expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
     expect(container.querySelector('.skeleton')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /min/ })).not.toBeInTheDocument();
   });
 
-  it("appelle onEditSearch au clic sur 'Modifier la recherche' pendant le chargement", async () => {
-    const user = userEvent.setup();
-    const { onEditSearch } = renderResults(null);
+  it("affiche la liste dans l'ordre recu, sans re-trier", () => {
+    renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
-    await user.click(
-      screen.getAllByRole('button', { name: 'Modifier la recherche' })[0],
-    );
-
-    expect(onEditSearch).toHaveBeenCalledTimes(1);
-  });
-
-  it("affiche le contexte de la recherche et la liste dans l'ordre recu, sans re-trier", () => {
-    const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
-
-    expect(
-      screen
-        .getAllByRole('button', { name: 'Modifier la recherche' })[0]
-        .closest('p'),
-    ).toHaveTextContent('De Gare Part-Dieu à Hôtel de Ville');
-
-    const cards = desktopCards(container);
+    const cards = screen.getAllByRole('button', { name: /min/ });
     expect(cards).toHaveLength(2);
     // Le premier itineraire recu (le plus rapide) reste premier affiche.
     expect(cards[0]).toHaveTextContent('25 min');
@@ -236,6 +208,11 @@ describe('RecherchePageResults', () => {
     it("affiche le bouton \"Suivre ce trajet\" dans le detail de l'itineraire selectionne", () => {
       renderResults([FAST_ITINERARY]);
 
+      // getAllBy (pas getBy) : le detail existe en double dans le DOM
+      // (copie mobile inline + copie desktop en panneau, issue #234) - seule
+      // une media query CSS decide laquelle est visible, jsdom ne
+      // l'applique pas en test (meme raisonnement que pour la liste
+      // ailleurs dans ce fichier).
       expect(
         screen.getAllByRole('button', { name: 'Suivre ce trajet' }).length,
       ).toBeGreaterThan(0);
@@ -266,9 +243,7 @@ describe('RecherchePageResults', () => {
     it('affiche un bandeau explicite quand fromCache est vrai', () => {
       renderResults([FAST_ITINERARY], undefined, undefined, undefined, true);
 
-      expect(
-        screen.getAllByText('Résultats hors ligne').length,
-      ).toBeGreaterThan(0);
+      expect(screen.getByText('Résultats hors ligne')).toBeInTheDocument();
     });
 
     it("n'affiche aucun bandeau de mode degrade pour un resultat frais (fromCache absent)", () => {
@@ -288,12 +263,10 @@ describe('RecherchePageResults', () => {
         true,
       );
 
+      expect(screen.getByText('Résultats hors ligne')).toBeInTheDocument();
       expect(
-        screen.getAllByText('Résultats hors ligne').length,
-      ).toBeGreaterThan(0);
-      expect(
-        screen.getAllByText(/Aucun trajet en transport en commun/).length,
-      ).toBeGreaterThan(0);
+        screen.getByText(/Aucun trajet en transport en commun/),
+      ).toBeInTheDocument();
     });
   });
 
@@ -316,32 +289,30 @@ describe('RecherchePageResults', () => {
         `Prochain passage à ${formatTime(grouped.nextDepartures![0])}, puis ` +
         `${formatTime(grouped.nextDepartures![1])}, ${formatTime(grouped.nextDepartures![2])}`;
 
-      const detailPanel = container.querySelector(
-        '.resultats-panel-detail',
-      ) as HTMLElement;
-      expect(detailPanel).toHaveTextContent(expected);
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      expect(detail).toHaveTextContent(expected);
 
       // Plus sur la carte compacte de la liste (le but de #173 : l'alleger).
-      const cards = desktopCards(container);
-      expect(cards[0]).not.toHaveTextContent('Prochain passage');
+      const card = screen.getAllByRole('button', { name: /min/ })[0];
+      expect(card).not.toHaveTextContent('Prochain passage');
     });
 
     it("n'affiche aucun texte de prochain passage quand l'itineraire n'a pas ete regroupe (nextDepartures absent)", () => {
       const { container } = renderResults([FAST_ITINERARY]);
 
-      const detailPanel = container.querySelector(
-        '.resultats-panel-detail',
-      ) as HTMLElement;
-      expect(detailPanel).not.toHaveTextContent('Prochain passage');
-      expect(desktopCards(container)[0]).not.toHaveTextContent('Prochain passage');
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      expect(detail).not.toHaveTextContent('Prochain passage');
+      expect(
+        screen.getAllByRole('button', { name: /min/ })[0],
+      ).not.toHaveTextContent('Prochain passage');
     });
   });
 
   describe('badges qualitatifs de scoring (issue #126)', () => {
     it("affiche le badge 'meilleur choix global' sur le premier itineraire, absent des autres, sans preference prioritaire", () => {
-      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+      renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
-      const cards = desktopCards(container);
+      const cards = screen.getAllByRole('button', { name: /min/ });
       expect(
         within(cards[0]).getByText('Le plus adapté à vos critères'),
       ).toBeInTheDocument();
@@ -354,13 +325,13 @@ describe('RecherchePageResults', () => {
       // FAST_ITINERARY (index 0, 1 correspondance) reste le meilleur choix
       // global ; SLOW_ITINERARY (index 1, 0 correspondance) est celui qui
       // satisfait le mieux le critere "limit_transfers".
-      const { container } = renderResults(
+      renderResults(
         [FAST_ITINERARY, SLOW_ITINERARY],
         undefined,
         ['limit_transfers'],
       );
 
-      const cards = desktopCards(container);
+      const cards = screen.getAllByRole('button', { name: /min/ });
       expect(
         within(cards[0]).getByText('Le plus adapté à vos critères'),
       ).toBeInTheDocument();
@@ -370,101 +341,78 @@ describe('RecherchePageResults', () => {
     });
 
     it('n’affiche jamais plus de 2 badges au total sur la liste', () => {
-      const { container } = renderResults(
+      renderResults(
         [FAST_ITINERARY, SLOW_ITINERARY],
         undefined,
         ['limit_transfers'],
       );
 
-      const panel = container.querySelector('.resultats-panel-list') as HTMLElement;
-      expect(within(panel).getAllByText(/./, { selector: '.badge' })).toHaveLength(2);
+      expect(screen.getAllByText(/./, { selector: '.badge' })).toHaveLength(2);
     });
 
     it("n'affiche aucune valeur chiffree dans le texte des badges", () => {
-      const { container } = renderResults(
+      renderResults(
         [FAST_ITINERARY, SLOW_ITINERARY],
         undefined,
         ['limit_transfers'],
       );
 
-      const panel = container.querySelector('.resultats-panel-list') as HTMLElement;
-      for (const badge of within(panel).getAllByText(/./, { selector: '.badge' })) {
+      for (const badge of screen.getAllByText(/./, { selector: '.badge' })) {
         expect(badge.textContent).not.toMatch(/\d/);
       }
-    });
-
-    it('affiche aussi les badges dans le bandeau mobile', () => {
-      const { container } = renderResults(
-        [FAST_ITINERARY, SLOW_ITINERARY],
-        undefined,
-        ['limit_transfers'],
-      );
-
-      const sheetBody = container.querySelector('.resultats-sheet-body') as HTMLElement;
-      expect(
-        within(sheetBody).getByText('Le moins de correspondances'),
-      ).toBeInTheDocument();
     });
   });
 
   it('presente le premier itineraire selectionne par defaut, avec son detail par segment', () => {
     const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
-    const cards = desktopCards(container);
+    const cards = screen.getAllByRole('button', { name: /min/ });
     expect(cards[0]).toHaveAttribute('aria-current', 'true');
     expect(cards[1]).not.toHaveAttribute('aria-current');
 
-    // Panneau detail desktop, toujours visible des qu'un itineraire est
-    // selectionne (contrairement au bandeau mobile, replie par defaut sur
-    // le detail - voir les tests dedies au bandeau plus bas).
-    const detailPanel = container.querySelector('.resultats-panel-detail');
-    expect(within(detailPanel as HTMLElement).getByText('Bus C1')).toBeInTheDocument();
+    // Detail affiche a la suite de la liste, des qu'un itineraire est
+    // selectionne (issue #234 : plus de panneau/etat dedie, un seul et
+    // meme corps defilant).
+    const detail = container.querySelector('.resultats-detail') as HTMLElement;
+    expect(within(detail).getByText('Bus C1')).toBeInTheDocument();
     expect(
-      within(detailPanel as HTMLElement).getByText('Arrêt Bellecour → Gare Part-Dieu'),
+      within(detail).getByText('Arrêt Bellecour → Gare Part-Dieu'),
     ).toBeInTheDocument();
   });
 
   it('change le detail affiche quand un autre itineraire de la liste est selectionne', async () => {
     const user = userEvent.setup();
-    const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+    renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
-    const cards = desktopCards(container);
+    const cards = screen.getAllByRole('button', { name: /min/ });
     await user.click(cards[1]);
 
     expect(cards[1]).toHaveAttribute('aria-current', 'true');
     expect(cards[0]).not.toHaveAttribute('aria-current');
     // Le detail par segment du deuxieme itineraire (trajet 100% marche) ne
-    // contient plus de segment bus, ni dans le panneau desktop ni dans le
-    // bandeau mobile (bascule sur "detail" au clic, voir RecherchePageResults.tsx).
+    // contient plus de segment bus - la liste reste affichee telle quelle
+    // au-dessus (issue #234 : pas de bascule, seul le detail en dessous
+    // change).
     expect(screen.queryByText('Bus C1')).not.toBeInTheDocument();
   });
 
-  it("rend l'etat vide DANS le panneau fusionne, plus de page separee (issue #190)", async () => {
-    const user = userEvent.setup();
-    const { container, onEditSearch } = renderResults([]);
+  it("rend l'etat vide a la suite du formulaire de recherche, plus de page separee (issue #190)", () => {
+    const { container } = renderResults([]);
 
-    // Plus de `.resultats-page` : meme coquille carte + panneau que
-    // "recherche en cours".
+    // Plus de `.resultats-page` : meme coquille carte + carte de recherche
+    // que "recherche en cours".
     expect(container.querySelector('.resultats-page')).not.toBeInTheDocument();
     expect(container.querySelector('.resultats-shell')).toBeInTheDocument();
     expect(container.querySelector('.resultats-map-bg')).toBeInTheDocument();
 
-    const listPanel = container.querySelector(
-      '.resultats-panel-list',
-    ) as HTMLElement;
     expect(
-      within(listPanel).getByText(
-        'Aucun itinéraire trouvé pour ce trajet, même à pied.',
-      ),
+      screen.getByText('Aucun itinéraire trouvé pour ce trajet, même à pied.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    // Action de recours = "Modifier la recherche" de SearchContext (edition
-    // en place, decision #190).
-    await user.click(
-      within(listPanel).getByRole('button', { name: 'Modifier la recherche' }),
-    );
-    expect(onEditSearch).toHaveBeenCalledTimes(1);
+    // Action de recours = les champs de recherche, juste au-dessus (issue
+    // #234) - plus de bouton "Modifier la recherche" dedie.
+    expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
   });
 
   it('affiche le trajet a pied de repli comme un resultat normal, avec un bandeau explicatif (issue #190)', () => {
@@ -494,20 +442,13 @@ describe('RecherchePageResults', () => {
       kind: 'walk-only',
     });
 
-    const listPanel = container.querySelector(
-      '.resultats-panel-list',
-    ) as HTMLElement;
     // Bandeau explicatif ...
     expect(
-      within(listPanel).getByText(/Aucun trajet en transport en commun/),
+      screen.getByText(/Aucun trajet en transport en commun/),
     ).toBeInTheDocument();
     // ... au-dessus d'un vrai resultat (carte-itineraire cliquable + detail).
-    expect(
-      within(listPanel).getByRole('button', { name: /min/ }),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector('.resultats-panel-detail'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /min/ })).toBeInTheDocument();
+    expect(container.querySelector('.resultats-detail')).toBeInTheDocument();
   });
 
   it('affiche le repli "prochain creneau" comme un resultat normal, avec un bandeau heure demandee -> heure reelle (issue #91)', () => {
@@ -529,39 +470,34 @@ describe('RecherchePageResults', () => {
       },
     );
 
-    const listPanel = container.querySelector(
-      '.resultats-panel-list',
-    ) as HTMLElement;
-    const note = within(listPanel).getByText(/Aucun trajet à \d{2}:\d{2}/);
+    const note = screen.getByText(/Aucun trajet à \d{2}:\d{2}/);
     // "Aucun trajet à HH:mm. Prochain trajet <jour> à HH:mm."
     expect(note).toHaveTextContent(/Prochain trajet .*\d{2}:\d{2}\.?$/);
     // Un vrai resultat est affiche en dessous (pas l'etat vide).
     expect(container.querySelector('.resultats-empty')).not.toBeInTheDocument();
-    expect(
-      within(listPanel).getByRole('button', { name: /min/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /min/ })).toBeInTheDocument();
   });
 
   describe('badges de ligne par mode de transport (issue #129)', () => {
     it('affiche un badge de ligne avec le numero de ligne pour un segment BUS, a la place de l icone', () => {
-      const { container } = renderResults([FAST_ITINERARY]);
+      renderResults([FAST_ITINERARY]);
 
-      const card = desktopCards(container)[0];
+      const card = screen.getAllByRole('button', { name: /min/ })[0];
       expect(within(card).getByText('C1')).toHaveClass('line-badge--bus');
     });
 
     it('affiche deux badges distincts pour deux lignes de bus differentes sur le meme itineraire', () => {
-      const { container } = renderResults([TWO_BUS_LINES_ITINERARY]);
+      renderResults([TWO_BUS_LINES_ITINERARY]);
 
-      const card = desktopCards(container)[0];
+      const card = screen.getAllByRole('button', { name: /min/ })[0];
       expect(within(card).getByText('24')).toBeInTheDocument();
       expect(within(card).getByText('C6')).toBeInTheDocument();
     });
 
     it('garde l icone existante pour un mode sans ligne (marche)', () => {
-      const { container } = renderResults([SLOW_ITINERARY]);
+      renderResults([SLOW_ITINERARY]);
 
-      const card = desktopCards(container)[0];
+      const card = screen.getAllByRole('button', { name: /min/ })[0];
       // SLOW_ITINERARY n'a qu'un segment WALK : aucun badge de ligne ne doit apparaitre.
       expect(card.querySelector('.line-badge')).not.toBeInTheDocument();
     });
@@ -569,40 +505,30 @@ describe('RecherchePageResults', () => {
     it('inclut le numero de ligne dans le texte cache pour lecteurs d ecran', () => {
       renderResults([FAST_ITINERARY]);
 
-      expect(screen.getAllByText('Modes : Marche, Bus C1.')[0]).toBeInTheDocument();
-    });
-
-    it('affiche aussi les badges de ligne dans l apercu compact du bandeau mobile replie', async () => {
-      const user = userEvent.setup();
-      const { container } = renderResults([FAST_ITINERARY]);
-
-      const handleButton = container.querySelector('.resultats-sheet-handle') as HTMLElement;
-      await user.click(handleButton);
-
-      expect(within(handleButton).getByText('C1')).toBeInTheDocument();
+      expect(screen.getByText('Modes : Marche, Bus C1.')).toBeInTheDocument();
     });
 
     it('affiche aussi le badge de ligne dans le detail deplie du trajet selectionne', () => {
       const { container } = renderResults([FAST_ITINERARY]);
 
-      const detailPanel = container.querySelector('.resultats-panel-detail') as HTMLElement;
-      expect(within(detailPanel).getByText('C1')).toHaveClass('line-badge--bus');
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      expect(within(detail).getByText('C1')).toHaveClass('line-badge--bus');
     });
 
     it('garde l icone existante dans le detail deplie pour un segment marche', () => {
       const { container } = renderResults([FAST_ITINERARY]);
 
-      const detailPanel = container.querySelector('.resultats-panel-detail') as HTMLElement;
-      const walkSegment = within(detailPanel)
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      const walkSegment = within(detail)
         .getByText('Marche')
         .closest('.resultats-segment') as HTMLElement;
       expect(walkSegment.querySelector('.line-badge')).not.toBeInTheDocument();
     });
 
     it('applique la couleur de ligne GTFS en fond plein sur le badge (issue #129, section 8)', () => {
-      const { container } = renderResults([FAST_ITINERARY]);
+      renderResults([FAST_ITINERARY]);
 
-      const card = desktopCards(container)[0];
+      const card = screen.getAllByRole('button', { name: /min/ })[0];
       expect(within(card).getByText('C1')).toHaveStyle({
         background: '#95C11E',
         color: '#1A171B',
@@ -612,130 +538,138 @@ describe('RecherchePageResults', () => {
     it('applique aussi la couleur de ligne dans le detail deplie du trajet selectionne', () => {
       const { container } = renderResults([FAST_ITINERARY]);
 
-      const detailPanel = container.querySelector('.resultats-panel-detail') as HTMLElement;
-      expect(within(detailPanel).getByText('C1')).toHaveStyle({ background: '#95C11E' });
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      expect(within(detail).getByText('C1')).toHaveStyle({ background: '#95C11E' });
     });
 
     it('retombe sur le badge neutre quand le segment n a pas de couleur GTFS', () => {
-      const { container } = renderResults([TWO_BUS_LINES_ITINERARY]);
+      renderResults([TWO_BUS_LINES_ITINERARY]);
 
-      const card = desktopCards(container)[0];
+      const card = screen.getAllByRole('button', { name: /min/ })[0];
       // TWO_BUS_LINES_ITINERARY n'a pas routeColor/routeTextColor sur ses segments.
       expect(within(card).getByText('24')).not.toHaveAttribute('style');
     });
   });
 
-  describe('vue Edition (issue #171/#172)', () => {
-    it("affiche le contenu de renderEditForm et masque la liste/le detail quand isEditingSearch est vrai", () => {
-      const { container } = render(
-        <RecherchePageResults
-          origin={ORIGIN}
-          destination={DESTINATION}
-          itineraries={[FAST_ITINERARY]}
-          onEditSearch={vi.fn()}
-          isEditingSearch
-          renderEditForm={() => <input aria-label="Origine (test)" />}
-        />,
-      );
-
-      expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
-      expect(container.querySelector('.resultats-panels')).not.toBeInTheDocument();
-      expect(container.querySelector('.resultats-sheet')).not.toBeInTheDocument();
-      expect(container.querySelector('.recherche-panel-form')).toBeInTheDocument();
-    });
-
-    it('la touche Echap appelle onCancelEdit pendant l\'edition', async () => {
-      const user = userEvent.setup();
-      const onCancelEdit = vi.fn();
-      render(
-        <RecherchePageResults
-          origin={ORIGIN}
-          destination={DESTINATION}
-          itineraries={[FAST_ITINERARY]}
-          onEditSearch={vi.fn()}
-          isEditingSearch
-          onCancelEdit={onCancelEdit}
-          renderEditForm={() => <input aria-label="Origine (test)" />}
-        />,
-      );
-
-      await user.keyboard('{Escape}');
-
-      expect(onCancelEdit).toHaveBeenCalledTimes(1);
-    });
-
-    it("sans isEditingSearch, la liste reste affichee meme si renderEditForm est fourni", () => {
+  describe('carte de recherche persistante (issue #234)', () => {
+    it('affiche le formulaire ET les resultats simultanement, a la suite l\'un de l\'autre dans la meme carte', () => {
       const { container } = renderResults([FAST_ITINERARY]);
-      expect(container.querySelector('.recherche-panel-form')).not.toBeInTheDocument();
-      expect(desktopCards(container)).toHaveLength(1);
+
+      // Contrairement a l'ancienne "vue Edition" (#171/#172) puis a l'ancien
+      // duo panneaux/bandeau resultats separes (premiere version de #234,
+      // retiree apres retour utilisateur en session) : une seule carte,
+      // .recherche-panel-form, contient le formulaire puis les resultats.
+      const form = container.querySelector('.recherche-panel-form') as HTMLElement;
+      expect(form).toBeInTheDocument();
+      expect(within(form).getByLabelText('Origine (test)')).toBeInTheDocument();
+      expect(
+        within(form).getAllByRole('button', { name: /min/ }),
+      ).toHaveLength(1);
+    });
+
+    it('une seule instance de la carte est montee, pas une copie desktop + une copie mobile', () => {
+      renderResults([FAST_ITINERARY]);
+      // getByLabelText (pas getAllBy) leve deja une erreur si le champ
+      // existe en double - assertion explicite en plus pour la clarte de
+      // l'intention (RecherchePageResults.tsx : id de champ potentiellement
+      // dupliques sinon, voir le commentaire de RecherchePageResults).
+      expect(screen.getAllByLabelText('Origine (test)')).toHaveLength(1);
+      // Meme raisonnement pour les resultats : plus de panneau desktop +
+      // bandeau mobile dupliques (ancienne disposition), une seule liste.
+      expect(screen.getAllByRole('button', { name: /min/ })).toHaveLength(1);
+    });
+
+    it('reste affichee dans les 3 etats (chargement, vide, resultats)', () => {
+      const { unmount: unmount1 } = renderResults(null);
+      expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
+      unmount1();
+
+      const { unmount: unmount2 } = renderResults([]);
+      expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
+      unmount2();
+
+      renderResults([FAST_ITINERARY]);
+      expect(screen.getByLabelText('Origine (test)')).toBeInTheDocument();
+    });
+
+    it('un espace separe le bouton "Rechercher" de ce qui suit (retour utilisateur en session)', () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+      expect(
+        container.querySelector('.recherche-panel-form-results'),
+      ).toBeInTheDocument();
     });
   });
 
-  describe('bandeau mobile (bottom sheet)', () => {
-    function sheet(container: HTMLElement) {
-      const el = container.querySelector('.resultats-sheet');
-      if (!el) throw new Error('.resultats-sheet introuvable');
+  describe(
+    "detail de l'itineraire selectionne en desktop : panneau separe, pas " +
+      'dans la carte de recherche (issue #234, retour utilisateur en session)',
+    () => {
+      it('le panneau detail (.resultats-detail-panel) existe hors de la carte de recherche', () => {
+        const { container } = renderResults([FAST_ITINERARY]);
+
+        const form = container.querySelector(
+          '.recherche-panel-form',
+        ) as HTMLElement;
+        const detailPanel = container.querySelector(
+          '.resultats-detail-panel',
+        ) as HTMLElement;
+        expect(detailPanel).toBeInTheDocument();
+        expect(form.contains(detailPanel)).toBe(false);
+      });
+
+      it("n'affiche aucun panneau detail tant qu'aucun itineraire n'est disponible", () => {
+        const { container: loading } = renderResults(null);
+        expect(
+          loading.querySelector('.resultats-detail-panel'),
+        ).not.toBeInTheDocument();
+
+        const { container: empty } = renderResults([]);
+        expect(
+          empty.querySelector('.resultats-detail-panel'),
+        ).not.toBeInTheDocument();
+      });
+
+      it("le panneau detail reflete l'itineraire selectionne, comme la copie mobile", () => {
+        const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+
+        const detailPanel = container.querySelector(
+          '.resultats-detail-panel',
+        ) as HTMLElement;
+        expect(within(detailPanel).getByText('Bus C1')).toBeInTheDocument();
+      });
+    },
+  );
+
+  describe('repli/deploiement de la carte en mobile (data-sheet-state)', () => {
+    function panelForm(container: HTMLElement) {
+      const el = container.querySelector('.recherche-panel-form');
+      if (!el) throw new Error('.recherche-panel-form introuvable');
       return el as HTMLElement;
     }
 
-    it('demarre replie sur la liste des trajets ("list")', () => {
+    it('demarre depliee ("expanded")', () => {
       const { container } = renderResults([FAST_ITINERARY]);
-      expect(sheet(container)).toHaveAttribute('data-sheet-state', 'list');
+      expect(panelForm(container)).toHaveAttribute('data-sheet-state', 'expanded');
     });
 
-    it('la poignee replie puis redeploie le bandeau au tap ("list" -> "collapsed" -> "list")', async () => {
+    it('la poignee replie puis redeploie la carte au tap', async () => {
       const user = userEvent.setup();
       const { container } = renderResults([FAST_ITINERARY]);
       const handleButton = container.querySelector(
-        '.resultats-sheet-handle',
+        '.recherche-panel-form-handle',
       ) as HTMLElement;
 
       await user.click(handleButton);
-      expect(sheet(container)).toHaveAttribute('data-sheet-state', 'collapsed');
+      expect(panelForm(container)).toHaveAttribute('data-sheet-state', 'collapsed');
 
       await user.click(handleButton);
-      expect(sheet(container)).toHaveAttribute('data-sheet-state', 'list');
+      expect(panelForm(container)).toHaveAttribute('data-sheet-state', 'expanded');
     });
 
-    it('affiche un apercu du trajet selectionne dans la poignee une fois replie', async () => {
-      const user = userEvent.setup();
+    it('un glissement vers le bas sur la poignee replie la carte', () => {
       const { container } = renderResults([FAST_ITINERARY]);
       const handleButton = container.querySelector(
-        '.resultats-sheet-handle',
-      ) as HTMLElement;
-
-      await user.click(handleButton);
-
-      expect(within(handleButton).getByText(/25 min/)).toBeInTheDocument();
-    });
-
-    it('selectionner un trajet dans le bandeau ouvre directement son detail, avec un retour vers la liste', async () => {
-      const user = userEvent.setup();
-      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
-
-      const sheetBody = container.querySelector(
-        '.resultats-sheet-body',
-      ) as HTMLElement;
-      const secondCard = within(sheetBody).getAllByRole('button', {
-        name: /min/,
-      })[1];
-      await user.click(secondCard);
-
-      expect(sheet(container)).toHaveAttribute('data-sheet-state', 'detail');
-      expect(
-        within(sheetBody).getByRole('button', { name: /Tous les trajets/ }),
-      ).toBeInTheDocument();
-
-      await user.click(
-        within(sheetBody).getByRole('button', { name: /Tous les trajets/ }),
-      );
-      expect(sheet(container)).toHaveAttribute('data-sheet-state', 'list');
-    });
-
-    it('un glissement vers le bas sur la poignee replie le bandeau', () => {
-      const { container } = renderResults([FAST_ITINERARY]);
-      const handleButton = container.querySelector(
-        '.resultats-sheet-handle',
+        '.recherche-panel-form-handle',
       ) as HTMLElement;
 
       fireEvent.touchStart(handleButton, { touches: [{ clientY: 100 }] });
@@ -743,7 +677,7 @@ describe('RecherchePageResults', () => {
         changedTouches: [{ clientY: 220 }],
       });
 
-      expect(sheet(container)).toHaveAttribute('data-sheet-state', 'collapsed');
+      expect(panelForm(container)).toHaveAttribute('data-sheet-state', 'collapsed');
     });
   });
 });

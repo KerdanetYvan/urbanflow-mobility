@@ -301,8 +301,9 @@
 }
 
 /* Fond obscurci plein ecran (issue #233, lot 2) - z-index eleve : au-dessus
-   du panneau flottant (.resultats-panel-list etc., voir RecherchePageResults.css)
-   ET de la carte Leaflet, qui a son propre z-index natif. `align-items:
+   de la carte de recherche flottante (.recherche-panel-form, voir
+   RecherchePageResults.css) ET de la carte Leaflet, qui a son propre
+   z-index natif. `align-items:
    flex-end` par defaut (mobile-first) : feuille remontant du bas (retour
    utilisateur en session, pattern "bottom sheet"), plus adapte a l'ecran
    reduit qu'une boite centree flottant au milieu de la carte. Devient
