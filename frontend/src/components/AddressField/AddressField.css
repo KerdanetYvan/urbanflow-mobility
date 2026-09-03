@@ -9,14 +9,28 @@
   position: relative;
 }
 
-/* Liste de suggestions d'autocompletion, superposee au contenu suivant
-   plutot que de le repousser (evite un saut de mise en page a chaque
-   frappe). */
+/* Liste de suggestions d'autocompletion (issue #233 : positionnement
+   flottant via @floating-ui/dom, voir le commentaire de AddressField.tsx
+   pour le detail complet). `position: fixed` (jamais `absolute` comme
+   avant) : le dropdown est porte hors du DOM de son champ via un React
+   Portal (`document.body`), donc plus jamais contraint par le scroll
+   interne d'un ancetre (carte de recherche, `overflow-y: auto`) - il
+   s'affiche desormais par-dessus tout le reste de l'ecran. `left`/`top`
+   et `min-width`/`max-width`/`max-height` sont calcules et appliques par
+   JS a l'ouverture (voir le useEffect du composant) - les valeurs ici ne
+   sont qu'un etat initial neutre avant le premier calcul (evite un flash
+   visible a (0,0) pleine largeur le temps que l'effet s'execute).
+   `width: max-content` (pas `left: 0; right: 0` comme avant, qui forcait
+   la largeur du champ) : le dropdown peut desormais s'elargir pour une
+   suggestion plus longue que le champ (retour utilisateur en session),
+   toujours plafonne par `max-width` (espace reellement disponible avant
+   le bord du viewport, voir size() cote JS). */
 .address-suggestions {
-  position: absolute;
+  position: fixed;
+  top: 0;
   left: 0;
-  right: 0;
-  z-index: 20;
+  width: max-content;
+  z-index: 1000;
   margin: 0;
   padding: var(--space-1);
   list-style: none;
@@ -24,10 +38,6 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
-  /* Assez haut pour montrer la fusion arrets + adresses (jusqu'a 10 entrees,
-     issue #168) sans forcer un scroll des les premiers resultats - au-dela
-     ca defile. */
-  max-height: 22rem;
   overflow-y: auto;
 }
 
@@ -68,10 +78,13 @@
   color: var(--color-text-muted);
 }
 
-/* Anti-débordement (issue #161) : une adresse longue (immeuble + résidence +
-   code postal) reste sur une ligne tronquée plutôt que d'allonger le
-   dropdown - l'ellipsis vit sur le libellé, `min-width: 0` le laissant
-   rétrécir sous la largeur de son contenu dans le flex. */
+/* Anti-débordement (issue #161), revu en dernier recours seulement depuis
+   #233 : le dropdown s'élargit désormais pour accueillir une suggestion
+   plus longue que le champ (voir `size()` dans AddressField.tsx et `width:
+   max-content` dans AddressField.css) - cet ellipsis ne joue plus que si
+   même la largeur maximale disponible (bord du viewport) ne suffit pas.
+   `min-width: 0` le laissant rétrécir sous la largeur de son contenu dans
+   le flex reste nécessaire pour que l'ellipsis puisse s'appliquer du tout. */
 .address-suggestion-label {
   min-width: 0;
   overflow: hidden;
