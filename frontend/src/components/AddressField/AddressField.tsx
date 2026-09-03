@@ -146,6 +146,21 @@ function AddressField({
     if (!isOpen || !reference || !floatingEl) return;
 
     function updatePosition() {
+      // Réinitialise les contraintes de taille posées par size() au calcul
+      // précédent AVANT de relancer computePosition. Sans ça, flip() (qui
+      // s'exécute avant size() dans la chaîne ci-dessous) mesure un dropdown
+      // déjà rétréci au tour d'avant : il le voit « rentrer » sous le champ
+      // même quand la place réelle manque, et ne bascule donc jamais
+      // au-dessus. Résultat : sur le champ Destination (bas de la colonne,
+      // près du bord bas de l'écran) le dropdown restait coincé en dessous,
+      // écrasé à quelques dizaines de pixels avec un scroll interne. En
+      // repartant de la taille naturelle à chaque calcul, flip() décide
+      // correctement, puis size() ne plafonne qu'ensuite (gotcha documenté
+      // par @floating-ui quand flip() précède size()).
+      floatingEl!.style.minWidth = '';
+      floatingEl!.style.maxWidth = '';
+      floatingEl!.style.maxHeight = '';
+
       void computePosition(reference!, floatingEl!, {
         placement: 'bottom-start',
         middleware: [
