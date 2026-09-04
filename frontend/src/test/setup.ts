@@ -66,6 +66,34 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
 });
 
+/**
+ * jsdom (environnement de test de Vitest) n'implemente pas `window.matchMedia`
+ * (contrairement a un vrai navigateur) - `TypeError: window.matchMedia is
+ * not a function` des qu'un composant l'appelle (issue #245,
+ * `useThemeSwitch`, qui suit `prefers-color-scheme` pour la position
+ * initiale du switch de theme). Repli par defaut sur `matches: false` (theme
+ * clair) : suffisant pour la quasi-totalite des tests, qui ne testent pas
+ * une branche systeme-sombre specifique - `useThemeSwitch.spec.ts` surcharge
+ * `matchMedia` localement (`vi.stubGlobal`) pour les scenarios ou la valeur
+ * exacte importe. `addListener`/`removeListener` (API depreciee) inclus en
+ * plus de `addEventListener`/`removeEventListener` : certaines libs/polyfills
+ * y recourent encore, les deux ne coutent rien a stubber ici.
+ */
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
 // Demonte l'arbre React rendu apres chaque test. @testing-library/react
 // enregistre normalement ce cleanup automatiquement quand `globals: true`,
 // mais la detection est prise en defaut dans cet environnement (Vitest 4) :

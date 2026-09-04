@@ -47,6 +47,65 @@
   margin-top: var(--space-2);
 }
 
+/* Switch de reglage de theme (issue #245, ThemeSetting dans ProfilPage.tsx)
+   - piste ovale contenant les 2 icones (soleil/lune) fixes a chaque
+   extremite, un disque ("thumb") qui glisse par-dessus l'icone active.
+   Hauteur alignee sur --touch-target-min (meme cible tactile minimale que
+   le reste de l'app, ex. .profil-checkbox) plutot qu'un switch plus petit
+   comme on en voit souvent - accessibilite avant convention visuelle. */
+.profil-theme-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 4.5rem;
+  height: var(--touch-target-min);
+  padding: 0 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.profil-theme-switch:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
+/* Les icones restent au-dessus du disque (z-index) : le disque glisse
+   DESSOUS/AUTOUR de l'icone active plutot que de la recouvrir. */
+.profil-theme-switch svg {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.profil-theme-switch-thumb {
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  transition: transform 0.2s ease;
+}
+
+/* aria-checked (pas une classe dediee) : une seule source de verite pour
+   l'etat visuel ET l'etat annonce aux technologies d'assistance, voir
+   ProfilPage.tsx. Distance de translation = largeur de piste - largeur du
+   disque - les deux marges (gauche+droite) autour de lui. */
+.profil-theme-switch[aria-checked='true'] .profil-theme-switch-thumb {
+  transform: translateX(calc(4.5rem - 2rem - 0.5rem));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profil-theme-switch-thumb {
+    transition: none;
+  }
+}
+
 /* Domicile/travail (issue #113/#114) - bloc separe des 2 fieldsets
    cote-a-cote (.profil-fieldsets), voir ProfilPage.tsx pour le pourquoi. */
 .profil-addresses-hint {
