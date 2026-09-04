@@ -17,8 +17,12 @@ export default defineConfig({
       // qu'un usager reste bloque sur une vieille version.
       registerType: 'autoUpdate',
       // Fichiers statiques a precacher en plus du build JS/CSS genere par
-      // Vite (deja precache automatiquement par le plugin).
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      // Vite (deja precache automatiquement par le plugin). theme-init.js
+      // (audit securite OWASP #262 - anti-FOUC extrait d'index.html pour
+      // rester compatible CSP `script-src 'self'`) : charge directement par
+      // une balise <script src> dans index.html, pas importe depuis un
+      // module - meme raison que favicon.svg/apple-touch-icon.png ci-dessus.
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'theme-init.js'],
       manifest: {
         name: 'UrbanFlow Mobility',
         short_name: 'UrbanFlow',

@@ -1,0 +1,70 @@
+# Configuration Caddy de production (audit securite OWASP #262).
+#
+# NE VIT PAS DANS docker-compose.prod.yml : Caddy est installe directement
+# sur l'hote du VPS (pas conteneurise, voir le commentaire en tete de
+# docker-compose.prod.yml), donc ce fichier n'est PAS applique
+# automatiquement par le pipeline de deploiement (.github/workflows/ci.yml,
+# job "deploy"). C'est une source de verite VERSIONNEE a synchroniser
+# manuellement sur le VPS, exactement comme .env (voir memoire projet
+# "prod-env-manuel-vps") :
+#
+#   scp docker/Caddyfile <user>@<host>:/etc/caddy/Caddyfile
+#   ssh <user>@<host> "sudo systemctl reload caddy"
+#
+# Avant de considerer que c'est termine : recharger Caddy sur le VPS, puis
+# verifier dans un vrai navigateur (onglet Reseau + Console) qu'aucune
+# violation de Content-Security-Policy n'apparait sur les ecrans principaux
+# (recherche avec carte affichee, connexion, profil) - cette configuration
+# n'a pas pu etre testee contre un Caddy reel depuis cette session.
+#
+# A adapter si le nom de domaine change (urbanflow-mobility.kerdanetyvan.dev
+# actuellement, voir README.md).
+urbanflow-mobility.kerdanetyvan.dev {
+	# Fichiers statiques du frontend (deployes par rsync, voir le job
+	# "deploy" de ci.yml - /var/www/urbanflow-frontend/).
+	root * /var/www/urbanflow-frontend
+	encode gzip zstd
+
+	# /api/* -> backend NestJS, jamais expose directement (127.0.0.1:3000
+	# uniquement, voir docker-compose.prod.yml) - VITE_API_URL=/api au build
+	# du frontend (meme domaine, pas de CORS necessaire en prod).
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# SPA : toute route qui ne correspond pas a un fichier statique retombe
+	# sur index.html (react-router-dom gere le routing cote client, ex.
+	# /profil ou /recherche rechargee directement au clavier).
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+
+	# En-tetes de securite pour LA PAGE HTML elle-meme (audit securite OWASP
+	# #262, complement A05) : helmet() (backend/src/main.ts) protege deja
+	# les reponses JSON de l'API, mais Caddy sert ce document directement
+	# sans jamais repasser par ce middleware - c'etait le seul point du
+	# perimetre HTTP sans en-tetes de securite versionnes.
+	header {
+		# Chaque source listee correspond a un besoin reel de l'app, pas une
+		# liste generique :
+		# - img-src *.tile.openstreetmap.org : tuiles de carte (MapView,
+		#   Leaflet) - le plus gros poste de requetes de l'app.
+		# - script-src/style-src 'self' uniquement (pas de police externe -
+		#   verifie, aucun @import Google Fonts ni CDN dans ce projet ;
+		#   pas de script inline - le seul qui existait, l'anti-FOUC du
+		#   theme, a ete extrait en fichier externe self, voir
+		#   frontend/public/theme-init.js).
+		# - connect-src 'self' : l'API est appelee en meme origine (/api,
+		#   proxy ci-dessus) - aucun fetch() cross-origin cote frontend.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+		# Autorise la geolocalisation en meme origine (F2, coeur de l'app -
+		# ne PAS la bloquer par erreur en copiant une policy generique).
+		Permissions-Policy "geolocation=(self), camera=(), microphone=()"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}

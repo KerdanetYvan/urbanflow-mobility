@@ -59,3 +59,31 @@ Vérifié en conditions réelles : 12 requêtes consécutives vers `/auth/login`
 ## 6. Limites de cet audit
 
 Revue manuelle et vérification ciblée des deux correctifs, pas un audit de sécurité mené par un tiers ni un scan automatisé (SAST/DAST). Ne remplace pas un test d'intrusion en bonne et due forme, hors périmètre réaliste pour ce projet à ce stade.
+
+## 7. Second audit — 2026-09-04/05 (issue [#262](https://github.com/KerdanetYvan/urbanflow-mobility/issues/262))
+
+> Casquette Dev BE/QA — audit plus large que #21 : OWASP Top 10 Web (2021) **et** OWASP API Security Top 10 (2023), complété d'un scan de dépendances (SCA) et d'un scan de secrets. Méthodologie et checklists officielles OWASP (`OWASP/secure-agent-playbook`) plutôt que la checklist maison de #32, périmètre étendu à tous les contrôleurs (dont `push`, `trips/following`, ajoutés depuis #21) et au frontend.
+
+**Résultat** : 0 vulnérabilité de dépendance (1467 dépendances, frontend+backend), 0 secret exposé, 4 findings MEDIUM/MEDIUM-HIGH corrigés, 2 LOW corrigés, 2 points informationnels traités. Détail complet et statut dans l'issue #262.
+
+### 7.1 Mise à jour du constat A10 (SSRF) de la section 5
+
+Le constat initial (« les appels sortants... jamais une URL construite à partir d'une entrée utilisateur ») reste vrai pour OTP/météo/GBFS/GTFS-RT, mais ne couvrait pas le suivi de trajet (issue #18, ajouté après #21) : `SubscribePushDto.endpoint` acceptait n'importe quelle URL syntaxiquement valide, y compris une IP privée/`localhost`. `TripDisruptionMonitorService` envoie automatiquement une requête serveur→`endpoint` dès qu'une perturbation touche un trajet suivi — SSRF authentifié, aveugle, vers le réseau interne. **Corrigé** : `endpoint` restreint à une allowlist d'hébergeurs de push connus (FCM, Mozilla, Apple) via un nouveau validateur `IsPushEndpoint` (`backend/src/common/validators/push-endpoint.validator.ts`).
+
+### 7.2 Nouveaux correctifs (au-delà du périmètre initial de #21)
+
+- **A04 (rate limiting)** durci : `ThrottlerGuard` était réservé à `AuthController` depuis #21 — étendu à `TripsController` (30/min, `/trips` peut saturer OpenTripPlanner), `PlacesController` (60/min, Nominatim) et `UsersController` (20/min, l'inscription permettait une énumération d'emails sans limite).
+- **A03/A02 (frontend)** : purge du cache de trajets local (`tripCache`, coordonnées GPS) à la déconnexion et à la suppression de compte — restait lisible jusqu'à 24h sur un appareil partagé.
+- **A09 (journalisation)** : `LoggingInterceptor` journalisait la query string complète de `/trips` et `/places` (coordonnées GPS, termes de recherche) — ne journalise plus que le chemin.
+- **A07 (défense en profondeur)** : `JwtStrategy` et `AuthService#refresh` restreignent désormais explicitement l'algorithme accepté à `HS256`.
+- **A03 (exposition de données)** : `ProfilesController`/`FollowedTripController` renvoient des DTO de sortie dédiés plutôt que les entités TypeORM directement.
+- **A06 (dépendances)** : `npm audit` refait sur les deux sous-projets, 0 vulnérabilité (contre 4 high + 7 en #21) — Dependabot (ajouté en #21) a fait son travail depuis.
+- **A05 (secrets/config)** : job CI `gitleaks` ajouté (scan de l'historique git complet à chaque push/PR) ; `.gitignore` racine étendu à `.env*` (ne couvrait que `.env` exact).
+
+### 7.3 Limite de #21 toujours non corrigée
+
+**A07 — rotation du refresh token.** Toujours pas de révocation à l'émission d'un nouveau refresh token (voir section 4) — hors périmètre de #262 également, un vrai correctif suppose une nouvelle table de jetons révoqués. Reste documenté ici plutôt qu'oublié.
+
+### 7.4 Gap révélé par cet audit, hors périmètre sécurité pur
+
+Le `Content-Security-Policy` posé par `helmet()` (section 3.2) ne protège que les réponses **JSON de l'API** — en production, le HTML servi à l'utilisateur passe par Caddy (`/etc/caddy/Caddyfile` sur le VPS), jamais par ce middleware NestJS. Le CSP qui compte réellement (celui de la page chargée par le navigateur) n'était donc, jusqu'ici, ni versionné ni revu. Un `docker/Caddyfile` versionné (source de vérité, à synchroniser manuellement sur le VPS comme `.env`) a été ajouté à cette occasion — voir `docker/Caddyfile` pour le détail du CSP retenu.
