@@ -114,7 +114,9 @@ export type TripModeChip =
 
 ### 7.6 Accessibilité — limite assumée
 
-Pas de vérification de contraste au runtime entre `route_color` et `route_text_color` : ces couleurs sont définies par l'opérateur (STAR) pour ses propres supports, on leur fait confiance telles quelles plutôt que de recalculer un ratio WCAG à l'affichage. Le filet de sécurité reste celui déjà en place depuis la section 4 : le texte de la ligne (ex. "C1") et la forme du badge restent le canal d'information indépendant de la couleur (WCAG 1.4.1), que la couleur GTFS soit lisible ou non pour un cas particulier. Aucune ligne du réseau STAR actuel ne pose de problème visible à l'usage, mais ce n'est pas garanti pour un futur opérateur GTFS ajouté (voir contrainte d'interopérabilité du projet) — limite acceptée, pas vérifiée automatiquement.
+Pas de vérification de contraste au runtime entre `route_color` et `route_text_color` : ces couleurs sont définies par l'opérateur (STAR) pour ses propres supports, on leur fait confiance telles quelles plutôt que de recalculer un ratio WCAG à l'affichage. Le filet de sécurité reste celui déjà en place depuis la section 4 : le texte de la ligne (ex. "C1") et la forme du badge restent le canal d'information indépendant de la couleur (WCAG 1.4.1), que la couleur GTFS soit lisible ou non pour un cas particulier.
+
+**Correction (issue #254, analyse de style générale du 2026-09-04)** : contrairement à l'affirmation initiale ci-dessus ("aucune ligne actuelle ne pose de problème visible"), la ligne de métro **a** (Kennedy ↔ La Poterie, `route_id` `7-1001`) a un ratio de contraste texte/fond mesuré à **4.33:1** (`route_color` `#EE1D23` / `route_text_color` `#FFFFFF`) — sous le seuil WCAG AA de 4.5:1 pour du texte normal, d'un écart minime (0.17 point). Vérifié en session, décision explicite de ne **pas** corriger : ce sont les couleurs officielles réelles de la ligne A du réseau STAR (identité visuelle reconnaissable), l'écart est marginal, et le filet de sécurité WCAG 1.4.1 ci-dessus (forme + texte, indépendants de la couleur) couvre déjà ce cas précis - un badge illisible en couleur reste identifiable par sa forme et son texte. La limite reste donc acceptée telle quelle, cette fois avec un exemple concret vérifié plutôt qu'une hypothèse non vérifiée. Reste vrai pour un futur opérateur GTFS ajouté (voir contrainte d'interopérabilité du projet) — toujours pas de vérification automatique.
 
 ### 7.7 Tests (extension)
 
@@ -128,4 +130,4 @@ Pas de vérification de contraste au runtime entre `route_color` et `route_text_
 ## 8. Hors périmètre / limites acceptées
 
 - Le réseau STAR (Rennes Métropole, seule source GTFS ingérée à ce jour) ne comporte pas de ligne RAIL — la forme "train" reste donc non démontrable avec les données réelles actuelles, mais le code la gère pour rester générique vis-à-vis du modèle OTP.
-- Pas de vérification automatique de contraste sur les couleurs de ligne GTFS (voir section 7.6) — limite assumée, pas une lacune non documentée.
+- Pas de vérification automatique de contraste sur les couleurs de ligne GTFS (voir section 7.6) — limite assumée, pas une lacune non documentée. Exemple concret vérifié : ligne de métro **a**, 4.33:1 (sous le seuil AA 4.5:1), conservé tel quel (issue #254).
