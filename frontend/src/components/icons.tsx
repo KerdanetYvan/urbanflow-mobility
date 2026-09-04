@@ -51,6 +51,11 @@ export function MapPinIcon() {
 /**
  * Fleches opposees verticales, pour le bouton d'inversion origine/destination
  * (issue #35) - suggere un echange plutot qu'une simple direction unique.
+ * Reutilisee telle quelle par la chip "Limiter le nombre de correspondances"
+ * du Profil (issue #255) : meme idee d'echange, appliquee cette fois a un
+ * changement de ligne plutot qu'a une inversion de champs - les deux
+ * usages n'apparaissent jamais sur le meme ecran, pas de risque de
+ * confusion pour l'utilisateur.
  */
 export function SwapIcon() {
   return (
@@ -169,6 +174,38 @@ export function CarIcon() {
       <path d="M4 16h16" />
       <circle cx="7.5" cy="16" r="1.6" />
       <circle cx="16.5" cy="16" r="1.6" />
+    </svg>
+  );
+}
+
+/**
+ * Fauteuil roulant (issue #255, chip "Accessible en fauteuil roulant" du
+ * Profil) - grande roue arriere + dossier/torse + bras vers la main
+ * courante, vue de profil simplifiee, meme registre monoline que le reste
+ * de ce fichier.
+ */
+export function WheelchairIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="9" cy="16" r="6" />
+      <circle cx="15.5" cy="5.5" r="1.6" />
+      <path d="M15.5 8v4h4.5" />
+      <path d="M12.5 9h4l1.5 5H9" />
+    </svg>
+  );
+}
+
+/**
+ * Regle graduee (issue #255, chip "Limiter la distance de marche" du
+ * Profil) - concept de distance/mesure, distincte de WalkIcon (deja prise
+ * par le mode de transport "Marche" sur ce meme ecran, la reutiliser ici
+ * aurait ete ambigu).
+ */
+export function RulerIcon() {
+  return (
+    <svg {...iconProps()}>
+      <rect x="3" y="9" width="18" height="6" rx="1.5" />
+      <path d="M7 9v2.5M11 9v2.5M15 9v2.5" />
     </svg>
   );
 }

@@ -285,6 +285,53 @@ describe('ProfilPage', () => {
     });
   });
 
+  describe('chips icone+libelle pour les modes/preferences (issue #255)', () => {
+    beforeEach(() => {
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('regroupe les modes de transport par categorie (Actif/Transport en commun/Partage)', async () => {
+      renderPage();
+
+      expect(await screen.findByText('Actif')).toBeInTheDocument();
+      expect(screen.getByText('Transport en commun')).toBeInTheDocument();
+      expect(screen.getByText('Partagé')).toBeInTheDocument();
+      // Regroupement programmatique (WCAG 1.3.1), pas seulement visuel :
+      // chaque categorie est un vrai <fieldset>, pas juste une <div>.
+      expect(
+        screen.getByRole('group', { name: 'Actif' }),
+      ).toBeInTheDocument();
+    });
+
+    it('reste un vrai <input type="checkbox"> natif sous la chip (acceptance : semantique inchangee)', async () => {
+      renderPage();
+
+      const walking = await screen.findByRole('checkbox', { name: 'Marche' });
+      expect(walking.tagName).toBe('INPUT');
+      expect(walking).toHaveAttribute('type', 'checkbox');
+    });
+
+    it('coche une chip au clic sur son libelle visible (pas seulement le checkbox natif masque)', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const walkingLabel = (await screen.findByText('Marche')).closest('label');
+      expect(walkingLabel).not.toHaveClass('profil-chip-checked');
+
+      await user.click(walkingLabel!);
+
+      expect(walkingLabel).toHaveClass('profil-chip-checked');
+      expect(screen.getByRole('checkbox', { name: 'Marche' })).toBeChecked();
+    });
+  });
+
   it('pre-remplit le formulaire avec le profil existant et le met a jour', async () => {
     vi.mocked(profileLib.getMyProfile).mockResolvedValue({
       id: 'profile-1',
