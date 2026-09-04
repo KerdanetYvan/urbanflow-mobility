@@ -5,11 +5,14 @@ import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { LockIcon, MoonIcon, SunIcon } from '../../components/icons';
+import { LockIcon, MinusIcon, MoonIcon, PlusIcon, SunIcon } from '../../components/icons';
 import Skeleton from '../../components/Skeleton/Skeleton';
+import Switch from '../../components/Switch/Switch';
 import { ApiError } from '../../lib/api';
 import { deleteAccount, logout } from '../../lib/auth';
 import { formatCoordinates } from '../../lib/format';
+import type { GlyphSizePreference } from '../../lib/glyphSize';
+import { useGlyphSizePreference } from '../../lib/useGlyphSizePreference';
 import type { PlaceSuggestion } from '../../lib/places';
 import { useAuth } from '../../lib/useAuth';
 import { useThemeSwitch } from '../../lib/useThemeSwitch';
@@ -450,56 +453,139 @@ function AccountActions({ onLogout, onAccountDeleted }: AccountActionsProps) {
 }
 
 /**
+ * Reglages d'affichage (issue #245 puis #246) - regroupe les preferences
+ * de PRESENTATION cote appareil/navigateur (theme, taille des reperes de
+ * carte), toutes deux persistees en localStorage plutot que dans le profil
+ * de mobilite backend (voir lib/theme.ts et lib/glyphSize.ts - decision PO
+ * explicite documentee dans les deux issues : `accessibilityPreferences`
+ * du profil sert au SCORING des itineraires, pas a l'affichage). Commun aux
+ * deux etats de ProfilPage (onboarding et formulaire d'edition), meme motif
+ * que AccountActions ci-dessus : extrait en composant partage plutot que
+ * duplique. Volontairement HORS du <form> de preferences de mobilite (qui
+ * n'est soumis qu'au clic sur "Enregistrer", GET/PATCH /profiles/me) : ces
+ * reglages ne sont pas une donnee de compte, chacun s'applique
+ * immediatement a son propre clic, sans bouton "Enregistrer" dedie ni
+ * requete reseau.
+ */
+function DisplaySettings() {
+  return (
+    <fieldset className="profil-fieldset">
+      <legend>Affichage</legend>
+      <ThemeSetting />
+      <GlyphSizeSetting />
+    </fieldset>
+  );
+}
+
+/**
  * Reglage de theme (issue #245) - un vrai interrupteur a 2 positions
  * (soleil/lune), pas 3 boutons radio : decision UX prise en session apres
  * une premiere version a 3 options (Systeme/Clair/Sombre), jugee trop
  * lourde pour un reglage que la plupart des gens ne touchent qu'une fois.
- * `role="switch"`/`aria-checked` (pas une checkbox stylee en CSS pur) :
- * semantique ARIA dediee, annoncee correctement par les lecteurs d'ecran
- * comme un interrupteur ("active"/"inactif") plutot qu'une case a cocher.
  * `useThemeSwitch` gere la position initiale quand aucun choix explicite
  * n'a encore ete fait (suit le theme systeme, voir son commentaire) - au
  * premier clic ici, un choix explicite est enregistre, sans retour arriere
  * possible vers "systeme" depuis ce switch (assume, voir useThemeSwitch).
- * Commun aux deux etats de ProfilPage (onboarding et formulaire d'edition),
- * meme motif que AccountActions ci-dessus : extrait en composant partage
- * plutot que duplique. Volontairement HORS du <form> de preferences de
- * mobilite (qui n'est soumis qu'au clic sur "Enregistrer", GET/PATCH
- * /profiles/me) : ce reglage n'est pas une donnee de compte, il s'applique
- * immediatement a chaque clic, sans bouton "Enregistrer" dedie ni requete
- * reseau.
  */
 function ThemeSetting() {
   const [isDark, toggle] = useThemeSwitch();
 
   return (
-    <fieldset className="profil-fieldset">
-      <legend>Affichage</legend>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={isDark}
-        aria-label={
+    <div className="profil-setting-row">
+      <span className="profil-setting-row-label">Thème</span>
+      <Switch
+        checked={isDark}
+        onChange={toggle}
+        ariaLabel={
           isDark
             ? 'Thème sombre activé, basculer vers le thème clair'
             : 'Thème clair activé, basculer vers le thème sombre'
         }
-        className="profil-theme-switch"
-        onClick={toggle}
+        iconOff={<SunIcon />}
+        iconOn={<MoonIcon />}
+      />
+    </div>
+  );
+}
+
+/**
+ * Niveaux du reglage de taille des reperes de carte (issue #246) - tableau
+ * plutot que le seul booleen `GlyphSizePreference` actuel ('normal'/'large')
+ * : meme motif que TRANSPORT_MODES/THEME_OPTIONS (avant sa bascule en
+ * switch pour #245), pour que GlyphSizeSetting reste ecrit une bonne fois
+ * pour toutes - un 3e palier futur (ex. "Tres grande") n'ajouterait qu'une
+ * entree ici, sans toucher au stepper lui-meme.
+ */
+const GLYPH_SIZE_LEVELS: { value: GlyphSizePreference; label: string }[] = [
+  { value: 'normal', label: 'Normale' },
+  { value: 'large', label: 'Grande' },
+];
+
+/**
+ * Reglage de taille des reperes de la carte (issue #246) - un stepper
+ * (boutons -/+ autour du niveau courant), pas un switch comme ThemeSetting
+ * ci-dessus : decision UX prise en session - contrairement a "clair/sombre"
+ * (une vraie bascule binaire, bien rendue par un interrupteur physique),
+ * "normale/grande" se lit plus naturellement comme un CHOIX sur une echelle
+ * ordonnee, et le stepper reste utilisable tel quel si un palier
+ * intermediaire est ajoute plus tard (voir GLYPH_SIZE_LEVELS) - un switch
+ * ne le permettrait pas sans redesign. `aria-live="polite"` sur le libelle
+ * du niveau : annonce le changement aux lecteurs d'ecran sans deplacer le
+ * focus (les 2 boutons restent sur place, contrairement a un <select> qui
+ * aurait avale le focus dans sa propre liste d'options). Boutons desactives
+ * en butee (`disabled`) plutot qu'un comportement cyclique (revenir a
+ * "Normale" apres "Grande") : plus previsible, et l'etat desactive est
+ * lui-meme un signal visuel qu'on est a une extremite.
+ */
+function GlyphSizeSetting() {
+  const [preference, setPreference] = useGlyphSizePreference();
+  const index = GLYPH_SIZE_LEVELS.findIndex(
+    (level) => level.value === preference,
+  );
+  const canDecrement = index > 0;
+  const canIncrement = index < GLYPH_SIZE_LEVELS.length - 1;
+
+  function decrement() {
+    if (canDecrement) setPreference(GLYPH_SIZE_LEVELS[index - 1].value);
+  }
+
+  function increment() {
+    if (canIncrement) setPreference(GLYPH_SIZE_LEVELS[index + 1].value);
+  }
+
+  return (
+    <div className="profil-setting-row">
+      <span className="profil-setting-row-label" id="glyph-size-label">
+        Repères de la carte
+      </span>
+      <div
+        className="profil-stepper"
+        role="group"
+        aria-labelledby="glyph-size-label"
       >
-        {/* Icones enveloppees individuellement (pas 2 <svg> nus) : donne un
-            crochet CSS par icone pour la mettre en valeur (--color-on-primary)
-            quand le disque la recouvre, sans dupliquer SunIcon/MoonIcon selon
-            l'etat - voir .profil-theme-switch-icon dans ProfilPage.css. */}
-        <span className="profil-theme-switch-icon profil-theme-switch-icon-light" aria-hidden="true">
-          <SunIcon />
+        <button
+          type="button"
+          className="profil-stepper-btn"
+          onClick={decrement}
+          disabled={!canDecrement}
+          aria-label="Réduire la taille des repères de la carte"
+        >
+          <MinusIcon />
+        </button>
+        <span className="profil-stepper-value" aria-live="polite">
+          {GLYPH_SIZE_LEVELS[index].label}
         </span>
-        <span className="profil-theme-switch-icon profil-theme-switch-icon-dark" aria-hidden="true">
-          <MoonIcon />
-        </span>
-        <span className="profil-theme-switch-thumb" aria-hidden="true" />
-      </button>
-    </fieldset>
+        <button
+          type="button"
+          className="profil-stepper-btn"
+          onClick={increment}
+          disabled={!canIncrement}
+          aria-label="Agrandir les repères de la carte"
+        >
+          <PlusIcon />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -748,7 +834,7 @@ function ProfilPage() {
       <section className="profil-page">
         <h1>Profil de mobilité</h1>
         <ProfileOnboarding onComplete={() => navigate('/recherche')} />
-        <ThemeSetting />
+        <DisplaySettings />
         <AccountActions
           onLogout={handleLogout}
           onAccountDeleted={handleAccountDeleted}
@@ -853,11 +939,11 @@ function ProfilPage() {
       {/* Hors du <form> : ne doit pas pouvoir etre declenche par un Entree
           dans un champ du formulaire de profil (comportement par defaut
           d'un bouton submit a l'interieur d'un <form>). Meme raison pour
-          ThemeSetting juste en dessous (issue #245), meme si elle ne
-          contient aucun bouton submit - reste hors du <form> de preferences
-          de mobilite par coherence, ce n'est pas une donnee de ce
-          formulaire. */}
-      <ThemeSetting />
+          DisplaySettings juste en dessous (issue #245/#246), meme si elle
+          ne contient aucun bouton submit - reste hors du <form> de
+          preferences de mobilite par coherence, ce n'est pas une donnee de
+          ce formulaire. */}
+      <DisplaySettings />
       <AccountActions
         onLogout={handleLogout}
         onAccountDeleted={handleAccountDeleted}

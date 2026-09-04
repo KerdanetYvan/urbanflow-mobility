@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
@@ -7,6 +7,7 @@ import type { SharedMobilityStation } from '../../lib/sharedMobility';
 import type { GeoPosition } from '../../lib/useGeolocation';
 import type { TripItinerary, TripPlace } from '../../lib/trips';
 import { chipLabel, tripModeChips } from '../../lib/tripModeChips';
+import { useGlyphScale } from '../../lib/useGlyphScale';
 import { getModeStyle } from './modeStyles';
 import { getSegmentColor } from './segmentColor';
 import { useSharedMobilityStations } from './useSharedMobilityStations';
@@ -22,25 +23,43 @@ import './MapView.css';
  * une variable qui change entre theme clair et sombre - une teinte pensee
  * pour du texte/une bordure sur fond de PAGE (ex. --color-primary-emphasis,
  * claire en theme sombre) devient illisible une fois posee sur un fond de
- * carte qui, lui, ne s'assombrit jamais. ORIGIN_ICON suivait `var(--color-
+ * carte qui, lui, ne s'assombrit jamais. buildOriginIcon suivait `var(--color-
  * primary-emphasis)` avant issue #244 (ambre, introduit par #158 pour la
  * coherence de marque) - retire ici : en theme sombre le token passe a une
  * teinte tres claire, quasi invisible sur les tuiles OSM. Remplace par la
- * meme forme "pin" que DESTINATION_ICON (plus grande et plus lisible qu'un
- * simple disque, et se distingue mieux des autres marqueurs circulaires de
- * la carte - correspondances, stations GBFS) en rouge fixe (decision PO
- * explicite : ne pas reintroduire l'ambre sur ce marqueur, y compris une
- * variante fixe). Depart/arrivee restent distinguables par la forme ET la
- * couleur - DESTINATION_ICON passe a un drapeau a damier noir/blanc (issue
- * #244, convention universelle "arrivee/ligne d'arrivee") plutot qu'un
- * fanion de couleur.
+ * meme forme "pin" que buildDestinationIcon (plus grande et plus lisible
+ * qu'un simple disque, et se distingue mieux des autres marqueurs
+ * circulaires de la carte - correspondances, stations GBFS) en rouge fixe
+ * (decision PO explicite : ne pas reintroduire l'ambre sur ce marqueur, y
+ * compris une variante fixe). Depart/arrivee restent distinguables par la
+ * forme ET la couleur - buildDestinationIcon passe a un drapeau a damier
+ * noir/blanc (issue #244, convention universelle "arrivee/ligne d'arrivee")
+ * plutot qu'un fanion de couleur.
+ *
+ * Fonctions de fabrique (pas des constantes de module, depuis issue #246)
+ * parametrees par `scale` (voir useGlyphScale.ts - combine largeur d'ecran
+ * et reglage manuel du Profil) : la taille de chaque glyphe doit pouvoir
+ * changer en cours de session (redimensionnement/rotation d'ecran, ou
+ * reglage change dans un autre onglet), impossible avec des `L.divIcon`
+ * calcules une seule fois au chargement du module. `iconSize` ET
+ * `iconAnchor` sont recalcules ensemble a partir des memes proportions
+ * qu'a l'origine (scale=1 reproduit exactement les valeurs d'avant #246),
+ * jamais l'un sans l'autre - un anchor qui ne suit pas la taille ferait
+ * deriver le point du marqueur qui touche reellement la coordonnee
+ * geographique (la pointe du pin, la base de la hampe...) au lieu de rester
+ * colle dessus.
  */
-const ORIGIN_ICON = L.divIcon({
-  className: 'mapview-marker',
-  html: '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 1 1 14 0C19 14.8 12 21 12 21Z" fill="#e23d3d" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="9.5" r="2.5" fill="#fff"/></svg>',
-  iconSize: [22, 22],
-  iconAnchor: [11, 22],
-});
+function buildOriginIcon(scale: number): L.DivIcon {
+  // Carre, ancre au centre horizontal / bas (pointe du pin) - voir le
+  // commentaire ci-dessus pour le detail de la forme.
+  const size = 22 * scale;
+  return L.divIcon({
+    className: 'mapview-marker',
+    html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 1 1 14 0C19 14.8 12 21 12 21Z" fill="#e23d3d" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="9.5" r="2.5" fill="#fff"/></svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+  });
+}
 
 /**
  * Drapeau a damier (issue #244) : hampe grise (contour blanc pour ressortir
@@ -48,41 +67,59 @@ const ORIGIN_ICON = L.divIcon({
  * quadrille noir/blanc (grille 4x3, alternance en damier) - convention
  * universelle de ligne d'arrivee, plus immediatement reconnaissable qu'une
  * simple couleur. iconAnchor a la base de la hampe (le point au sol, comme
- * pour ORIGIN_ICON), pas au centre du fanion.
+ * pour buildOriginIcon), pas au centre du fanion - pas carre (20x24)
+ * contrairement aux autres icones de ce fichier, donc l'ancre suit un
+ * RATIO propre a chaque axe (25% en largeur, ~91.7% en hauteur) plutot que
+ * size/2 partout.
  */
-const DESTINATION_ICON = L.divIcon({
-  className: 'mapview-marker',
-  html: '<svg width="20" height="24" viewBox="0 0 20 24"><path d="M5 22V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M5 22V2" stroke="#6b6375" stroke-width="2" stroke-linecap="round"/><rect x="5" y="2" width="13" height="9" fill="#fff" stroke="#1a1a1a" stroke-width="1"/><rect x="5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="8.25" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="14.75" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="5" y="8" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="8" width="3.25" height="3" fill="#1a1a1a"/></svg>',
-  iconSize: [20, 24],
-  iconAnchor: [5, 22],
-});
+function buildDestinationIcon(scale: number): L.DivIcon {
+  const width = 20 * scale;
+  const height = 24 * scale;
+  return L.divIcon({
+    className: 'mapview-marker',
+    html: `<svg width="${width}" height="${height}" viewBox="0 0 20 24"><path d="M5 22V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M5 22V2" stroke="#6b6375" stroke-width="2" stroke-linecap="round"/><rect x="5" y="2" width="13" height="9" fill="#fff" stroke="#1a1a1a" stroke-width="1"/><rect x="5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="8.25" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="14.75" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="5" y="8" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="8" width="3.25" height="3" fill="#1a1a1a"/></svg>`,
+    iconSize: [width, height],
+    iconAnchor: [width * 0.25, height * (22 / 24)],
+  });
+}
 
-const TRANSFER_ICON = L.divIcon({
-  className: 'mapview-marker',
-  html: '<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#fff" stroke="#6b6375" stroke-width="2.5"/></svg>',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-});
+function buildTransferIcon(scale: number): L.DivIcon {
+  const size = 12 * scale;
+  return L.divIcon({
+    className: 'mapview-marker',
+    html: `<svg width="${size}" height="${size}" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#fff" stroke="#6b6375" stroke-width="2.5"/></svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
 /**
  * Icone d'une station/vehicule en libre-service (velos, trottinettes -
- * issue #13). Dynamique (une par station, contrairement aux icones fixes
- * ci-dessus) : le badge affiche le nombre de velos disponibles a l'instant,
- * ne peut donc pas etre une constante calculee une seule fois au chargement
- * du module. Couleur = disponibilite reelle (var(--color-success) au moins
- * un velo louable, sinon var(--color-text-muted) - station fermee a la
- * location OU a quai plein/vide) plutot qu'une seule couleur "station GBFS"
- * fixe : c'est la disponibilite, pas la simple presence d'une station, qui
- * interesse l'usager sur cette carte.
+ * issue #13). Deja reconstruite a chaque rendu avant #246 (le badge affiche
+ * le nombre de velos disponibles a l'instant, jamais une constante figee) -
+ * `scale` est juste un parametre de plus, meme raisonnement que les
+ * fonctions ci-dessus. Couleur = disponibilite reelle (var(--color-success)
+ * au moins un velo louable, sinon var(--color-text-muted) - station fermee
+ * a la location OU a quai plein/vide) plutot qu'une seule couleur "station
+ * GBFS" fixe : c'est la disponibilite, pas la simple presence d'une
+ * station, qui interesse l'usager sur cette carte.
  */
-function sharedMobilityIcon(station: SharedMobilityStation): L.DivIcon {
+function sharedMobilityIcon(
+  station: SharedMobilityStation,
+  scale: number,
+): L.DivIcon {
   const isAvailable = station.isRenting && station.bikesAvailable > 0;
   const fill = isAvailable ? 'var(--color-success)' : 'var(--color-text-muted)';
+  const size = 20 * scale;
+  // Taille de police proportionnelle au disque (9/20 du diametre d'origine)
+  // plutot qu'une valeur fixe : sinon le chiffre deborderait du disque a
+  // l'echelle "normal" mobile (x1.25) et davantage encore en "grand" (x1.75).
+  const fontSize = size * (9 / 20);
   return L.divIcon({
     className: 'mapview-marker',
-    html: `<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${fill}" stroke="#fff" stroke-width="2"/><text x="10" y="10" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="#fff">${station.bikesAvailable}</text></svg>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    html: `<svg width="${size}" height="${size}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${fill}" stroke="#fff" stroke-width="2"/><text x="10" y="10" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}" font-weight="700" fill="#fff">${station.bikesAvailable}</text></svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -91,14 +128,24 @@ function sharedMobilityIcon(station: SharedMobilityStation): L.DivIcon {
  * pour se distinguer visuellement du marqueur "origine" (aussi un simple
  * disque), l'animation etant definie en CSS (MapView.css,
  * .mapview-user-marker-ring) plutot qu'en SVG pour rester une simple
- * transition de taille/opacite peu couteuse.
+ * transition de taille/opacite peu couteuse. Seule icone de ce fichier a
+ * ne pas etre un SVG (deux <span> stylees en CSS) : leur taille de base
+ * (0.75rem, voir MapView.css) est donc surchargee ici en `style` inline
+ * plutot que par une largeur/hauteur SVG - l'inline gagne sur la regle de
+ * la feuille de style pour ces deux proprietes, sans toucher au reste
+ * (couleur, bordure, animation de pulsation) qui reste porte par la classe.
  */
-const USER_POSITION_ICON = L.divIcon({
-  className: 'mapview-marker mapview-user-marker',
-  html: '<span class="mapview-user-marker-ring"></span><span class="mapview-user-marker-dot"></span>',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
+function buildUserPositionIcon(scale: number): L.DivIcon {
+  const size = 18 * scale;
+  const dotSize = 12 * scale; // 0.75rem = 12px au repos, voir MapView.css.
+  const dotStyle = `width:${dotSize}px;height:${dotSize}px`;
+  return L.divIcon({
+    className: 'mapview-marker mapview-user-marker',
+    html: `<span class="mapview-user-marker-ring" style="${dotStyle}"></span><span class="mapview-user-marker-dot" style="${dotStyle}"></span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
 /** Simple point lat/lon, sans les metadonnees d'un TripPlace (nom...). */
 interface LatLon {
@@ -243,6 +290,27 @@ function MapView({
   // recherche : elle aide a planifier le premier/dernier kilometre a pied,
   // avant meme d'avoir lance une recherche.
   const sharedMobilityStations = useSharedMobilityStations();
+
+  // Facteur d'echelle des glyphes (issue #246 - ecran + reglage manuel du
+  // Profil, voir useGlyphScale.ts). useMemo par icone : ne reconstruit les
+  // L.divIcon (couteux comparativement a un simple recalcul de props) que
+  // lorsque le facteur change reellement, pas a chaque rendu de MapView
+  // (ex. mise a jour des stations GBFS toutes les minutes, sans rapport
+  // avec la taille des glyphes).
+  const glyphScale = useGlyphScale();
+  const originIcon = useMemo(() => buildOriginIcon(glyphScale), [glyphScale]);
+  const destinationIcon = useMemo(
+    () => buildDestinationIcon(glyphScale),
+    [glyphScale],
+  );
+  const transferIcon = useMemo(
+    () => buildTransferIcon(glyphScale),
+    [glyphScale],
+  );
+  const userPositionIcon = useMemo(
+    () => buildUserPositionIcon(glyphScale),
+    [glyphScale],
+  );
 
   const segments = itinerary?.segments ?? [];
   const hasItinerary = segments.length > 0;
@@ -404,7 +472,7 @@ function MapView({
         {origin && (
           <Marker
             position={[origin.lat, origin.lon]}
-            icon={ORIGIN_ICON}
+            icon={originIcon}
             interactive={false}
             keyboard={false}
           />
@@ -412,7 +480,7 @@ function MapView({
         {destination && (
           <Marker
             position={[destination.lat, destination.lon]}
-            icon={DESTINATION_ICON}
+            icon={destinationIcon}
             interactive={false}
             keyboard={false}
           />
@@ -422,7 +490,7 @@ function MapView({
             position={[singlePoint.lat, singlePoint.lon]}
             // originProp fourni (destinationProp absent) -> c'est l'origine
             // qui manque de contrepartie, meme icone que le cas complet.
-            icon={originProp ? ORIGIN_ICON : DESTINATION_ICON}
+            icon={originProp ? originIcon : destinationIcon}
             interactive={false}
             keyboard={false}
           />
@@ -431,7 +499,7 @@ function MapView({
           <Marker
             key={index}
             position={[point.lat, point.lon]}
-            icon={TRANSFER_ICON}
+            icon={transferIcon}
             interactive={false}
             keyboard={false}
           />
@@ -446,7 +514,7 @@ function MapView({
           <Marker
             key={station.id}
             position={[station.lat, station.lon]}
-            icon={sharedMobilityIcon(station)}
+            icon={sharedMobilityIcon(station, glyphScale)}
             interactive={false}
             keyboard={false}
           />
@@ -459,7 +527,7 @@ function MapView({
           // pour se retrouver si besoin.
           <Marker
             position={[userPosition.lat, userPosition.lon]}
-            icon={USER_POSITION_ICON}
+            icon={userPositionIcon}
             interactive={false}
             keyboard={false}
           />

@@ -1,0 +1,106 @@
+/* Interrupteur generique a 2 positions (extrait de ProfilPage.css, issue
+   #245/#246 - voir le commentaire de Switch.tsx). Hauteur alignee sur
+   --touch-target-min (meme cible tactile minimale que le reste de l'app,
+   ex. .profil-checkbox) plutot qu'un switch plus petit comme on en voit
+   souvent - accessibilite avant convention visuelle.
+
+   Variables locales : la piste (--switch-w/--switch-h), le disque
+   (--switch-thumb) et son inset (--switch-inset, identique en haut et a
+   gauche pour un disque parfaitement centre verticalement). La distance de
+   translation du disque (regle [aria-checked='true'] plus bas) et sa
+   position de repos en decoulent toutes les deux, plutot que d'etre
+   recalculees a la main si ces dimensions changent un jour. */
+.switch {
+  --switch-w: 4.5rem;
+  --switch-h: var(--touch-target-min);
+  --switch-thumb: 2rem;
+  --switch-inset: calc((var(--switch-h) - var(--switch-thumb)) / 2);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  padding: 0 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  /* Dégradé tres subtil (pas un aplat) : creuse legerement la piste sans
+     introduire de teinte hors charte - memes tokens neutres que le reste
+     de la page, juste 2 arrets au lieu d'1. */
+  background: linear-gradient(180deg, var(--color-bg-subtle), var(--color-bg));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 8%);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.switch:hover {
+  border-color: var(--color-primary-emphasis);
+}
+
+.switch:active {
+  /* Retour tactile au clic (pas seulement la translation du disque, plus
+     lente) - un interrupteur physique s'attend a etre "presse". */
+  transform: scale(0.96);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
+/* Les icones restent au-dessus du disque (z-index) : le disque glisse
+   DESSOUS/AUTOUR de l'icone active plutot que de la recouvrir. Chacune
+   transitionne independamment vers --color-on-primary quand le disque
+   (fond --color-primary) passe dessous - voir les 2 regles [aria-checked]
+   plus bas - au lieu de rester au meme gris quelle que soit l'icone
+   active. */
+.switch-icon {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  transition: color 0.2s ease;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: var(--switch-inset);
+  left: var(--switch-inset);
+  width: var(--switch-thumb);
+  height: var(--switch-thumb);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  /* Profondeur (pas un disque plat pose a plat sur la piste) : double ombre
+     (contact rapproche + portee douce, valeurs discretes - la piste
+     elle-meme n'a que 44px de haut). */
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 20%),
+    0 2px 6px rgb(0 0 0 / 15%);
+  transition: transform 0.2s ease;
+}
+
+/* aria-checked (pas une classe dediee) : une seule source de verite pour
+   l'etat visuel ET l'etat annonce aux technologies d'assistance, voir
+   Switch.tsx. Distance de translation = largeur de piste - largeur du
+   disque - les deux insets (gauche+droite) autour de lui. */
+.switch[aria-checked='true'] .switch-thumb {
+  transform: translateX(
+    calc(var(--switch-w) - var(--switch-thumb) - 2 * var(--switch-inset))
+  );
+}
+
+.switch[aria-checked='false'] .switch-icon-off,
+.switch[aria-checked='true'] .switch-icon-on {
+  color: var(--color-on-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch-icon,
+  .switch-thumb {
+    transition: none;
+  }
+}
