@@ -36,6 +36,13 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
     const { method, url } = request;
+    // Chemin seul, sans la query string (audit securite OWASP #262, API8) :
+    // `url` (Express) inclut les parametres de requete - `GET /trips` et
+    // `GET /places` recoivent des coordonnees GPS precises et des termes de
+    // recherche en parametres, qui se retrouveraient sinon en clair dans les
+    // logs serveur sans chiffrement ni politique de retention, alors que ces
+    // memes donnees sont chiffrees en base (voir encrypted-column.transformer.ts).
+    const path = url.split('?')[0];
     // Horodatage de depart pour calculer la duree totale de traitement
     const start = Date.now();
 
@@ -44,7 +51,7 @@ export class LoggingInterceptor implements NestInterceptor {
         // A ce stade, la reponse a ete envoyee : response.statusCode est final
         const duration = Date.now() - start;
         this.logger.log(
-          `${method} ${url} ${response.statusCode} +${duration}ms`,
+          `${method} ${path} ${response.statusCode} +${duration}ms`,
         );
       }),
     );

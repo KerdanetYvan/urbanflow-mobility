@@ -13,6 +13,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
@@ -24,7 +25,17 @@ import { UsersService } from './users.service';
 /**
  * Endpoint REST /users - pluriel, conforme a la convention de nommage
  * des endpoints du projet (voir CLAUDE.md).
+ *
+ * ThrottlerGuard (audit securite OWASP #262, API2 - authentification
+ * cassee) : contrairement a /auth/login et /auth/forgot-password, POST
+ * /users renvoie un 409 explicite si l'email existe deja - necessaire pour
+ * qu'un usager puisse corriger une faute de frappe, mais ca permet aussi
+ * d'enumerer les emails inscrits par force brute sans cette limite. Limite
+ * volontairement plus large que celle d'AuthController (20 vs 10/min) :
+ * une inscription legitime n'a besoin que d'un ou deux essais.
  */
+@Throttle({ default: { limit: 20, ttl: 60_000 } })
+@UseGuards(ThrottlerGuard)
 @ApiTags('users')
 @Controller('users')
 export class UsersController {

@@ -1,6 +1,39 @@
 import { ApiError } from './api';
-import { deleteAccount } from './auth';
+import { deleteAccount, logout } from './auth';
 import { getAccessToken, saveTokens, clearTokens } from './authStorage';
+import { getCachedTrip, saveTripToCache } from './tripCache';
+import type { PlaceSuggestion } from './places';
+import type { TripSearchResult } from './trips';
+
+const ORIGIN: PlaceSuggestion = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
+const DESTINATION: PlaceSuggestion = { label: 'Hôtel de Ville', lat: 45.77, lon: 4.83 };
+const RESULT: TripSearchResult = {
+  itineraries: [
+    { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
+  ],
+};
+
+/**
+ * logout() (issue #65, durci par l'audit securite OWASP #262) : purge aussi
+ * le cache de trajets, pas seulement les jetons - voir tripCache.ts pour le
+ * risque (coordonnees GPS lisibles par un usager suivant sur un appareil
+ * partage).
+ */
+describe('logout', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('efface les jetons stockes et le cache de trajets', () => {
+    saveTokens({ accessToken: 'fake-access-token', refreshToken: 'fake-refresh' });
+    saveTripToCache(ORIGIN, DESTINATION, RESULT);
+
+    logout();
+
+    expect(getAccessToken()).toBeNull();
+    expect(getCachedTrip(ORIGIN, DESTINATION)).toBeNull();
+  });
+});
 
 /**
  * deleteAccount() (issue #164, DELETE /users/me) - meme motif que
@@ -12,6 +45,7 @@ import { getAccessToken, saveTokens, clearTokens } from './authStorage';
 describe('deleteAccount (DELETE /users/me, issue #164)', () => {
   afterEach(() => {
     clearTokens();
+    localStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -49,6 +83,23 @@ describe('deleteAccount (DELETE /users/me, issue #164)', () => {
     await deleteAccount('MotDePasse123!');
 
     expect(getAccessToken()).toBeNull();
+  });
+
+  it('efface aussi le cache de trajets apres une suppression reussie (audit securite OWASP #262)', async () => {
+    saveTokens({ accessToken: 'fake-access-token', refreshToken: 'fake-refresh' });
+    saveTripToCache(ORIGIN, DESTINATION, RESULT);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+        json: () => Promise.resolve(null),
+      }),
+    );
+
+    await deleteAccount('MotDePasse123!');
+
+    expect(getCachedTrip(ORIGIN, DESTINATION)).toBeNull();
   });
 
   it(
