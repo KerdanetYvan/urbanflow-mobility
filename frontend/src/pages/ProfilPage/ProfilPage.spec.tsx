@@ -333,6 +333,41 @@ describe('ProfilPage', () => {
     });
   });
 
+  describe('reglage de theme (issue #245)', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      document.documentElement.removeAttribute('data-theme');
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('affiche un interrupteur (pas 3 boutons radio) reflétant le theme courant', async () => {
+      renderPage();
+
+      const toggle = await screen.findByRole('switch');
+      // Stub matchMedia par defaut (test/setup.ts) : matches false -> clair.
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('un clic fixe un theme explicite et pose data-theme sur <html>', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const toggle = await screen.findByRole('switch');
+      await user.click(toggle);
+
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(localStorage.getItem('urbanflow.theme.v1')).toBe('dark');
+    });
+  });
+
   it("redirige vers la connexion si le chargement du profil renvoie 401 (session expiree)", async () => {
     vi.mocked(profileLib.getMyProfile).mockRejectedValue(
       new ApiError('Session expirée, veuillez vous reconnecter', 401),

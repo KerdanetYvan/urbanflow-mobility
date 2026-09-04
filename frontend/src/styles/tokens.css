@@ -117,8 +117,25 @@
   --touch-target-min: 2.75rem; /* 44px, cible tactile minimale */
 }
 
+/**
+ * Surcharges du theme sombre - dupliquees deux fois plutot qu'une regle
+ * unique, pour deux modes d'activation independants (issue #245) :
+ *
+ * 1. `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
+ *    - theme sombre du SYSTEME, sauf si l'utilisateur a explicitement force
+ *      le clair (data-theme="light") depuis le reglage du Profil.
+ * 2. `:root[data-theme="dark"]` - theme sombre force manuellement, MEME si
+ *    le systeme est en theme clair (une media query ne peut pas etre
+ *    combinee en "OR" avec un selecteur d'attribut en CSS standard sans
+ *    preprocesseur, d'ou la duplication plutot qu'une regle commune).
+ *
+ * `data-theme` est pose sur <html> par lib/theme.ts (`applyTheme`), lu au
+ * demarrage par `useThemePreference` (React) et, avant meme que React soit
+ * monte, par le script inline anti-FOUC de `index.html` - les trois
+ * endroits doivent rester coherents si ces valeurs changent.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --color-bg: #16171d;
     --color-bg-subtle: #1f2028;
     --color-text: #e5e4e7;
@@ -140,4 +157,21 @@
        --color-primary-emphasis plus haut). */
     --color-primary-emphasis: #f4c177;
   }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #16171d;
+  --color-bg-subtle: #1f2028;
+  --color-text: #e5e4e7;
+  --color-text-muted: #9ca3af;
+  --color-border: #2e303a;
+
+  --color-success-text: #7fd89a;
+  --color-warning-text: #f0a06a;
+  --color-error-text: #f2a0a0;
+  --color-info-text: #9dbcf5;
+
+  --color-primary: #e0993d;
+  --color-primary-dark: #c97f22;
+  --color-primary-emphasis: #f4c177;
 }

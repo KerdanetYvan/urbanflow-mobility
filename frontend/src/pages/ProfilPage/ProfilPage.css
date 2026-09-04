@@ -47,6 +47,120 @@
   margin-top: var(--space-2);
 }
 
+/* Switch de reglage de theme (issue #245, ThemeSetting dans ProfilPage.tsx)
+   - piste ovale contenant les 2 icones (soleil/lune) fixes a chaque
+   extremite, un disque ("thumb") qui glisse par-dessus l'icone active.
+   Hauteur alignee sur --touch-target-min (meme cible tactile minimale que
+   le reste de l'app, ex. .profil-checkbox) plutot qu'un switch plus petit
+   comme on en voit souvent - accessibilite avant convention visuelle.
+
+   Variables locales : la piste (--switch-w/--switch-h), le disque
+   (--switch-thumb) et son inset (--switch-inset, identique en haut et a
+   gauche pour un disque parfaitement centre verticalement - piege corrige
+   en session, le 0.25rem d'origine le decalait de 2px par rapport au
+   centre des icones). La distance de translation du disque (regle
+   [aria-checked='true'] plus bas) et sa position de repos en decoulent
+   toutes les deux, plutot que d'etre recalculees a la main si ces
+   dimensions changent un jour. */
+.profil-theme-switch {
+  --switch-w: 4.5rem;
+  --switch-h: var(--touch-target-min);
+  --switch-thumb: 2rem;
+  --switch-inset: calc((var(--switch-h) - var(--switch-thumb)) / 2);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  padding: 0 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  /* Dégradé tres subtil (pas un aplat) : creuse legerement la piste sans
+     introduire de teinte hors charte - memes tokens neutres que le reste
+     de la page, juste 2 arrets au lieu d'1. */
+  background: linear-gradient(180deg, var(--color-bg-subtle), var(--color-bg));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 8%);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.profil-theme-switch:hover {
+  border-color: var(--color-primary-emphasis);
+}
+
+.profil-theme-switch:active {
+  /* Retour tactile au clic (pas seulement la translation du disque, plus
+     lente) - meme registre que .btn qui n'a pas d'etat "active" dedie
+     aujourd'hui, introduit ici car un interrupteur physique s'attend a
+     etre "presse". */
+  transform: scale(0.96);
+}
+
+.profil-theme-switch:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
+/* Les icones restent au-dessus du disque (z-index) : le disque glisse
+   DESSOUS/AUTOUR de l'icone active plutot que de la recouvrir. Chacune
+   transitionne independamment vers --color-on-primary quand le disque
+   (fond --color-primary) passe dessous - voir les 2 regles
+   [aria-checked] plus bas - au lieu de rester au meme gris quelle que
+   soit l'icone active, defaut releve en session ("le switch n'est pas
+   ouf") : la couleur suivait la piste, jamais le disque. */
+.profil-theme-switch-icon {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  transition: color 0.2s ease;
+}
+
+.profil-theme-switch-thumb {
+  position: absolute;
+  top: var(--switch-inset);
+  left: var(--switch-inset);
+  width: var(--switch-thumb);
+  height: var(--switch-thumb);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  /* Profondeur (pas un disque plat pose a plat sur la piste) : double ombre
+     (contact rapproche + portee douce, meme principe que RecherchePageResults.css
+     mais des valeurs plus discretes - la piste elle-meme n'a que 44px de
+     haut, une ombre aussi marquee qu'un panneau plein ecran l'ecraserait). */
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 20%),
+    0 2px 6px rgb(0 0 0 / 15%);
+  transition: transform 0.2s ease;
+}
+
+/* aria-checked (pas une classe dediee) : une seule source de verite pour
+   l'etat visuel ET l'etat annonce aux technologies d'assistance, voir
+   ProfilPage.tsx. Distance de translation = largeur de piste - largeur du
+   disque - les deux insets (gauche+droite) autour de lui. */
+.profil-theme-switch[aria-checked='true'] .profil-theme-switch-thumb {
+  transform: translateX(
+    calc(var(--switch-w) - var(--switch-thumb) - 2 * var(--switch-inset))
+  );
+}
+
+.profil-theme-switch[aria-checked='false'] .profil-theme-switch-icon-light,
+.profil-theme-switch[aria-checked='true'] .profil-theme-switch-icon-dark {
+  color: var(--color-on-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profil-theme-switch,
+  .profil-theme-switch-icon,
+  .profil-theme-switch-thumb {
+    transition: none;
+  }
+}
+
 /* Domicile/travail (issue #113/#114) - bloc separe des 2 fieldsets
    cote-a-cote (.profil-fieldsets), voir ProfilPage.tsx pour le pourquoi. */
 .profil-addresses-hint {
