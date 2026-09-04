@@ -117,6 +117,21 @@ Object.defineProperty(window, 'ResizeObserver', {
   value: ResizeObserverStub,
 });
 
+/**
+ * jsdom n'implemente pas non plus `Element.prototype.scrollIntoView` (meme
+ * categorie de trou que matchMedia/ResizeObserver ci-dessus) -
+ * `TypeError: ... scrollIntoView is not a function` des qu'`AddressField`
+ * fait defiler l'option en surbrillance dans le champ de vue (issue #253,
+ * navigation clavier). Stub no-op : aucun test de ce projet ne verifie une
+ * position de scroll reelle (jsdom n'a de toute facon pas de moteur de
+ * rendu pour ca), seul l'absence de crash compte ici.
+ */
+Object.defineProperty(Element.prototype, 'scrollIntoView', {
+  writable: true,
+  configurable: true,
+  value: () => {},
+});
+
 // Demonte l'arbre React rendu apres chaque test. @testing-library/react
 // enregistre normalement ce cleanup automatiquement quand `globals: true`,
 // mais la detection est prise en defaut dans cet environnement (Vitest 4) :

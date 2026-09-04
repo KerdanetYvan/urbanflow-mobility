@@ -64,6 +64,15 @@
   background: var(--color-bg-subtle);
 }
 
+/* Surbrillance clavier (issue #253, flèches haut/bas) : même traitement
+   visuel que le survol/focus ci-dessus - le focus réel ne quitte jamais
+   l'input (voir aria-activedescendant, AddressField.tsx), donc aucun
+   :focus-visible natif ne s'applique ici, seul ce sélecteur sur
+   aria-selected donne un retour visuel a la navigation clavier. */
+.address-suggestions li[aria-selected='true'] button {
+  background: var(--color-bg-subtle);
+}
+
 /* Suggestion du géocodeur (issue #168) : icône (puce transport pour un
    arrêt, épingle pour une adresse) + libellé sur une ligne. */
 .address-suggestion {
