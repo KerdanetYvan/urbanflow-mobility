@@ -1,0 +1,14 @@
+# Allowlist gitleaks (job CI "Scan de secrets", .github/workflows/ci.yml,
+# audit securite OWASP #262) - faux positifs verifies manuellement (regle
+# generique par entropie "generic-api-key", sans comprehension du contexte).
+# Format : un fingerprint par ligne, tel qu'imprime par `gitleaks detect`.
+
+# match.p256dhKey = dto.keys.p256dh - assignation d'une propriete nommee
+# "*Key" par coincidence (cle de chiffrement Web Push cote NAVIGATEUR,
+# recue du client dans le corps de la requete, jamais un secret serveur).
+eedb0669329adfac48e225058e76fb931ae84d58:backend/src/push/push-subscription.service.ts:generic-api-key:36
+
+# TEST_KEY - cle de test du transformer de chiffrement, generee une fois
+# pour les tests unitaires (voir le commentaire juste au-dessus dans le
+# fichier), sans rapport avec une cle de production.
+a8f688445a2ca5f5e7c29a91fc51221ab33af6a6:backend/src/common/encryption/encrypted-column.transformer.spec.ts:generic-api-key:4
