@@ -242,6 +242,16 @@ function EmptyResults() {
 
 interface ItinerarySegmentsProps {
   itinerary: TripItinerary;
+  /**
+   * Libelles reellement recherches par l'utilisateur (issue #250) - servent
+   * UNIQUEMENT a nommer l'extremite du tout premier/dernier segment (voir
+   * plus bas), jamais les arrets de correspondance intermediaires (deja
+   * correctement nommes par OTP). Memes props que RecherchePageResults
+   * recoit deja de RecherchePage.tsx, simplement transmises un niveau plus
+   * bas.
+   */
+  origin: PlaceSuggestion;
+  destination: PlaceSuggestion;
 }
 
 /**
@@ -252,7 +262,7 @@ interface ItinerarySegmentsProps {
  * ci-dessous) affiche deja le trace du trajet selectionne, une deuxieme
  * carte ici serait redondante (decision prise en session le 2026-08-03).
  */
-function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
+function ItinerarySegments({ itinerary, origin, destination }: ItinerarySegmentsProps) {
   return (
     <>
       {itinerary.disrupted && (
@@ -284,35 +294,51 @@ function ItinerarySegments({ itinerary }: ItinerarySegmentsProps) {
         className="resultats-segments"
         aria-label="Détail du trajet sélectionné, segment par segment"
       >
-        {itinerary.segments.map((segment, index) => (
-          <li key={index} className="resultats-segment">
-            <span className="resultats-segment-icon" aria-hidden="true">
-              {isLineMode(segment.mode) ? (
-                <LineBadge
-                  mode={segment.mode}
-                  label={segment.routeName ?? getModeStyle(segment.mode).label}
-                  color={toHexColor(segment.routeColor)}
-                  textColor={toHexColor(segment.routeTextColor)}
-                />
-              ) : (
-                getTripModeIcon(segment.mode)
-              )}
-            </span>
-            <span className="resultats-segment-body">
-              <span className="resultats-segment-label">
-                {getModeStyle(segment.mode).label}
-                {segment.routeName ? ` ${segment.routeName}` : ''}
+        {itinerary.segments.map((segment, index) => {
+          // Issue #250 : OTP nomme "Origin"/"Destination" (en anglais) le
+          // point de depart/arrivee GLOBAL du trajet quand il ne correspond
+          // a aucun arret/POI connu (une adresse geocodee, pas un arret de
+          // transport) - jamais traduit, jamais remplace par le libelle
+          // recherche par l'utilisateur avant cette issue. Ne concerne QUE
+          // le premier "from" et le dernier "to" (l'origine/la destination
+          // globales du trajet) : les arrets de correspondance
+          // intermediaires sont deja correctement nommes par OTP (ce sont
+          // de vrais arrets), on ne les touche pas.
+          const isFirstSegment = index === 0;
+          const isLastSegment = index === itinerary.segments.length - 1;
+          const fromName = isFirstSegment ? origin.label : segment.from.name;
+          const toName = isLastSegment ? destination.label : segment.to.name;
+
+          return (
+            <li key={index} className="resultats-segment">
+              <span className="resultats-segment-icon" aria-hidden="true">
+                {isLineMode(segment.mode) ? (
+                  <LineBadge
+                    mode={segment.mode}
+                    label={segment.routeName ?? getModeStyle(segment.mode).label}
+                    color={toHexColor(segment.routeColor)}
+                    textColor={toHexColor(segment.routeTextColor)}
+                  />
+                ) : (
+                  getTripModeIcon(segment.mode)
+                )}
               </span>
-              <span className="resultats-segment-time">
-                {formatTime(segment.startTime)} – {formatTime(segment.endTime)}{' '}
-                ({formatDuration(segment.durationSeconds)})
+              <span className="resultats-segment-body">
+                <span className="resultats-segment-label">
+                  {getModeStyle(segment.mode).label}
+                  {segment.routeName ? ` ${segment.routeName}` : ''}
+                </span>
+                <span className="resultats-segment-time">
+                  {formatTime(segment.startTime)} – {formatTime(segment.endTime)}{' '}
+                  ({formatDuration(segment.durationSeconds)})
+                </span>
+                <span className="resultats-segment-stop">
+                  {fromName} → {toName}
+                </span>
               </span>
-              <span className="resultats-segment-stop">
-                {segment.from.name} → {segment.to.name}
-              </span>
-            </span>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
     </>
   );
@@ -522,7 +548,11 @@ function RecherchePageResults({
       <h2 className="resultats-detail-heading">
         Détail du trajet sélectionné
       </h2>
-      <ItinerarySegments itinerary={selectedItinerary} />
+      <ItinerarySegments
+        itinerary={selectedItinerary}
+        origin={origin}
+        destination={destination}
+      />
     </>
   );
 

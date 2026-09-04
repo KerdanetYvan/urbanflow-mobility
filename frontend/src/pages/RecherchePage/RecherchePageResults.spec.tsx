@@ -375,8 +375,12 @@ describe('RecherchePageResults', () => {
     // meme corps defilant).
     const detail = container.querySelector('.resultats-detail') as HTMLElement;
     expect(within(detail).getByText('Bus C1')).toBeInTheDocument();
+    // Le dernier segment affiche le libelle DESTINATION (issue #250), pas
+    // le "to.name" brut du fixture ("Gare Part-Dieu", laisse volontairement
+    // different de DESTINATION.label pour verifier justement ce
+    // remplacement) - voir le nouveau test dedie plus bas dans ce fichier.
     expect(
-      within(detail).getByText('Arrêt Bellecour → Gare Part-Dieu'),
+      within(detail).getByText(`Arrêt Bellecour → ${DESTINATION.label}`),
     ).toBeInTheDocument();
   });
 
@@ -395,6 +399,62 @@ describe('RecherchePageResults', () => {
     // change).
     expect(screen.queryByText('Bus C1')).not.toBeInTheDocument();
   });
+
+  it(
+    "remplace \"Origin\"/\"Destination\" (repli OTP en anglais pour un point " +
+      'sans arret/POI connu) par les libelles reellement recherches (issue #250)',
+    () => {
+      // Reproduit exactement ce qu'OTP renvoie pour un point qui n'est pas
+      // un arret nomme connu : le nom brut litteral "Origin"/"Destination",
+      // jamais traduit - voir backend/src/otp/otp-client.service.ts pour le
+      // client qui relaie cette reponse telle quelle.
+      const itineraryWithOtpPlaceholders: TripItinerary = {
+        startTime: '2026-08-02T08:00:00.000Z',
+        endTime: '2026-08-02T08:25:00.000Z',
+        durationSeconds: 1500,
+        transfers: 0,
+        segments: [
+          {
+            mode: 'WALK',
+            startTime: '2026-08-02T08:00:00.000Z',
+            endTime: '2026-08-02T08:25:00.000Z',
+            durationSeconds: 1500,
+            distanceMeters: 2000,
+            from: { name: 'Origin', lat: 45.75, lon: 4.85 },
+            to: { name: 'Destination', lat: 45.77, lon: 4.83 },
+            geometry: [
+              { lat: 45.75, lon: 4.85 },
+              { lat: 45.77, lon: 4.83 },
+            ],
+          },
+        ],
+      };
+      const { container } = renderResults([itineraryWithOtpPlaceholders]);
+
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      expect(
+        within(detail).getByText(`${ORIGIN.label} → ${DESTINATION.label}`),
+      ).toBeInTheDocument();
+      expect(within(detail).queryByText(/Origin/)).not.toBeInTheDocument();
+      expect(within(detail).queryByText(/Destination/)).not.toBeInTheDocument();
+    },
+  );
+
+  it(
+    'ne touche PAS aux arrets de correspondance intermediaires, deja ' +
+      'correctement nommes par OTP (issue #250)',
+    () => {
+      const { container } = renderResults([FAST_ITINERARY]);
+
+      const detail = container.querySelector('.resultats-detail') as HTMLElement;
+      // Segment intermediaire (ni le tout premier "from", ni le tout
+      // dernier "to") : "Arrêt Bellecour" reste tel quel, ne devient jamais
+      // ORIGIN.label/DESTINATION.label.
+      expect(
+        within(detail).getByText(`${ORIGIN.label} → Arrêt Bellecour`),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("rend l'etat vide a la suite du formulaire de recherche, plus de page separee (issue #190)", () => {
     const { container } = renderResults([]);
