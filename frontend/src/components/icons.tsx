@@ -88,6 +88,28 @@ export function MoonIcon() {
 }
 
 /**
+ * Moins/plus (issue #246, stepper de taille des reperes de carte dans
+ * ProfilPage.tsx) - meme trait qu'un signe mathematique simple plutot
+ * qu'un pictogramme de loupe +/- (evite toute ambiguite avec un zoom de
+ * carte, qui n'est pas ce que ce reglage fait).
+ */
+export function MinusIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function PlusIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/**
  * Icones par mode de transport (issue #36, voir
  * docs/specs/f2-ecrans-planification.md section 5) - une par mode affiche
  * sur les cartes-itineraire de l'ecran de resultats. Meme convention que le

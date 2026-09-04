@@ -48,10 +48,12 @@
 }
 
 /* Reglages d'affichage (issue #245/#246, DisplaySettings dans
-   ProfilPage.tsx) - une ligne par reglage (libelle + Switch partage, voir
-   components/Switch/), plusieurs lignes possibles dans le meme fieldset
-   "Affichage" (theme, taille des reperes de carte). */
-.profil-switch-row {
+   ProfilPage.tsx) - une ligne par reglage (libelle + controle), plusieurs
+   lignes possibles dans le meme fieldset "Affichage" (theme via Switch,
+   taille des reperes de carte via .profil-stepper ci-dessous - types de
+   controle differents a dessein, voir le commentaire de GlyphSizeSetting
+   dans ProfilPage.tsx). */
+.profil-setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -59,25 +61,72 @@
   min-height: var(--touch-target-min);
 }
 
-.profil-switch-row + .profil-switch-row {
+.profil-setting-row + .profil-setting-row {
   margin-top: var(--space-3);
 }
 
-.profil-switch-row-label {
+.profil-setting-row-label {
   font-size: var(--text-base);
 }
 
-/* Reglage de taille des reperes de carte (issue #246, GlyphSizeSetting) :
-   2 MapPinIcon a des tailles differentes plutot que 2 icones distinctes
-   (voir le commentaire de GlyphSizeSetting) - agrandies/reduites par
-   transform scale() plutot qu'en dupliquant/modifiant MapPinIcon (composant
-   partage avec AddressField, jamais touche ici). */
-.profil-glyph-switch-icon-small svg {
-  transform: scale(0.75);
+/* Stepper (issue #246, GlyphSizeSetting) : 2 boutons ronds encadrant le
+   libelle du niveau courant - meme registre visuel que .switch (piste
+   neutre, anneau de focus/hover en --color-primary-emphasis) sans en
+   reprendre le mecanisme de glissement, ce n'est pas un interrupteur a 2
+   positions mais un choix sur une echelle ordonnee (voir GLYPH_SIZE_LEVELS). */
+.profil-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.profil-glyph-switch-icon-large svg {
-  transform: scale(1.15);
+.profil-stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.profil-stepper-btn:hover:not(:disabled) {
+  border-color: var(--color-primary-emphasis);
+}
+
+.profil-stepper-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.profil-stepper-btn:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
+/* Bouton desactive en butee (voir GlyphSizeSetting) : opacite reduite
+   plutot que masque, pour que sa PLACE reste previsible (le bouton "+"
+   ne saute pas quand "-" disparait). */
+.profil-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.profil-stepper-value {
+  min-width: 4.5rem;
+  text-align: center;
+  font-size: var(--text-base);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profil-stepper-btn {
+    transition: none;
+  }
 }
 
 /* Domicile/travail (issue #113/#114) - bloc separe des 2 fieldsets

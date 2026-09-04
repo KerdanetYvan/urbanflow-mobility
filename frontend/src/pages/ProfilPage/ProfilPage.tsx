@@ -5,12 +5,13 @@ import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { LockIcon, MapPinIcon, MoonIcon, SunIcon } from '../../components/icons';
+import { LockIcon, MinusIcon, MoonIcon, PlusIcon, SunIcon } from '../../components/icons';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import Switch from '../../components/Switch/Switch';
 import { ApiError } from '../../lib/api';
 import { deleteAccount, logout } from '../../lib/auth';
 import { formatCoordinates } from '../../lib/format';
+import type { GlyphSizePreference } from '../../lib/glyphSize';
 import { useGlyphSizePreference } from '../../lib/useGlyphSizePreference';
 import type { PlaceSuggestion } from '../../lib/places';
 import { useAuth } from '../../lib/useAuth';
@@ -485,15 +486,13 @@ function DisplaySettings() {
  * n'a encore ete fait (suit le theme systeme, voir son commentaire) - au
  * premier clic ici, un choix explicite est enregistre, sans retour arriere
  * possible vers "systeme" depuis ce switch (assume, voir useThemeSwitch).
- * Le composant `Switch` lui-meme (role="switch"/aria-checked, piste+disque)
- * est partage avec GlyphSizeSetting ci-dessous - voir components/Switch/.
  */
 function ThemeSetting() {
   const [isDark, toggle] = useThemeSwitch();
 
   return (
-    <div className="profil-switch-row">
-      <span className="profil-switch-row-label">Thème</span>
+    <div className="profil-setting-row">
+      <span className="profil-setting-row-label">Thème</span>
       <Switch
         checked={isDark}
         onChange={toggle}
@@ -510,46 +509,82 @@ function ThemeSetting() {
 }
 
 /**
- * Reglage de taille des reperes de la carte (issue #246) - meme mecanique
- * de switch que ThemeSetting ci-dessus, mais binaire "normal"/"large"
- * plutot que "clair"/"sombre" (`GlyphSizePreference`, voir lib/glyphSize.ts)
- * : contrairement au theme, il n'y a pas de "systeme" a suivre ici, la
- * carte a deja son propre agrandissement de base selon la largeur d'ecran
- * (voir lib/useGlyphScale.ts, consomme par MapView.tsx) - ce switch dit
- * seulement si on veut ENCORE plus grand, par-dessus cette base. Deux
- * `MapPinIcon` a des tailles differentes (pas 2 icones distinctes comme
- * soleil/lune) : la meme forme que les reperes qu'on est en train
- * d'agrandir est plus parlante ici qu'une metaphore separee. */
+ * Niveaux du reglage de taille des reperes de carte (issue #246) - tableau
+ * plutot que le seul booleen `GlyphSizePreference` actuel ('normal'/'large')
+ * : meme motif que TRANSPORT_MODES/THEME_OPTIONS (avant sa bascule en
+ * switch pour #245), pour que GlyphSizeSetting reste ecrit une bonne fois
+ * pour toutes - un 3e palier futur (ex. "Tres grande") n'ajouterait qu'une
+ * entree ici, sans toucher au stepper lui-meme.
+ */
+const GLYPH_SIZE_LEVELS: { value: GlyphSizePreference; label: string }[] = [
+  { value: 'normal', label: 'Normale' },
+  { value: 'large', label: 'Grande' },
+];
+
+/**
+ * Reglage de taille des reperes de la carte (issue #246) - un stepper
+ * (boutons -/+ autour du niveau courant), pas un switch comme ThemeSetting
+ * ci-dessus : decision UX prise en session - contrairement a "clair/sombre"
+ * (une vraie bascule binaire, bien rendue par un interrupteur physique),
+ * "normale/grande" se lit plus naturellement comme un CHOIX sur une echelle
+ * ordonnee, et le stepper reste utilisable tel quel si un palier
+ * intermediaire est ajoute plus tard (voir GLYPH_SIZE_LEVELS) - un switch
+ * ne le permettrait pas sans redesign. `aria-live="polite"` sur le libelle
+ * du niveau : annonce le changement aux lecteurs d'ecran sans deplacer le
+ * focus (les 2 boutons restent sur place, contrairement a un <select> qui
+ * aurait avale le focus dans sa propre liste d'options). Boutons desactives
+ * en butee (`disabled`) plutot qu'un comportement cyclique (revenir a
+ * "Normale" apres "Grande") : plus previsible, et l'etat desactive est
+ * lui-meme un signal visuel qu'on est a une extremite.
+ */
 function GlyphSizeSetting() {
   const [preference, setPreference] = useGlyphSizePreference();
-  const isLarge = preference === 'large';
+  const index = GLYPH_SIZE_LEVELS.findIndex(
+    (level) => level.value === preference,
+  );
+  const canDecrement = index > 0;
+  const canIncrement = index < GLYPH_SIZE_LEVELS.length - 1;
 
-  function toggle() {
-    setPreference(isLarge ? 'normal' : 'large');
+  function decrement() {
+    if (canDecrement) setPreference(GLYPH_SIZE_LEVELS[index - 1].value);
+  }
+
+  function increment() {
+    if (canIncrement) setPreference(GLYPH_SIZE_LEVELS[index + 1].value);
   }
 
   return (
-    <div className="profil-switch-row">
-      <span className="profil-switch-row-label">Repères de la carte</span>
-      <Switch
-        checked={isLarge}
-        onChange={toggle}
-        ariaLabel={
-          isLarge
-            ? 'Repères de carte agrandis, revenir à la taille normale'
-            : 'Repères de carte en taille normale, les agrandir'
-        }
-        iconOff={
-          <span className="profil-glyph-switch-icon-small">
-            <MapPinIcon />
-          </span>
-        }
-        iconOn={
-          <span className="profil-glyph-switch-icon-large">
-            <MapPinIcon />
-          </span>
-        }
-      />
+    <div className="profil-setting-row">
+      <span className="profil-setting-row-label" id="glyph-size-label">
+        Repères de la carte
+      </span>
+      <div
+        className="profil-stepper"
+        role="group"
+        aria-labelledby="glyph-size-label"
+      >
+        <button
+          type="button"
+          className="profil-stepper-btn"
+          onClick={decrement}
+          disabled={!canDecrement}
+          aria-label="Réduire la taille des repères de la carte"
+        >
+          <MinusIcon />
+        </button>
+        <span className="profil-stepper-value" aria-live="polite">
+          {GLYPH_SIZE_LEVELS[index].label}
+        </span>
+        <button
+          type="button"
+          className="profil-stepper-btn"
+          onClick={increment}
+          disabled={!canIncrement}
+          aria-label="Agrandir les repères de la carte"
+        >
+          <PlusIcon />
+        </button>
+      </div>
     </div>
   );
 }

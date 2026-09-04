@@ -381,28 +381,56 @@ describe('ProfilPage', () => {
       });
     });
 
-    it("affiche un second interrupteur, distinct de celui du theme, sur 'normal' par defaut", async () => {
+    it("affiche un stepper (pas un switch) sur 'Normale' par defaut, bouton '-' desactive", async () => {
       renderPage();
 
-      const toggle = await screen.findByRole('switch', {
-        name: /Repères de carte/,
-      });
-      expect(toggle).toHaveAttribute('aria-checked', 'false');
-      // Les 2 switches (theme + taille) coexistent sans se marcher dessus.
-      expect(screen.getAllByRole('switch')).toHaveLength(2);
+      expect(await screen.findByText('Normale')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name: 'Réduire la taille des repères de la carte',
+        }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole('button', {
+          name: 'Agrandir les repères de la carte',
+        }),
+      ).toBeEnabled();
+      // Coexiste avec le switch de theme (issue #245) sans s'y confondre.
+      expect(screen.getAllByRole('switch')).toHaveLength(1);
     });
 
-    it('un clic enregistre la preference "large"', async () => {
+    it('un clic sur "+" enregistre la preference "large" et desactive "+" a son tour', async () => {
       const user = userEvent.setup();
       renderPage();
 
-      const toggle = await screen.findByRole('switch', {
-        name: /Repères de carte/,
-      });
-      await user.click(toggle);
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Agrandir les repères de la carte',
+        }),
+      );
 
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByText('Grande')).toBeInTheDocument();
       expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('large');
+      expect(
+        screen.getByRole('button', {
+          name: 'Agrandir les repères de la carte',
+        }),
+      ).toBeDisabled();
+    });
+
+    it('un clic sur "-" depuis "Grande" revient a "Normale"', async () => {
+      localStorage.setItem('urbanflow.glyphSize.v1', 'large');
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Réduire la taille des repères de la carte',
+        }),
+      );
+
+      expect(screen.getByText('Normale')).toBeInTheDocument();
+      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('normal');
     });
   });
 
