@@ -18,8 +18,8 @@ import {
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import type { JwtPayload } from '../../auth/jwt-payload.interface';
+import { FollowedTripDto } from './dto/followed-trip.dto';
 import { StartFollowingTripDto } from './dto/start-following-trip.dto';
-import { FollowedTrip } from './followed-trip.entity';
 import { FollowedTripService } from './followed-trip.service';
 
 /**
@@ -41,24 +41,28 @@ export class FollowedTripController {
   @ApiOperation({
     summary: "Demarre le suivi d'un itineraire (remplace un suivi existant)",
   })
-  @ApiResponse({ status: 201, type: FollowedTrip })
-  create(
+  @ApiResponse({ status: 201, type: FollowedTripDto })
+  async create(
     @CurrentUser() user: JwtPayload,
     @Body() dto: StartFollowingTripDto,
-  ): Promise<FollowedTrip> {
-    return this.followedTripService.startFollowing(user.sub, dto);
+  ): Promise<FollowedTripDto> {
+    const followedTrip = await this.followedTripService.startFollowing(
+      user.sub,
+      dto,
+    );
+    return FollowedTripDto.fromEntity(followedTrip);
   }
 
   @Get()
   @ApiOperation({ summary: 'Le trajet actuellement suivi, si applicable' })
-  @ApiResponse({ status: 200, type: FollowedTrip })
+  @ApiResponse({ status: 200, type: FollowedTripDto })
   @ApiResponse({ status: 404, description: 'Aucun trajet suivi actuellement' })
-  async findCurrent(@CurrentUser() user: JwtPayload): Promise<FollowedTrip> {
+  async findCurrent(@CurrentUser() user: JwtPayload): Promise<FollowedTripDto> {
     const followedTrip = await this.followedTripService.findCurrent(user.sub);
     if (!followedTrip) {
       throw new NotFoundException('Aucun trajet suivi actuellement');
     }
-    return followedTrip;
+    return FollowedTripDto.fromEntity(followedTrip);
   }
 
   @Delete()

@@ -19,8 +19,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { JwtPayload } from '../auth/jwt-payload.interface';
 import { CreateProfileDto } from './dto/create-profile.dto';
+import { MobilityProfileDto } from './dto/mobility-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { MobilityProfile } from './mobility-profile.entity';
 import { ProfilesService } from './profiles.service';
 
 /**
@@ -41,35 +41,44 @@ export class ProfilesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Cree le profil de mobilite (F1)' })
-  @ApiResponse({ status: 201, type: MobilityProfile })
+  @ApiResponse({ status: 201, type: MobilityProfileDto })
   @ApiResponse({
     status: 409,
     description: 'Un profil existe deja pour cet utilisateur',
   })
-  create(@CurrentUser() user: JwtPayload, @Body() dto: CreateProfileDto) {
-    return this.profilesService.create(user.sub, dto);
+  async create(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreateProfileDto,
+  ): Promise<MobilityProfileDto> {
+    const profile = await this.profilesService.create(user.sub, dto);
+    return MobilityProfileDto.fromEntity(profile);
   }
 
   @Get('me')
   @ApiOperation({ summary: 'Recupere mon profil de mobilite' })
-  @ApiResponse({ status: 200, type: MobilityProfile })
+  @ApiResponse({ status: 200, type: MobilityProfileDto })
   @ApiResponse({
     status: 404,
     description: 'Pas encore de profil pour cet utilisateur',
   })
-  findMine(@CurrentUser() user: JwtPayload) {
-    return this.profilesService.findByUserId(user.sub);
+  async findMine(@CurrentUser() user: JwtPayload): Promise<MobilityProfileDto> {
+    const profile = await this.profilesService.findByUserId(user.sub);
+    return MobilityProfileDto.fromEntity(profile);
   }
 
   @Patch('me')
   @ApiOperation({ summary: 'Met a jour mon profil de mobilite (partiel)' })
-  @ApiResponse({ status: 200, type: MobilityProfile })
+  @ApiResponse({ status: 200, type: MobilityProfileDto })
   @ApiResponse({
     status: 404,
     description: 'Pas encore de profil pour cet utilisateur',
   })
-  updateMine(@CurrentUser() user: JwtPayload, @Body() dto: UpdateProfileDto) {
-    return this.profilesService.update(user.sub, dto);
+  async updateMine(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<MobilityProfileDto> {
+    const profile = await this.profilesService.update(user.sub, dto);
+    return MobilityProfileDto.fromEntity(profile);
   }
 
   @Delete('me')

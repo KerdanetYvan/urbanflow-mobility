@@ -23,6 +23,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET') as string,
+      // Restreint explicitement l'algorithme accepte (audit securite OWASP
+      // #262, API8 - defense en profondeur) : sans ceci, la librairie
+      // deduit l'algorithme du token presente plutot que de l'imposer -
+      // non exploitable ici (un secret symetrique est toujours fourni,
+      // "alg: none" est deja rejete), mais explicite vaut mieux qu'implicite
+      // si la config venait a evoluer (ex. migration vers des cles
+      // asymetriques sans mettre a jour ce point).
+      algorithms: ['HS256'],
     });
   }
 
