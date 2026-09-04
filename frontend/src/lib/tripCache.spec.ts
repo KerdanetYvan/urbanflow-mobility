@@ -1,5 +1,5 @@
 import type { PlaceSuggestion } from './places';
-import { getCachedTrip, saveTripToCache } from './tripCache';
+import { clearTripCache, getCachedTrip, saveTripToCache } from './tripCache';
 import type { TripSearchResult } from './trips';
 
 const ORIGIN: PlaceSuggestion = { label: 'Gare Part-Dieu', lat: 45.76, lon: 4.86 };
@@ -110,5 +110,20 @@ describe('tripCache (issue #10, mode dégradé)', () => {
 
     expect(getCachedTrip(ORIGIN, DESTINATION)).toBeNull();
     expect(() => saveTripToCache(ORIGIN, DESTINATION, RESULT)).not.toThrow();
+  });
+
+  describe('clearTripCache (audit securite OWASP #262 - purge a la deconnexion)', () => {
+    it('efface un cache existant', () => {
+      saveTripToCache(ORIGIN, DESTINATION, RESULT);
+
+      clearTripCache();
+
+      expect(getCachedTrip(ORIGIN, DESTINATION)).toBeNull();
+      expect(localStorage.getItem('urbanflow.tripCache.v1')).toBeNull();
+    });
+
+    it("n'echoue pas quand le cache est deja vide", () => {
+      expect(() => clearTripCache()).not.toThrow();
+    });
   });
 });

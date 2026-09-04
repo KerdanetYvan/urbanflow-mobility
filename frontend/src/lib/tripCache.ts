@@ -123,3 +123,20 @@ export function getCachedTrip(
     ) ?? null
   );
 }
+
+/**
+ * Purge le cache (audit securite OWASP #262 - deconnexion/suppression de
+ * compte, voir auth.ts#logout et #deleteAccount). Ce cache reste utilisable
+ * sans compte par conception (issue #64), mais une deconnexion EXPLICITE
+ * est le signal le plus net qu'un autre usager va potentiellement utiliser
+ * le meme appareil ensuite - sans cette purge, les dernieres origines/
+ * destinations (coordonnees GPS, potentiellement domicile/travail)
+ * resteraient lisibles jusqu'a expiration naturelle (RETENTION_MS, 24h).
+ */
+export function clearTripCache(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage indisponible (navigation privee tres ancienne) : rien a purger.
+  }
+}

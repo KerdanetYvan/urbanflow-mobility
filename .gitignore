@@ -2,7 +2,10 @@ node_modules/
 dist/
 build/
 coverage/
-.env
+# Tous les fichiers .env reels (audit securite OWASP #262 - .env, .env.local,
+# .env.production...), sauf le gabarit versionne intentionnellement.
+.env*
+!.env.example
 *.log
 .DS_Store
 

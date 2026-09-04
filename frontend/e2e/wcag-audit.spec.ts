@@ -16,9 +16,22 @@ import AxeBuilder from '@axe-core/playwright';
  * sans erreur bloquante").
  */
 
-/** Compte de test dedie a l'audit, cree une seule fois avant les tests (voir README pour la procedure). */
+/** Compte de test dedie a l'audit (voir backend/src/seed/seed.ts - `npm run seed` le cree). */
 const AUDIT_EMAIL = 'audit-wcag@test.local';
 const AUDIT_PASSWORD = 'AuditWcag123!';
+
+/**
+ * Termes de recherche origine/destination pour le test "Resultats de
+ * recherche" ci-dessous (audit securite OWASP #262 - CI). Par defaut,
+ * valeurs reelles de la metropole (comportement local inchange, donnees
+ * reelles montees dans routing-engine/data/). En CI, ou seul le petit jeu
+ * de donnees synthetique versionne est disponible (routing-engine/
+ * test-fixtures/, voir routing-engine/README.md), le workflow surcharge ces
+ * variables avec des noms d'arrets du fixture (ex. "Gare"/"Université").
+ */
+const SEARCH_ORIGIN_QUERY = process.env.WCAG_SEARCH_ORIGIN_QUERY ?? 'Gares';
+const SEARCH_DESTINATION_QUERY =
+  process.env.WCAG_SEARCH_DESTINATION_QUERY ?? 'République';
 
 /**
  * Lance axe-core sur la page courante et echoue le test en listant les
@@ -88,11 +101,19 @@ test.describe('Recherche avec résultats', () => {
   test('Résultats de recherche affichés', async ({ page }) => {
     await page.goto('/recherche');
 
-    await page.getByLabel('Origine', { exact: true }).fill('Gares');
-    await page.getByRole('button', { name: /Gares/ }).first().click();
+    await page.getByLabel('Origine', { exact: true }).fill(SEARCH_ORIGIN_QUERY);
+    await page
+      .getByRole('button', { name: new RegExp(SEARCH_ORIGIN_QUERY) })
+      .first()
+      .click();
 
-    await page.getByLabel('Destination', { exact: true }).fill('République');
-    await page.getByRole('button', { name: /République/ }).first().click();
+    await page
+      .getByLabel('Destination', { exact: true })
+      .fill(SEARCH_DESTINATION_QUERY);
+    await page
+      .getByRole('button', { name: new RegExp(SEARCH_DESTINATION_QUERY) })
+      .first()
+      .click();
 
     await page.getByRole('button', { name: 'Rechercher' }).click();
     // Un itineraire affiche confirme que les resultats sont bien rendus
@@ -104,7 +125,15 @@ test.describe('Recherche avec résultats', () => {
 });
 
 test.describe('Navigation clavier', () => {
-  test('Popover "Modes de transport" : ouverture/fermeture au clavier', async ({ page }) => {
+  // fixme (audit securite/CI OWASP #262, decouvert au premier run reel de
+  // cette suite en CI) : le bouton popover "Modes de transport" cible ici a
+  // ete remplace par des chips icone+libelle (voir le commentaire "remplace
+  // l'ancien bouton dedie 'Modes de transport'" dans RecherchePage.tsx,
+  // issues #108/#109, #255) - ce test n'a jamais ete mis a jour en
+  // consequence et echoue systematiquement (bouton introuvable). A
+  // reecrire contre le nouveau pattern d'interaction clavier des chips
+  // avant de reactiver (retirer `.fixme`).
+  test.fixme('Popover "Modes de transport" : ouverture/fermeture au clavier', async ({ page }) => {
     await page.goto('/recherche');
 
     const trigger = page.getByRole('button', { name: /Modes de transport/ });

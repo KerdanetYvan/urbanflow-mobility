@@ -1,5 +1,6 @@
 import { apiPost, authDelete } from './api';
 import { clearTokens, saveTokens, type TokenPair } from './authStorage';
+import { clearTripCache } from './tripCache';
 
 interface RegisteredUser {
   id: string;
@@ -22,9 +23,14 @@ export async function login(email: string, password: string): Promise<void> {
  * Deconnecte l'utilisateur (issue #65). Purement local : le backend n'a pas
  * de mecanisme de revocation de jetons (JWT sans etat, voir auth.service.ts)
  * - se deconnecter, c'est juste oublier les jetons stockes cote client.
+ *
+ * Purge aussi le cache de trajets (audit securite OWASP #262) : une
+ * deconnexion explicite est le signal le plus net qu'un autre usager peut
+ * reutiliser le meme appareil - voir tripCache.ts#clearTripCache.
  */
 export function logout(): void {
   clearTokens();
+  clearTripCache();
 }
 
 /**
@@ -62,10 +68,12 @@ export function resetPassword(
  * pas seulement une boite de dialogue cote client - voir ProfilPage.tsx).
  * Leve une ApiError (401) si le mot de passe est incorrect.
  *
- * Nettoie les jetons locaux apres coup, comme logout() : le compte n'existe
- * plus, il n'y a plus rien a rafraichir/reutiliser.
+ * Nettoie les jetons locaux et le cache de trajets apres coup, comme
+ * logout() : le compte n'existe plus, il n'y a plus rien a rafraichir/
+ * reutiliser (audit securite OWASP #262).
  */
 export async function deleteAccount(password: string): Promise<void> {
   await authDelete<void>('/users/me', { password });
   clearTokens();
+  clearTripCache();
 }

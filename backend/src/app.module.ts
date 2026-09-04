@@ -44,13 +44,16 @@ import { UsersModule } from './users/users.module';
     // la purge quotidienne automatique de l'historique perime (RGPD, voir
     // docs/specs/rgpd-geolocalisation.md section 3.1).
     ScheduleModule.forRoot(),
-    // Limitation de debit (issue #21, audit OWASP - A04 Conception non
-    // securisee) : configuration disponible pour toute l'app, mais le garde
-    // ThrottlerGuard n'est applique qu'aux endpoints sensibles
-    // (AuthController) plutot qu'en garde global - inutile de limiter le
-    // debit d'une recherche d'itineraire publique (GET /trips) de la meme
-    // facon qu'une tentative de connexion, qui est la seule cible reelle
-    // d'une attaque par force brute sur cette API.
+    // Limitation de debit (issue #21, durci par l'audit securite OWASP #262
+    // - API4 Consommation de ressources non restreinte) : ce reglage
+    // "default" (10 req/min/IP) est le plancher applique partout ou
+    // ThrottlerGuard est pose sans le surcharger - c'est le cas
+    // d'AuthController (seule cible reelle d'une attaque par force brute
+    // sur cette API). Les controleurs plus permissifs mais quand meme
+    // sensibles a l'abus automatise (TripsController, PlacesController,
+    // UsersController) surchargent cette limite via le decorateur
+    // `@Throttle({ default: { limit, ttl } })` plutot que de definir un
+    // second palier ici - une seule configuration globale a maintenir.
     ThrottlerModule.forRoot({
       throttlers: [
         {

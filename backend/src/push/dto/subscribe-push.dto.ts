@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsString, IsUrl, ValidateNested } from 'class-validator';
+import { IsNotEmpty, IsString, ValidateNested } from 'class-validator';
+import { IsPushEndpoint } from '../../common/validators/push-endpoint.validator';
 
 /**
  * Cles de chiffrement d'un abonnement Web Push (issue #18) - forme exacte de
@@ -32,7 +33,10 @@ export class SubscribePushDto {
     description: 'URL du service de push du navigateur',
     example: 'https://fcm.googleapis.com/fcm/send/abc123',
   })
-  @IsUrl({ require_tld: false })
+  // Restreint aux hebergeurs de push connus (audit securite OWASP #262,
+  // API7 - SSRF) plutot qu'a n'importe quelle URL bien formee : voir
+  // push-endpoint.validator.ts pour le detail du risque.
+  @IsPushEndpoint()
   endpoint: string;
 
   @ApiProperty({ type: PushSubscriptionKeysDto })

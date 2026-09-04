@@ -5,6 +5,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -22,7 +23,19 @@ import { TripsService } from './trips.service';
  * `search` (issue #16) peuple `user` si un token valide est fourni, sans
  * jamais renvoyer 401 - permet de personnaliser le classement des
  * itineraires selon le profil de mobilite sans exiger d'etre connecte.
+ *
+ * ThrottlerGuard (audit securite OWASP #262, API4 - consommation de
+ * ressources non restreinte) : `search` declenche jusqu'a 3 appels
+ * OpenTripPlanner (recherche normale + repli "prochain creneau" + repli a
+ * pied, voir TripsService) par requete entrante - sans limite, un flood
+ * anonyme sature le moteur de calcul d'itineraires pour tout le monde.
+ * Limite plus large que celle d'AuthController (10/min, ciblee force
+ * brute) : ici il s'agit d'eviter l'abus automatise tout en restant
+ * confortable pour un usage legitime (plusieurs recherches successives en
+ * ajustant origine/destination).
  */
+@Throttle({ default: { limit: 30, ttl: 60_000 } })
+@UseGuards(ThrottlerGuard)
 @ApiTags('trips')
 @Controller('trips')
 export class TripsController {

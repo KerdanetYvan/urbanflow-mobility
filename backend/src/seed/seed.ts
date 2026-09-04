@@ -68,6 +68,19 @@ const SEED_USERS: SeedUser[] = [
     password: 'SansProfil123!',
     profile: null,
   },
+  {
+    // Compte dedie a la suite Playwright d'audit WCAG (issue #20,
+    // frontend/e2e/wcag-audit.spec.ts) - jusqu'ici cree a la main en local
+    // avant de lancer les tests (procedure non versionnee), ce qui bloquait
+    // toute automatisation en CI (audit securite OWASP #262). Identifiants
+    // repris tels quels du fichier de test (AUDIT_EMAIL/AUDIT_PASSWORD).
+    email: 'audit-wcag@test.local',
+    password: 'AuditWcag123!',
+    profile: {
+      preferredTransportModes: [TransportMode.WALKING, TransportMode.BUS],
+      accessibilityPreferences: [],
+    },
+  },
 ];
 
 /**

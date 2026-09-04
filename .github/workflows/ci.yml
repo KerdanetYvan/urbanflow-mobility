@@ -39,6 +39,25 @@ jobs:
         working-directory: frontend
         run: npm test --if-present
 
+      # Couverture de test (audit securite/qualite #262) : rapport publie en
+      # artefact, sans seuil bloquant - la base actuelle (~68-75% cote
+      # backend, mesuree en session) n'a jamais ete suivie dans le temps,
+      # un seuil errone bloquerait la CI plutot que d'aider. Continue-on-error
+      # : ce step est informatif, ne doit jamais faire echouer le job.
+      - name: Couverture de tests
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        continue-on-error: true
+        run: npm run test:cov --if-present
+
+      - name: Publier le rapport de couverture
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 14
+
       # Le vrai build (tsc + vite build) - distinct des tests (Vitest, sa
       # propre transformation TS, plus tolerante) : sans cette etape, une
       # erreur de compilation peut passer la CI tout en cassant le build
@@ -84,6 +103,22 @@ jobs:
         working-directory: backend
         run: npm test --if-present
 
+      # Meme raisonnement que cote frontend ci-dessus : rapport publie, pas
+      # de seuil bloquant tant qu'aucune baseline n'a ete suivie dans le temps.
+      - name: Couverture de tests
+        if: steps.check.outputs.exists == 'true'
+        working-directory: backend
+        continue-on-error: true
+        run: npm run test:cov --if-present
+
+      - name: Publier le rapport de couverture
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          retention-days: 14
+
       # Le vrai build (nest build / tsc -b) - distinct des tests (Jest via
       # ts-jest, sa propre transformation TS, plus tolerante) : sans cette
       # etape, une erreur de compilation peut passer la CI tout en cassant
@@ -99,10 +134,168 @@ jobs:
         if: steps.check.outputs.exists != 'true'
         run: echo "backend/package.json absent — étape ignorée en attendant l'initialisation du projet."
 
+  # Scan de secrets codes en dur (audit securite OWASP #262 - controle
+  # preventif absent jusqu'ici). Job independant des deux precedents (pas de
+  # dependance a package.json), scanne l'historique git complet
+  # (fetch-depth: 0) plutot que le seul etat courant - un secret retire
+  # depuis reste visible dans un commit anterieur.
+  secrets-scan:
+    name: Scan de secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Installer gitleaks
+        run: |
+          curl -sSL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Scanner le dépôt
+        run: gitleaks detect --source . --redact --verbose
+
+  # Audit d'accessibilite WCAG 2.1 AA en conditions reelles (audit securite
+  # OWASP #262 - le test existait deja, frontend/e2e/wcag-audit.spec.ts, mais
+  # n'etait jamais lance qu'a la main). Monte la MEME stack Docker que le dev
+  # local (docker-compose.yml), avec le petit jeu de donnees OTP synthetique
+  # et versionne (routing-engine/test-fixtures/) plutot que les vraies
+  # donnees de la metropole - volontairement SANS le service nominatim
+  # (aucune fixture legere possible pour lui : import ~6 min + telechargement
+  # reseau a chaque run, voir routing-engine/README.md). GET /places degrade
+  # simplement sur les seuls arrets OTP dans ce cas (PlacesService,
+  # Promise.allSettled deja tolerant a cet echec) - n'affecte pas les
+  # verifications d'accessibilite (axe-core), qui portent sur le DOM rendu,
+  # pas sur la source des donnees affichees.
+  e2e-wcag:
+    name: E2E — Audit WCAG (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check for backend/frontend package.json
+        id: check
+        run: echo "exists=$(test -f backend/package.json && test -f frontend/package.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Préparer le .env (clé de chiffrement générée à la volée, éphémère)
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          cp .env.example .env
+          sed -i "s#^GEOLOCATION_ENCRYPTION_KEY=.*#GEOLOCATION_ENCRYPTION_KEY=$(openssl rand -base64 32)#" .env
+
+      - name: Copier le jeu de données de test OTP (fixture léger versionné)
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          cp routing-engine/test-fixtures/gtfs-test.zip routing-engine/data/
+          cp routing-engine/test-fixtures/osm-extract.osm.pbf routing-engine/data/
+
+      - name: Démarrer postgres, otp, mailhog
+        if: steps.check.outputs.exists == 'true'
+        run: docker compose up -d postgres otp mailhog
+
+      # --no-deps : n'entraine pas le demarrage de nominatim (dependance du
+      # service backend dans docker-compose.yml), jamais lance ci-dessus.
+      - name: Démarrer le backend (sans nominatim)
+        if: steps.check.outputs.exists == 'true'
+        run: docker compose up -d --no-deps backend
+
+      - name: Attendre que le backend réponde
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/ > /dev/null && exit 0
+            sleep 2
+          done
+          echo "::error::Backend indisponible après 2 minutes"
+          docker compose logs backend postgres otp
+          exit 1
+
+      - name: Peupler les comptes de test (dont le compte d'audit WCAG)
+        if: steps.check.outputs.exists == 'true'
+        run: docker compose exec -T backend npm run seed
+
+      # Frontend lance directement sur le runner (npm run dev), PAS via
+      # docker-compose.yml (service "frontend") : ce service declare un
+      # volume anonyme sur node_modules (`- /app/node_modules`, isolation
+      # dev classique cote conteneur) qui cree ce dossier sur l'HOTE avec
+      # les droits root des sa premiere creation - le `npm ci` du runner
+      # (utilisateur non-root) echoue ensuite dessus (EACCES, constate lors
+      # du premier run de ce job). Le frontend n'a besoin que d'un serveur
+      # Vite qui repond sur :5173, rien de plus, donc pas besoin de Docker
+      # ici - contrairement au backend/postgres/otp, qui restent en conteneur.
+      - uses: actions/setup-node@v7
+        if: steps.check.outputs.exists == 'true'
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer les dépendances frontend et Playwright (Chromium)
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Démarrer le frontend (serveur Vite, pas de conteneur)
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: nohup npm run dev > /tmp/vite-dev.log 2>&1 & disown
+
+      - name: Attendre que le frontend réponde
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:5173/ > /dev/null && exit 0
+            sleep 2
+          done
+          echo "::error::Frontend indisponible après 2 minutes"
+          cat /tmp/vite-dev.log
+          exit 1
+
+      - name: Lancer la suite d'audit WCAG
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        env:
+          # Noms des arrets du fixture OTP (routing-engine/test-fixtures/),
+          # pas les vrais lieux de la metropole - voir wcag-audit.spec.ts.
+          # "Universite" SANS accent (verifie sur le premier run reel de ce
+          # job, PR #263) : le geocodeur OTP (SandboxAPIGeocoder) renvoie ce
+          # nom de suggestion sans diacritique pour ce fixture, meme si la
+          # recherche elle-meme (prefixe) tolere l'accent en entree.
+          WCAG_SEARCH_ORIGIN_QUERY: Gare
+          WCAG_SEARCH_DESTINATION_QUERY: Universite
+        run: npm run test:e2e
+
+      - name: Logs des services (diagnostic en cas d'échec)
+        if: failure() && steps.check.outputs.exists == 'true'
+        run: |
+          docker compose logs --tail=300
+          echo "--- Vite (frontend, hors Docker) ---"
+          cat /tmp/vite-dev.log 2>/dev/null || echo "(pas de log - le serveur n'a peut-etre jamais demarre)"
+
+      - name: Publier le rapport Playwright
+        if: failure() && steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/test-results/
+          retention-days: 7
+
+      - name: Skip (no package.json yet)
+        if: steps.check.outputs.exists != 'true'
+        run: echo "backend/frontend package.json absent — étape ignorée."
+
   deploy:
     name: Déploiement production
     runs-on: ubuntu-latest
-    needs: [frontend, backend]
+    # e2e-wcag volontairement absent de needs : premier job du genre en CI,
+    # pas encore assez de runs pour avoir confiance qu'il ne bloquera jamais
+    # un deploiement legitime a tort (voir son commentaire). Reste visible
+    # comme check de PR, pourra devenir bloquant une fois eprouve.
+    needs: [frontend, backend, secrets-scan]
     # Seulement sur un push reel sur main (pas sur les PR) : merger sur main
     # redeploie automatiquement, ouvrir/mettre a jour une PR ne deploie rien.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

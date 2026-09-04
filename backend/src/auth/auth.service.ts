@@ -83,7 +83,12 @@ export class AuthService {
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(
         refreshToken,
-        { secret: this.configService.get<string>('JWT_REFRESH_SECRET') },
+        {
+          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          // Meme restriction explicite que JwtStrategy (audit securite
+          // OWASP #262, API8) - defense en profondeur.
+          algorithms: ['HS256'],
+        },
       );
 
       // On s'assure que l'utilisateur existe toujours (pas supprime depuis

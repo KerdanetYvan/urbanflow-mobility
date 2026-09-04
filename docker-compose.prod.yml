@@ -25,6 +25,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Audit securite/fiabilite OWASP #262 : pg_isready est deja fourni par
+    # l'image officielle postgis/postgis (verifie), le backend peut donc
+    # attendre une base reellement prete (condition: service_healthy
+    # ci-dessous) plutot que juste "conteneur demarre".
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Relai SMTP sortant auto-heberge (issue #70) : pas de SaaS externe
   # (Resend/SendGrid...) pour ne pas dependre d'un quota d'envoi tiers, voir
@@ -49,6 +58,14 @@ services:
       DKIM_AUTOGENERATE: 1
     volumes:
       - dkim_keys:/etc/opendkim/keys
+    # Simple sonde TCP sur le port SMTP (nc confirme present dans l'image) -
+    # ne verifie pas que le relai fonctionne reellement (SPF/DKIM/rDNS,
+    # etapes manuelles documentees plus haut), juste que le service ecoute.
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 25"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     # Pas de port publie : seul le reseau docker interne (le service
     # "backend" ci-dessous) doit pouvoir l'atteindre, sur le port SMTP
     # standard du conteneur (25).
@@ -68,6 +85,17 @@ services:
       - ./routing-engine/data:/var/opentripplanner
       - ./routing-engine/otp-config.json:/var/opentripplanner/otp-config.json:ro
     command: ["--build", "--serve"]
+    # curl confirme present dans cette image (Ubuntu). start_period genereux
+    # (5 min) : le premier demarrage compile le graphe complet de la
+    # metropole avant de servir quoi que ce soit (~36s mesures en session sur
+    # le jeu de donnees reel, voir routing-engine/README.md - marge large
+    # pour un VPS moins puissant que le poste de developpement).
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/otp/routers/default"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5m
 
   # Geocodage d'adresses (issue #167/#168). Comme otp : jamais expose, seul le
   # reseau docker interne y accede (le backend l'appelle via NOMINATIM_URL).
@@ -86,6 +114,17 @@ services:
     volumes:
       - nominatim_data:/var/lib/postgresql/16/main
     shm_size: 1gb
+    # curl confirme present dans cette image. start_period tres genereux
+    # (35 min) : le tout premier demarrage importe l'extrait OSM avant de
+    # repondre quoi que ce soit (~6 min observes en session pour
+    # l'Ille-et-Vilaine, marge large pour un VPS - voir routing-engine/README.md).
+    # /status est l'endpoint documente pour verifier que l'import est termine.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 35m
 
   backend:
     build:
@@ -93,11 +132,22 @@ services:
       dockerfile: ../docker/backend.prod.Dockerfile
     restart: always
     env_file: .env
+    # condition: service_healthy (audit securite/fiabilite OWASP #262) :
+    # attend une base/OTP/Nominatim reellement prets, pas juste demarres -
+    # evite des cycles de retry TypeORM inutiles au demarrage (deja tolere
+    # avant ce changement, mais plus lent). otp/nominatim peuvent chacun
+    # prendre plusieurs minutes a devenir "healthy" au tout premier
+    # demarrage (voir leurs healthcheck ci-dessus) - le backend attendra
+    # en consequence avant de demarrer, ce qui est le comportement voulu.
     depends_on:
-      - postgres
-      - postfix
-      - otp
-      - nominatim
+      postgres:
+        condition: service_healthy
+      postfix:
+        condition: service_healthy
+      otp:
+        condition: service_healthy
+      nominatim:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -106,6 +156,14 @@ services:
       # dans le systeme de fichiers ephemere du conteneur backend, jamais vu
       # par otp - meme motif que le montage `./routing-engine` du backend en
       # dev (docker-compose.yml), limite ici au seul sous-dossier necessaire.
+      #
+      # ATTENTION (audit securite OWASP #262) : le conteneur backend tourne
+      # desormais en utilisateur non-root "node" (uid/gid 1000, voir
+      # docker/backend.prod.Dockerfile) - si `npm run import:gtfs` est lance
+      # a la main sur ce service et echoue en permission refusee sur ce
+      # dossier bind-monte, ajuster le proprietaire cote VPS
+      # (`sudo chown -R 1000:1000 routing-engine/data`) plutot que de
+      # revenir a un conteneur root.
       - ./routing-engine/data:/app/routing-engine/data
 
 volumes:
