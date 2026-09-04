@@ -83,8 +83,8 @@ Vérifié en session : `osm-metropole.osm.pbf` de 38 Mo (~3,2 M nœuds), graphe 
 
 ### Rafraîchissement futur des données
 
-- **GTFS** : réexécuter `docker compose -f docker-compose.prod.yml exec backend npm run import:gtfs` sur le VPS (idempotent, voir `backend/README.md`) puis relancer `otp` avec `--build` pour recharger le graphe.
-- **OSM** : à refaire seulement si le réseau routier évolue significativement ou si la bbox de la métropole change — répéter l'extraction Geofabrik+osmium ci-dessus et retransférer le fichier par `scp` avant de relancer `otp --build`.
+- **GTFS** : **automatisé** depuis le 2026-09-04 (`.github/workflows/gtfs-refresh.yml`, cron chaque lundi 03:00 UTC + déclenchement manuel possible depuis l'onglet Actions). Le calendrier de service du flux STAR réel ne couvre qu'une fenêtre glissante de quelques semaines (~3 semaines observées) : sans ce rafraîchissement régulier, OTP finit par n'avoir plus aucun service actif à la date du jour et ne renvoie plus que des trajets à pied — bug constaté en session le 2026-09-04, cause : dernière donnée du 11 août jamais rafraîchie manuellement depuis. Le workflow réexécute `dist/gtfs/import-gtfs.js` (pas `npm run import:gtfs` : ce script npm invoque `ts-node`, absent de l'image de production) puis `docker compose -f docker-compose.prod.yml restart otp` — `up -d` seul ne relance **pas** un service dont la configuration/image n'a pas changé, constaté dans le même incident. Réexécution manuelle ponctuelle toujours possible sur le VPS avec ces deux commandes si besoin d'attendre le prochain lundi.
+- **OSM** : à refaire seulement si le réseau routier évolue significativement ou si la bbox de la métropole change — répéter l'extraction Geofabrik+osmium ci-dessus et retransférer le fichier par `scp` avant de relancer `otp --build`. Pas automatisé (pas de source téléchargeable directement par le backend comme pour le GTFS, voir plus haut).
 
 ## Jeu de données de test (développement local)
 

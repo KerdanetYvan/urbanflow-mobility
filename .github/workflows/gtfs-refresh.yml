@@ -1,0 +1,57 @@
+name: Rafraîchissement GTFS (production)
+
+# Le graphe OTP en production est construit a partir d'un export GTFS statique
+# (routing-engine/data/gtfs-metropole.zip, voir routing-engine/README.md) dont
+# le calendrier de service ne couvre qu'une fenetre glissante de quelques
+# semaines (~3 semaines observees pour le flux STAR reel). Sans rafraichissement
+# regulier, OTP finit par n'avoir plus aucun service actif a la date du jour et
+# ne renvoie plus que des trajets a pied (bug constate le 2026-09-04, cause :
+# derniere donnee du 11 aout jamais rafraichie). Ce workflow reimporte le flux
+# et relance OTP independamment du rythme des deploiements (qui peuvent rester
+# des semaines sans toucher a main).
+on:
+  schedule:
+    # Chaque lundi 03:00 UTC (faible trafic) - marge large sous la fenetre de
+    # service observee (~3 semaines) pour tolerer un echec ponctuel (ex. flux
+    # source indisponible) sans laisser la prod sans transport en commun.
+    - cron: '0 3 * * 1'
+  # Declenchement manuel (ex. juste apres avoir constate le probleme en
+  # session, comme le 2026-09-04, plutot que d'attendre le prochain lundi).
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    name: Réimport GTFS + reconstruction du graphe OTP
+    runs-on: ubuntu-latest
+    # Meme groupe que le deploiement (voir ci.yml) : les deux executent des
+    # commandes docker compose sur le meme VPS, un chevauchement pourrait
+    # entrer en collision comme le bug deja rencontre avec des deploiements
+    # Dependabot simultanes.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Configurer l'accès SSH au serveur
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Réimporter le GTFS et reconstruire OTP
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" '
+            set -e
+            cd /home/ubuntu/app
+            # dist/gtfs/import-gtfs.js plutot que "npm run import:gtfs" : ce
+            # script npm invoque ts-node, absent de image de prod (voir
+            # docker/backend.prod.Dockerfile, npm ci --omit=dev) - le
+            # javascript deja compile suffit, sans alias de chemin a resoudre
+            # (pas de "paths" dans tsconfig.json).
+            docker compose -f docker-compose.prod.yml exec -T backend node dist/gtfs/import-gtfs.js
+            # up -d ne relance PAS un service dont la configuration/image n a
+            # pas change (constate en session le 2026-09-04) - restart force
+            # bien la reexecution de l entrypoint OTP ("--build --serve") qui
+            # relit le zip fraichement ecrit sur le volume monte.
+            docker compose -f docker-compose.prod.yml restart otp
+          '
