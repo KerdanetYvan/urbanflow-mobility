@@ -487,8 +487,16 @@ function ThemeSetting() {
         className="profil-theme-switch"
         onClick={toggle}
       >
-        <SunIcon />
-        <MoonIcon />
+        {/* Icones enveloppees individuellement (pas 2 <svg> nus) : donne un
+            crochet CSS par icone pour la mettre en valeur (--color-on-primary)
+            quand le disque la recouvre, sans dupliquer SunIcon/MoonIcon selon
+            l'etat - voir .profil-theme-switch-icon dans ProfilPage.css. */}
+        <span className="profil-theme-switch-icon profil-theme-switch-icon-light" aria-hidden="true">
+          <SunIcon />
+        </span>
+        <span className="profil-theme-switch-icon profil-theme-switch-icon-dark" aria-hidden="true">
+          <MoonIcon />
+        </span>
         <span className="profil-theme-switch-thumb" aria-hidden="true" />
       </button>
     </fieldset>
