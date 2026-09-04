@@ -60,6 +60,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="UrbanFlow" />
+    <!--
+      Equivalent standard (non prefixe) de apple-mobile-web-app-capable
+      ci-dessus : Chrome/Edge le considerent depuis peu comme deprecie sans
+      lui, meme si Safari iOS continue de n'exiger que le prefixe Apple.
+      Les deux ensemble couvrent les deux familles de navigateurs sans
+      dupliquer de comportement contradictoire (meme valeur "yes").
+    -->
+    <meta name="mobile-web-app-capable" content="yes" />
   </head>
   <body>
     <div id="root"></div>
