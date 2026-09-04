@@ -56,14 +56,19 @@
   flex-shrink: 0;
 }
 
-/* Marqueur "ma position" (issue #9) - point plein + anneau pulsant, pour se
-   distinguer du marqueur "origine" (un disque statique de meme taille).
-   var(--color-primary-emphasis) (issue #158, meme raisonnement que
-   ORIGIN_ICON dans MapView.tsx) : ces classes sont referencees par leur nom
-   depuis la chaine HTML brute de USER_POSITION_ICON, mais restent definies
-   dans cette feuille de style normale - la variable s'applique donc comme
-   n'importe quelle autre regle CSS de ce fichier, theme clair/sombre
-   compris. */
+/* Marqueur "ma position" (issue #9) - point plein + anneau pulsant. Ces
+   classes sont referencees par leur nom depuis la chaine HTML brute de
+   USER_POSITION_ICON, mais restent definies dans cette feuille de style
+   normale - la variable s'applique donc comme n'importe quelle autre regle
+   CSS de ce fichier, theme clair/sombre compris. Encore en
+   var(--color-primary-emphasis) (issue #158) alors qu'ORIGIN_ICON
+   (MapView.tsx) en est sorti avec #244 (illisible sur les tuiles OSM,
+   toujours claires, une fois le theme sombre applique) : meme risque de
+   contraste probable ici, non traite par #244 qui ne portait que sur le
+   marqueur "depart" signale par l'utilisateur - a verifier/corriger dans un
+   futur ticket si constate en pratique. Distinction visuelle avec le
+   marqueur "depart" (desormais une forme "pin", plus un disque statique de
+   meme taille) assuree par la forme autant que par l'animation. */
 .mapview-user-marker {
   position: relative;
 }
