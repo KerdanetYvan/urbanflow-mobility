@@ -1,8 +1,8 @@
 /* Interrupteur generique a 2 positions (extrait de ProfilPage.css, issue
    #245/#246 - voir le commentaire de Switch.tsx). Hauteur alignee sur
    --touch-target-min (meme cible tactile minimale que le reste de l'app,
-   ex. .profil-checkbox) plutot qu'un switch plus petit comme on en voit
-   souvent - accessibilite avant convention visuelle.
+   ex. .profil-chip dans ProfilPage.css) plutot qu'un switch plus petit
+   comme on en voit souvent - accessibilite avant convention visuelle.
 
    Variables locales : la piste (--switch-w/--switch-h), le disque
    (--switch-thumb) et son inset (--switch-inset, identique en haut et a

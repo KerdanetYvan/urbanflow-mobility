@@ -1,11 +1,31 @@
-import { startTransition, useEffect, useState, type FormEvent } from 'react';
+import {
+  startTransition,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { LockIcon, MinusIcon, MoonIcon, PlusIcon, SunIcon } from '../../components/icons';
+import {
+  BikeIcon,
+  BusIcon,
+  CarIcon,
+  LockIcon,
+  MinusIcon,
+  MoonIcon,
+  PlusIcon,
+  RulerIcon,
+  ScooterIcon,
+  SunIcon,
+  SwapIcon,
+  WalkIcon,
+  WheelchairIcon,
+} from '../../components/icons';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import Switch from '../../components/Switch/Switch';
 import { ApiError } from '../../lib/api';
@@ -34,6 +54,177 @@ interface AddressFieldState {
 const EMPTY_ADDRESS: AddressFieldState = { query: '', selected: null };
 
 type Feedback = { variant: 'success' | 'error'; message: string };
+
+/**
+ * Icone par mode de transport prefere (issue #255, retour d'un audit de
+ * style : la liste de 8 cases a cocher texte-seul etait le mur le plus
+ * plat/generique de l'app). Un seul pictogramme pour bus/tram/metro/train
+ * (meme reutilisation que `getTripModeIcon`, components/tripModeIcon.tsx,
+ * deja utilise pour les segments d'itineraire) : le libelle textuel de
+ * chaque chip suffit a les distinguer, une 4e icone distincte n'apporterait
+ * rien. Table separee de `getTripModeIcon` malgre le chevauchement partiel :
+ * les cles sont celles de `TransportMode` (lib/profile.ts, ex. 'walking'),
+ * pas celles d'OTP (ex. 'WALK') que `getTripModeIcon` attend.
+ *
+ * Couleurs volontairement PAS reprises de `modeStyles.ts` (voir son
+ * commentaire, et la meme decision deja prise pour LineBadge - issue #129
+ * section 7.6/#254) : ces couleurs sont validees pour un usage cartographique
+ * precis, pas comme couleurs d'interface - les reprendre ici rouvrirait une
+ * validation de contraste WCAG 1.4.3 complete pour un gain marginal. Les
+ * chips suivent a la place la palette neutre/--color-primary-emphasis deja
+ * validee du reste de l'interface (meme formule que Badge.css).
+ */
+const TRANSPORT_MODE_ICON: Record<string, ReactNode> = {
+  walking: <WalkIcon />,
+  cycling: <BikeIcon />,
+  scooter: <ScooterIcon />,
+  bus: <BusIcon />,
+  tram: <BusIcon />,
+  metro: <BusIcon />,
+  train_ter: <BusIcon />,
+  carpooling: <CarIcon />,
+};
+
+/**
+ * Regroupement par categorie des modes de transport (issue #255, acceptance
+ * "regroupement visuel par categorie") - corrige 2 des 3 echecs de charge
+ * cognitive du rapport de critique concentres sur cet ecran (chunking,
+ * ≤4 choix visibles par decision) : 8 items d'un coup deviennent 3 groupes
+ * de 3/4/1. Values = valeurs de TRANSPORT_MODES (lib/profile.ts) qui
+ * appartiennent a ce groupe.
+ */
+const TRANSPORT_MODE_CATEGORIES: { label: string; values: string[] }[] = [
+  { label: 'Actif', values: ['walking', 'cycling', 'scooter'] },
+  { label: 'Transport en commun', values: ['bus', 'tram', 'metro', 'train_ter'] },
+  { label: 'Partagé', values: ['carpooling'] },
+];
+
+/**
+ * Icone par preference d'accessibilite (issue #255). `wheelchair_accessible`
+ * et `limit_walking_distance` ont chacune une icone dediee (WheelchairIcon/
+ * RulerIcon, components/icons.tsx) ; `limit_transfers` reutilise SwapIcon
+ * (deja utilisee par le bouton d'inversion origine/destination de
+ * /recherche - voir son commentaire) plutot qu'une 3e icone neuve.
+ */
+const ACCESSIBILITY_PREFERENCE_ICON: Record<string, ReactNode> = {
+  wheelchair_accessible: <WheelchairIcon />,
+  limit_walking_distance: <RulerIcon />,
+  limit_transfers: <SwapIcon />,
+};
+
+interface PreferenceChipProps {
+  checked: boolean;
+  icon: ReactNode;
+  label: string;
+  onChange: () => void;
+}
+
+/**
+ * Chip icone + libelle (issue #255) - remplace la case a cocher texte-seul
+ * (`.profil-checkbox`) pour les modes de transport et preferences
+ * d'accessibilite. Reste un vrai `<input type="checkbox">` natif sous le
+ * capot (acceptance de l'issue : comportement/semantique d'accessibilite
+ * inchange, seul l'habillage change) - juste visuellement discret
+ * (`.profil-chip-input`, voir ProfilPage.css) au profit du `<label>`
+ * entier qui porte l'apparence de la chip et reste la cible de clic/focus
+ * visible.
+ */
+function PreferenceChip({ checked, icon, label, onChange }: PreferenceChipProps) {
+  return (
+    <label
+      className={['profil-chip', checked && 'profil-chip-checked']
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <input
+        type="checkbox"
+        className="profil-chip-input"
+        checked={checked}
+        onChange={onChange}
+      />
+      <span className="profil-chip-icon" aria-hidden="true">
+        {icon}
+      </span>
+      {label}
+    </label>
+  );
+}
+
+interface TransportModeChipsProps {
+  selectedModes: string[];
+  onToggle: (mode: string) => void;
+}
+
+/**
+ * Modes de transport preferes, en chips regroupees par categorie (issue
+ * #255) - partagee entre l'onboarding (etape 1, ProfileOnboarding
+ * ci-dessous) et le formulaire d'edition (ProfilPage plus bas), qui
+ * affichaient jusqu'ici la meme liste dupliquee deux fois. Sous-fieldset
+ * par categorie (pas seulement une div) : le regroupement reste
+ * programmatique pour les technologies d'assistance (WCAG 1.3.1), pas
+ * seulement visuel.
+ */
+function TransportModeChips({ selectedModes, onToggle }: TransportModeChipsProps) {
+  return (
+    <fieldset className="profil-fieldset">
+      <legend>Modes de transport préférés</legend>
+      {TRANSPORT_MODE_CATEGORIES.map((category) => {
+        const modes = TRANSPORT_MODES.filter((mode) =>
+          category.values.includes(mode.value),
+        );
+        return (
+          <fieldset key={category.label} className="profil-chip-category">
+            <legend>{category.label}</legend>
+            <div className="profil-chip-group">
+              {modes.map((mode) => (
+                <PreferenceChip
+                  key={mode.value}
+                  checked={selectedModes.includes(mode.value)}
+                  icon={TRANSPORT_MODE_ICON[mode.value]}
+                  label={mode.label}
+                  onChange={() => onToggle(mode.value)}
+                />
+              ))}
+            </div>
+          </fieldset>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+interface AccessibilityPreferenceChipsProps {
+  selected: string[];
+  onToggle: (value: string) => void;
+}
+
+/**
+ * Preferences d'accessibilite, en chips (issue #255) - un seul groupe (3
+ * items, deja sous le seuil de 4 choix simultanes de la checklist de
+ * charge cognitive, pas besoin de sous-categories comme pour les modes de
+ * transport ci-dessus). Meme motif de partage que TransportModeChips.
+ */
+function AccessibilityPreferenceChips({
+  selected,
+  onToggle,
+}: AccessibilityPreferenceChipsProps) {
+  return (
+    <fieldset className="profil-fieldset">
+      <legend>Préférences d'accessibilité</legend>
+      <div className="profil-chip-group">
+        {ACCESSIBILITY_PREFERENCES.map((pref) => (
+          <PreferenceChip
+            key={pref.value}
+            checked={selected.includes(pref.value)}
+            icon={ACCESSIBILITY_PREFERENCE_ICON[pref.value]}
+            label={pref.label}
+            onChange={() => onToggle(pref.value)}
+          />
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
 /** Etape courante de l'onboarding (issue #106/#107, etape 3 ajoutee #236) - voir ProfileOnboarding. */
 type OnboardingStep = 1 | 2 | 3;
@@ -189,19 +380,10 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
             nous aide à classer vos itinéraires. Vous pourrez changer cela
             à tout moment depuis votre profil.
           </p>
-          <fieldset className="profil-fieldset">
-            <legend>Modes de transport préférés</legend>
-            {TRANSPORT_MODES.map((mode) => (
-              <label key={mode.value} className="profil-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedModes.includes(mode.value)}
-                  onChange={() => toggleMode(mode.value)}
-                />
-                {mode.label}
-              </label>
-            ))}
-          </fieldset>
+          <TransportModeChips
+            selectedModes={selectedModes}
+            onToggle={toggleMode}
+          />
           <div className="onboarding-actions">
             <Button
               type="button"
@@ -228,19 +410,10 @@ function ProfileOnboarding({ onComplete }: ProfileOnboardingProps) {
             Ces préférences influencent le classement de vos itinéraires,
             jamais un trajet ne sera exclu sur cette seule base.
           </p>
-          <fieldset className="profil-fieldset">
-            <legend>Préférences d'accessibilité</legend>
-            {ACCESSIBILITY_PREFERENCES.map((pref) => (
-              <label key={pref.value} className="profil-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedAccessibilityPreferences.includes(pref.value)}
-                  onChange={() => toggleAccessibilityPreference(pref.value)}
-                />
-                {pref.label}
-              </label>
-            ))}
-          </fieldset>
+          <AccessibilityPreferenceChips
+            selected={selectedAccessibilityPreferences}
+            onToggle={toggleAccessibilityPreference}
+          />
           <div className="onboarding-actions">
             <button
               type="button"
@@ -864,33 +1037,14 @@ function ProfilPage() {
         {/* Cote a cote a partir de 768px (issue #73, spec 5.2) - voir
             .profil-fieldsets dans ProfilPage.css. */}
         <div className="profil-fieldsets">
-          <fieldset className="profil-fieldset">
-            <legend>Modes de transport préférés</legend>
-            {TRANSPORT_MODES.map((mode) => (
-              <label key={mode.value} className="profil-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedModes.includes(mode.value)}
-                  onChange={() => toggleMode(mode.value)}
-                />
-                {mode.label}
-              </label>
-            ))}
-          </fieldset>
-
-          <fieldset className="profil-fieldset">
-            <legend>Préférences d'accessibilité</legend>
-            {ACCESSIBILITY_PREFERENCES.map((pref) => (
-              <label key={pref.value} className="profil-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedAccessibilityPreferences.includes(pref.value)}
-                  onChange={() => toggleAccessibilityPreference(pref.value)}
-                />
-                {pref.label}
-              </label>
-            ))}
-          </fieldset>
+          <TransportModeChips
+            selectedModes={selectedModes}
+            onToggle={toggleMode}
+          />
+          <AccessibilityPreferenceChips
+            selected={selectedAccessibilityPreferences}
+            onToggle={toggleAccessibilityPreference}
+          />
         </div>
 
         {/* Bloc separe des 2 fieldsets ci-dessus (issue #113/#114) - pas
