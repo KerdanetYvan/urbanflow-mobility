@@ -2,13 +2,28 @@
 # audit securite OWASP #262) - faux positifs verifies manuellement (regle
 # generique par entropie "generic-api-key", sans comprehension du contexte).
 # Format : un fingerprint par ligne, tel qu'imprime par `gitleaks detect`.
+#
+# Attention en editant ce fichier : ne pas reproduire le motif detecte dans
+# un commentaire explicatif (arrive une fois, voir historique) - la regle
+# generique scanne aussi le contenu de CE fichier comme n'importe quel
+# autre, un extrait cite mot pour mot redeclenche une nouvelle detection.
 
-# match.p256dhKey = dto.keys.p256dh - assignation d'une propriete nommee
-# "*Key" par coincidence (cle de chiffrement Web Push cote NAVIGATEUR,
-# recue du client dans le corps de la requete, jamais un secret serveur).
+# push-subscription.service.ts, ligne 36 : cle de chiffrement Web Push
+# fournie par le NAVIGATEUR du client dans le corps de la requete, jamais
+# un secret cote serveur - le nom de la propriete concernee suffit a
+# declencher la regle par coincidence.
 eedb0669329adfac48e225058e76fb931ae84d58:backend/src/push/push-subscription.service.ts:generic-api-key:36
 
-# TEST_KEY - cle de test du transformer de chiffrement, generee une fois
-# pour les tests unitaires (voir le commentaire juste au-dessus dans le
-# fichier), sans rapport avec une cle de production.
+# encrypted-column.transformer.spec.ts, ligne 4 : constante de test du
+# transformer de chiffrement, generee une fois pour les tests unitaires
+# uniquement, sans rapport avec une cle de production (voir le commentaire
+# juste au-dessus de cette ligne dans le fichier concerne).
 a8f688445a2ca5f5e7c29a91fc51221ab33af6a6:backend/src/common/encryption/encrypted-column.transformer.spec.ts:generic-api-key:4
+
+# Ce fichier lui-meme (commit historique 8fec160, deja pousse - non
+# reecrit) : une premiere version de ce commentaire reproduisait l'extrait
+# de code source de la ligne 15 ci-dessus, ce qui a redeclenche la regle
+# generique sur CE fichier. Corrige depuis (voir l'avertissement en tete de
+# fichier), mais cette ancienne version reste visible dans l'historique git
+# et doit donc rester ignoree elle aussi.
+8fec16062345ab29cd1ea787ca44af12f3366ee8:.gitleaksignore:generic-api-key:6
