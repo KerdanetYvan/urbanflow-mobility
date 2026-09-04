@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -103,6 +104,18 @@ interface SearchFiltersModalProps {
   onToggleMode: (mode: string) => void;
   departureTime: string;
   onDepartureTimeChange: (value: string) => void;
+  /**
+   * Ouverture controlee par le parent (issue #252) - auparavant un simple
+   * `useState` interne a ce composant, remonte pour que RecherchePage
+   * puisse fermer les dropdowns d'AddressField (origine/destination) des
+   * que cette modale s'ouvre, et inversement fermer cette modale des
+   * qu'un champ d'adresse reprend le focus - les deux overlays sont
+   * portes hors du flux normal (portal document.body pour AddressField,
+   * position fixed pour cette modale) et peuvent sinon se superposer sans
+   * qu'aucun des deux n'ait conscience de l'autre.
+   */
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
 }
 
 /** Selecteur simple, suffisant pour un focus trap - pas de dependance externe pour ca seul. */
@@ -142,8 +155,9 @@ function SearchFiltersModal({
   onToggleMode,
   departureTime,
   onDepartureTimeChange,
+  isOpen,
+  onOpenChange,
 }: SearchFiltersModalProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -153,10 +167,17 @@ function SearchFiltersModal({
   // = une unite de plus (peu importe laquelle).
   const activeCount = selectedModes.length + (departureTime ? 1 : 0);
 
-  function close() {
-    setIsOpen(false);
+  // useCallback (issue #252) : `close` reference desormais `onOpenChange`,
+  // une prop (avant : uniquement setIsOpen local, garanti stable par React
+  // sans avoir besoin d'etre declare en dependance). Identite stable tant
+  // que `onOpenChange` l'est (le cas ici, RecherchePage passe directement
+  // le setter de useState) - necessaire pour lister `close` dans le
+  // tableau de dependances de l'effet Echap/piege de focus ci-dessous sans
+  // le faire re-executer a chaque rendu.
+  const close = useCallback(() => {
+    onOpenChange(false);
     triggerRef.current?.focus();
-  }
+  }, [onOpenChange]);
 
   // Focus le premier element focusable a l'ouverture, piege Tab/Shift+Tab a
   // l'interieur de la modale (WAI-ARIA APG, pattern "Dialog (Modal)") et
@@ -189,7 +210,7 @@ function SearchFiltersModal({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, close]);
 
   return (
     <>
@@ -199,7 +220,7 @@ function SearchFiltersModal({
         className="recherche-filters-trigger"
         aria-haspopup="dialog"
         aria-label={activeCount > 0 ? `Filtres (${activeCount})` : 'Filtres'}
-        onClick={() => setIsOpen(true)}
+        onClick={() => onOpenChange(true)}
       >
         <FunnelIcon />
         {activeCount > 0 && (
@@ -380,6 +401,17 @@ function RecherchePage() {
 
   const [departureTime, setDepartureTime] = useState('');
   const [selectedModes, setSelectedModes] = useState<string[]>([]);
+  // Ouverture de SearchFiltersModal (issue #252) - remontee ici (au lieu
+  // d'un useState interne a la modale) pour pouvoir fermer les dropdowns
+  // d'AddressField des que cette modale s'ouvre : les deux overlays sont
+  // portes hors du flux normal (portal document.body pour AddressField,
+  // position fixed pour cette modale) et peuvent sinon se superposer -
+  // voir forceClosed passe aux AddressField dans renderRechercheForm
+  // ci-dessous. Pas de fermeture reciproque necessaire (voir le
+  // commentaire de la prop forceClosed dans AddressField.tsx) : ouvrir un
+  // dropdown pendant que cette modale est deja ouverte est deja impossible
+  // (fond opaque + piege de focus de la modale elle-meme).
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   // Preferences d'accessibilite du profil connecte (issue #126) - transmises
   // telles quelles a RecherchePageResults pour le badge cible de scoring.
   // Tableau vide si non connecte ou profil incomplet (voir #64) : seul le
@@ -968,6 +1000,9 @@ function RecherchePage() {
                   error={fieldErrors.origin}
                   quickEntries={buildQuickEntries('origin')}
                   hideLabel
+                  // Issue #252 : coordination avec SearchFiltersModal, voir
+                  // le commentaire d'isFiltersOpen plus haut.
+                  forceClosed={isFiltersOpen}
                   onChange={(value) =>
                     setOrigin({ query: value, selected: null })
                   }
@@ -985,6 +1020,7 @@ function RecherchePage() {
                 error={fieldErrors.destination}
                 quickEntries={buildQuickEntries('destination')}
                 hideLabel
+                forceClosed={isFiltersOpen}
                 onChange={(value) =>
                   setDestination({ query: value, selected: null })
                 }
@@ -1010,6 +1046,8 @@ function RecherchePage() {
               onToggleMode={toggleMode}
               departureTime={departureTime}
               onDepartureTimeChange={setDepartureTime}
+              isOpen={isFiltersOpen}
+              onOpenChange={setIsFiltersOpen}
             />
             <Button type="submit" className="recherche-submit">
               Rechercher

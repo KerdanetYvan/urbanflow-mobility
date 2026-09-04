@@ -648,6 +648,35 @@ describe('RecherchePage', () => {
       const [params] = vi.mocked(tripsLib.searchTrips).mock.calls[0];
       expect(params).not.toHaveProperty('transportModes');
     });
+
+    it(
+      "ferme le dropdown de suggestions d'adresse quand la modale de " +
+        'filtres s\'ouvre (issue #252, les deux overlays se chevauchaient)',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockResolvedValue([GARE]);
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.type(screen.getByLabelText('Origine'), 'Gare');
+        expect(
+          await screen.findByRole('button', { name: 'Gare Part-Dieu' }),
+        ).toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Filtres' }));
+
+        expect(
+          screen.queryByRole('button', { name: 'Gare Part-Dieu' }),
+        ).not.toBeInTheDocument();
+      },
+    );
+    // Pas de test symetrique "ouvrir un dropdown referme la modale" : verifie
+    // manuellement en session (Playwright, vrai navigateur) que ce sens est
+    // deja impossible via une interaction reelle - le fond opaque de la
+    // modale intercepte tout clic vers les champs situes derriere elle, et
+    // son piege de focus empeche deja Tab d'en sortir (voir le commentaire
+    // de forceClosed dans AddressField.tsx). Un test jsdom sur ce sens
+    // passerait a tort : jsdom n'applique ni l'occlusion par le fond ni un
+    // vrai piege de focus, contrairement a un navigateur reel.
   });
 
   it("transmet accessibilityPreferences du profil connecte a l'ecran de resultats, pour le badge cible de scoring (issue #126)", async () => {

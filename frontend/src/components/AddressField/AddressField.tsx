@@ -66,6 +66,22 @@ interface AddressFieldProps {
    * (label toujours dans le DOM, juste masque visuellement).
    */
   hideLabel?: boolean;
+  /**
+   * Un AUTRE overlay concurrent est ouvert ailleurs dans l'ecran (issue
+   * #252, ex. la modale de filtres de RecherchePage) : force la fermeture
+   * du dropdown de CE champ (suggestions ET entrées rapides), même s'il a
+   * le focus ou que des suggestions existent déjà. Absent = comportement
+   * normal (ex. ProfilPage, qui n'a pas d'overlay concurrent).
+   *
+   * Sens unique volontaire (pas de prop symetrique cote modale) : verifie
+   * en session que l'inverse (ouvrir CE dropdown pendant que la modale de
+   * filtres est deja ouverte) est deja impossible via une interaction
+   * normale - le fond `.recherche-filters-backdrop` de la modale intercepte
+   * deja tout clic vers les champs situes derriere elle, et son piege de
+   * focus (RecherchePage.tsx, SearchFiltersModal) empeche deja Tab d'en
+   * sortir. Ajouter une fermeture reciproque aurait ete du code mort.
+   */
+  forceClosed?: boolean;
 }
 
 /**
@@ -112,6 +128,7 @@ function AddressField({
   onSelect,
   quickEntries,
   hideLabel,
+  forceClosed,
 }: AddressFieldProps) {
   // Focus quelque part DANS le champ (input ou une entrée rapide) : piloté par
   // les gestionnaires focus/blur du conteneur, qui se propagent depuis les
@@ -126,12 +143,18 @@ function AddressField({
   // (effet ci-dessous, dépendant de floatingEl).
   const [floatingEl, setFloatingEl] = useState<HTMLUListElement | null>(null);
 
-  const showSuggestions = suggestions.length > 0;
+  // !forceClosed (issue #252) integre directement ici plutot qu'au moment
+  // du rendu des 2 portails plus bas : les deux booleens restent la seule
+  // source de verite pour "ce dropdown particulier doit-il s'afficher",
+  // qu'on la consulte pour choisir QUEL contenu montrer ou pour decider
+  // s'il faut l'empecher entierement (overlay concurrent ouvert ailleurs).
+  const showSuggestions = suggestions.length > 0 && !forceClosed;
   const showQuickEntries =
     !showSuggestions &&
     isFocused &&
     value.trim() === '' &&
-    (quickEntries?.length ?? 0) > 0;
+    (quickEntries?.length ?? 0) > 0 &&
+    !forceClosed;
   const isOpen = showSuggestions || showQuickEntries;
 
   // Positionne le dropdown porté en portal (voir le commentaire du composant
