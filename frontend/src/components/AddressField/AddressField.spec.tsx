@@ -223,3 +223,163 @@ describe('AddressField - entrées rapides', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('AddressField - navigation clavier (issue #253)', () => {
+  const HOTEL_DE_VILLE: PlaceSuggestion = {
+    label: 'Hôtel de Ville',
+    lat: 45.77,
+    lon: 4.83,
+  };
+
+  it('Flèche bas met en surbrillance la 1ère suggestion, puis la 2e', async () => {
+    const user = userEvent.setup();
+    renderField({ value: 'a', suggestions: [GARE, HOTEL_DE_VILLE] });
+    const input = screen.getByLabelText('Origine');
+
+    await user.click(input);
+    await user.keyboard('{ArrowDown}');
+
+    expect(input).toHaveAttribute(
+      'aria-activedescendant',
+      'origin-address-option-0',
+    );
+    expect(
+      screen.getByRole('option', { name: 'Gare Part-Dieu' }),
+    ).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{ArrowDown}');
+
+    expect(input).toHaveAttribute(
+      'aria-activedescendant',
+      'origin-address-option-1',
+    );
+    expect(
+      screen.getByRole('option', { name: 'Hôtel de Ville' }),
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it("Flèche bas au-delà de la dernière suggestion n'en sort pas (pas de bouclage)", async () => {
+    const user = userEvent.setup();
+    renderField({ value: 'a', suggestions: [GARE] });
+
+    await user.click(screen.getByLabelText('Origine'));
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+
+    expect(screen.getByLabelText('Origine')).toHaveAttribute(
+      'aria-activedescendant',
+      'origin-address-option-0',
+    );
+  });
+
+  it('Flèche haut depuis aucune surbrillance va à la dernière suggestion', async () => {
+    const user = userEvent.setup();
+    renderField({ value: 'a', suggestions: [GARE, HOTEL_DE_VILLE] });
+
+    await user.click(screen.getByLabelText('Origine'));
+    await user.keyboard('{ArrowUp}');
+
+    expect(screen.getByLabelText('Origine')).toHaveAttribute(
+      'aria-activedescendant',
+      'origin-address-option-1',
+    );
+  });
+
+  it('Entrée sur une suggestion en surbrillance la sélectionne (comme un clic)', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderField({ value: 'a', suggestions: [GARE, HOTEL_DE_VILLE] });
+
+    await user.click(screen.getByLabelText('Origine'));
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+    expect(onSelect).toHaveBeenCalledWith(HOTEL_DE_VILLE);
+  });
+
+  it(
+    "Entrée sans surbrillance, suggestions ouvertes, ne selectionne rien " +
+      '(issue #253 - anciennement soumettait le formulaire parent avec une ' +
+      'adresse non resolue)',
+    async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderField({ value: 'a', suggestions: [GARE] });
+
+      await user.click(screen.getByLabelText('Origine'));
+      await user.keyboard('{Enter}');
+
+      expect(onSelect).not.toHaveBeenCalled();
+    },
+  );
+
+  it('la frappe invalide la surbrillance en cours', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderField({ value: 'a', suggestions: [GARE] });
+
+    await user.click(screen.getByLabelText('Origine'));
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByLabelText('Origine')).toHaveAttribute(
+      'aria-activedescendant',
+      'origin-address-option-0',
+    );
+
+    rerender(
+      <>
+        <AddressField
+          id="origin-address"
+          label="Origine"
+          value="ar"
+          suggestions={[GARE]}
+          onChange={vi.fn()}
+          onSelect={vi.fn()}
+        />
+        <button type="button">Ailleurs</button>
+      </>,
+    );
+    await user.keyboard('r');
+
+    expect(
+      screen.getByLabelText('Origine'),
+    ).not.toHaveAttribute('aria-activedescendant');
+  });
+
+  it('navigue aussi aux flèches parmi les entrées rapides, et Entrée les sélectionne', async () => {
+    const user = userEvent.setup();
+    const onEntrySelect = vi.fn();
+    renderField({
+      quickEntries: [
+        {
+          key: 'home',
+          title: 'Domicile',
+          subtitle: '8 place du Marché',
+          icon: 'pin',
+          onSelect: onEntrySelect,
+        },
+      ],
+    });
+
+    await user.click(screen.getByLabelText('Origine'));
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    expect(onEntrySelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'active pas une entrée rapide desactivee (position GPS en cours d'acquisition)", async () => {
+    const user = userEvent.setup();
+    const onEntrySelect = vi.fn();
+    renderField({
+      quickEntries: [
+        {
+          key: 'current-position',
+          title: 'Ma position actuelle',
+          subtitle: 'Localisation…',
+          icon: 'pin',
+          disabled: true,
+          onSelect: onEntrySelect,
+        },
+      ],
+    });
+
+    await user.click(screen.getByLabelText('Origine'));
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    expect(onEntrySelect).not.toHaveBeenCalled();
+  });
+});

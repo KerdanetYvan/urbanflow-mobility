@@ -99,7 +99,7 @@ describe('AddressField - positionnement flottant (non-régression #233)', () => 
 
     // Simule l'effet de `size()` au 1er tour : il a plafonné le dropdown à
     // une hauteur ridicule (peu de place sous le champ Destination).
-    const dropdown = screen.getByRole('list');
+    const dropdown = screen.getByRole('listbox');
     dropdown.style.maxHeight = '92px';
     dropdown.style.maxWidth = '260px';
     dropdown.style.minWidth = '260px';

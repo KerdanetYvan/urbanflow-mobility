@@ -89,10 +89,22 @@ interface AddressFieldProps {
  * docs/specs/f2-ecrans-planification.md section 2.1) - extrait de
  * RecherchePage.tsx (issue #114) pour être réutilisé par ProfilPage.tsx
  * (domicile/travail, issue #114) sans le recréer. Réutilise FormField pour
- * l'input lui-même ; la liste de suggestions est une simple liste de
- * boutons (chacun déjà focusable/activable au clavier nativement), pas un
- * pattern combobox ARIA complet - suffisant pour ce projet, cohérent avec
- * le niveau d'effort d'accessibilité du reste des écrans qui l'utilisent.
+ * l'input lui-même.
+ *
+ * Pattern combobox ARIA (issue #253, retour d'un audit de style) : jusque-là
+ * la liste de suggestions était une simple liste de boutons (chacun
+ * focusable/activable nativement, mais atteignable uniquement par Tab
+ * successifs, pas par les flèches) - un piège concret s'en suivait, Entrée
+ * sur un texte tapé-mais-pas-encore-sélectionné soumettait le formulaire de
+ * recherche avec une adresse non résolue plutôt que de sélectionner une
+ * suggestion. Le focus reste maintenant sur l'`<input>` en permanence
+ * (`role="combobox"`) : Flèche haut/bas déplace `activeIndex` (surbrillance
+ * via `aria-activedescendant`, pas de focus réel déplacé sur les options -
+ * cohérent avec le pattern APG "Combobox with List Autocomplete"), Entrée
+ * sélectionne l'option en surbrillance s'il y en a une ; sinon, tant qu'une
+ * liste de SUGGESTIONS est ouverte (pas les entrées rapides - voir plus
+ * bas), Entrée est neutralisée plutôt que de laisser une soumission
+ * échouer sur une adresse non résolue.
  *
  * Deux contenus possibles pour le dropdown, jamais simultanés (issue #166) :
  * - les suggestions du géocodeur (`suggestions`, calculées par le parent via
@@ -157,6 +169,22 @@ function AddressField({
     !forceClosed;
   const isOpen = showSuggestions || showQuickEntries;
 
+  // Navigation clavier (issue #253) : index de l'option en surbrillance
+  // dans la liste ACTIVE (suggestions ou entrées rapides, jamais les deux -
+  // voir showSuggestions/showQuickEntries ci-dessus), ou `null` = aucune
+  // surbrillance (comportement initial a l'ouverture, ou apres une frappe -
+  // voir handleInputChange plus bas). `activeItems`/`activeItemId` sont
+  // deriv es a chaque rendu (pas de useEffect de synchronisation) : plus
+  // simple et evite un rendu de plus a chaque changement de liste.
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const activeItems: readonly (PlaceSuggestion | AddressQuickEntry)[] =
+    showSuggestions ? suggestions : showQuickEntries ? (quickEntries ?? []) : [];
+  const safeActiveIndex =
+    activeIndex !== null && activeIndex < activeItems.length ? activeIndex : null;
+  const listboxId = `${id}-listbox`;
+  const activeItemId =
+    safeActiveIndex !== null ? `${id}-option-${safeActiveIndex}` : undefined;
+
   // Positionne le dropdown porté en portal (voir le commentaire du composant
   // ci-dessus pour le détail de chaque middleware). Repositionnement
   // imperatif direct sur le style DOM (pas via un state React) - pattern
@@ -212,6 +240,20 @@ function AddressField({
     return autoUpdate(reference, floatingEl, updatePosition);
   }, [isOpen, floatingEl]);
 
+  // Garde l'option en surbrillance visible (issue #253) : la liste peut
+  // etre plus haute que son max-height (voir AddressField.css,
+  // overflow-y: auto) - sans ca, naviguer aux flèches au-dela de la
+  // portion visible ne montrerait aucun retour visuel du tout.
+  // 'nearest' (pas 'center'/'start') : ne bouge le scroll QUE si l'option
+  // est deja hors champ, jamais de saut inutile quand elle est deja
+  // visible.
+  useEffect(() => {
+    if (!activeItemId) return;
+    document
+      .getElementById(activeItemId)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [activeItemId]);
+
   /**
    * Fermeture "deliberee" (Echap, bouton "Fermer") : rend le focus au
    * declencheur, comme demande par la spec section 3. Le clic exterieur
@@ -223,6 +265,49 @@ function AddressField({
    */
   function close() {
     setIsFocused(false);
+    setActiveIndex(null);
+  }
+
+  /**
+   * Flèche haut/bas déplace `activeIndex` (bornée à la liste active, boucle
+   * pas d'un bout à l'autre - APG combobox : s'arrête au premier/dernier
+   * plutôt que de reboucler, jugé plus prévisible). Entrée : sélectionne
+   * l'option en surbrillance s'il y en a une (comportement identique au
+   * clic) ; sinon, tant qu'une liste de SUGGESTIONS (pas les entrées
+   * rapides, voir plus bas) est ouverte, neutralise la touche - c'est
+   * exactement le piège corrigé par l'issue #253 : Entrée sur un texte
+   * tapé-mais-pas-encore-résolu déclenchait une soumission native du
+   * formulaire de recherche avec une adresse toujours `null`. Les entrées
+   * rapides n'ont pas ce problème : le champ est vide dans ce cas, une
+   * soumission native y échoue déjà proprement (message de validation
+   * existant), pas la peine de la bloquer ici aussi.
+   */
+  function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!isOpen || activeItems.length === 0) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((current) =>
+        current === null ? 0 : Math.min(current + 1, activeItems.length - 1),
+      );
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((current) =>
+        current === null ? activeItems.length - 1 : Math.max(current - 1, 0),
+      );
+    } else if (event.key === 'Enter') {
+      if (safeActiveIndex !== null) {
+        event.preventDefault();
+        if (showSuggestions) {
+          onSelect(activeItems[safeActiveIndex] as PlaceSuggestion);
+        } else {
+          const entry = activeItems[safeActiveIndex] as AddressQuickEntry;
+          if (!entry.disabled) entry.onSelect();
+        }
+      } else if (showSuggestions) {
+        event.preventDefault();
+      }
+    }
   }
 
   /**
@@ -256,7 +341,10 @@ function AddressField({
     <div
       className="address-field"
       ref={containerRef}
-      onFocus={() => setIsFocused(true)}
+      onFocus={() => {
+        setIsFocused(true);
+        setActiveIndex(null);
+      }}
       onBlur={handleContainerBlur}
       onKeyDown={handleContainerKeyDown}
     >
@@ -265,10 +353,28 @@ function AddressField({
         label={label}
         icon={<MapPinIcon />}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          // Toute frappe invalide la position courante (issue #253) : la
+          // liste va changer (nouvelles suggestions, ou bascule suggestions
+          // <-> entrées rapides), une surbrillance sur un ancien index
+          // n'aurait plus de sens.
+          setActiveIndex(null);
+        }}
+        onKeyDown={handleInputKeyDown}
         error={error}
         autoComplete="off"
         hideLabel={hideLabel}
+        // Pattern combobox ARIA (issue #253, APG "Combobox with List
+        // Autocomplete") : le focus reste sur l'input en permanence, jamais
+        // déplacé sur les options - aria-activedescendant + aria-selected
+        // (sur chaque <li role="option">, voir plus bas) tiennent lieu de
+        // surbrillance pour les lecteurs d'écran comme pour le CSS.
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-activedescendant={activeItemId}
+        aria-autocomplete="list"
       />
       <div aria-live="polite" className="address-field-sr-only">
         {showSuggestions
@@ -279,9 +385,19 @@ function AddressField({
       </div>
       {showSuggestions &&
         createPortal(
-          <ul className="address-suggestions" ref={setFloatingEl}>
-            {suggestions.map((suggestion) => (
-              <li key={`${suggestion.lat}-${suggestion.lon}`}>
+          <ul
+            className="address-suggestions"
+            ref={setFloatingEl}
+            id={listboxId}
+            role="listbox"
+          >
+            {suggestions.map((suggestion, index) => (
+              <li
+                key={`${suggestion.lat}-${suggestion.lon}`}
+                id={`${id}-option-${index}`}
+                role="option"
+                aria-selected={index === safeActiveIndex}
+              >
                 <button
                   type="button"
                   className="address-suggestion"
@@ -307,9 +423,17 @@ function AddressField({
           <ul
             className="address-suggestions address-quick-entries"
             ref={setFloatingEl}
+            id={listboxId}
+            role="listbox"
           >
-            {quickEntries!.map((entry) => (
-              <li key={entry.key}>
+            {quickEntries!.map((entry, index) => (
+              <li
+                key={entry.key}
+                id={`${id}-option-${index}`}
+                role="option"
+                aria-selected={index === safeActiveIndex}
+                aria-disabled={entry.disabled}
+              >
                 <button
                   type="button"
                   className="address-quick-entry"

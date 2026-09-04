@@ -152,6 +152,33 @@ describe('RecherchePage', () => {
     expect(tripsLib.searchTrips).not.toHaveBeenCalled();
   });
 
+  it(
+    "Entrée sur une adresse tapée-mais-pas-sélectionnée ne soumet plus le " +
+      'formulaire (issue #253 - anciennement une soumission native avec une ' +
+      'adresse non resolue)',
+    async () => {
+      vi.mocked(placesLib.searchPlaces).mockResolvedValue([GARE]);
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.type(screen.getByLabelText('Origine'), 'Gare');
+      await screen.findByRole('option', { name: 'Gare Part-Dieu' });
+      await user.keyboard('{Enter}');
+
+      // Contrairement au clic sur "Rechercher" (test ci-dessus), la touche
+      // Entrée est neutralisee AVANT d'atteindre le gestionnaire de
+      // soumission du formulaire : ni appel reseau, ni message de
+      // validation "Adresse non résolue" (celui-ci suppose une vraie
+      // tentative de soumission).
+      expect(tripsLib.searchTrips).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText(
+          'Adresse non résolue. Sélectionnez une adresse dans la liste de suggestions.',
+        ),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it('bloque la recherche si origine et destination sont la meme adresse', async () => {
     vi.mocked(placesLib.searchPlaces).mockResolvedValue([GARE]);
     const user = userEvent.setup();
