@@ -1110,10 +1110,19 @@ function RecherchePage() {
           onTouchStart={handleFormHandleTouchStart}
           onTouchEnd={handleFormHandleTouchEnd}
           aria-expanded={formSheetState === 'expanded'}
+          // Nom accessible independant du <span> texte ci-dessous, qui n'est
+          // rendu qu'en etat "collapsed" : sans ceci, un lecteur d'ecran ne
+          // trouve aucun nom sur ce bouton une fois le bandeau deplie
+          // (audit Lighthouse - regle button-name, WCAG 4.1.2).
+          aria-label={
+            formSheetState === 'expanded'
+              ? 'Réduire le formulaire de recherche'
+              : 'Rechercher un trajet'
+          }
         >
           <span className="resultats-sheet-handle-bar" aria-hidden="true" />
           {formSheetState === 'collapsed' && (
-            <span className="recherche-panel-form-handle-label">
+            <span className="recherche-panel-form-handle-label" aria-hidden="true">
               Rechercher un trajet
             </span>
           )}

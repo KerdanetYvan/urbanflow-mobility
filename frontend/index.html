@@ -39,6 +39,21 @@
     <title>UrbanFlow Mobility</title>
 
     <!--
+      Preconnect vers les 3 sous-domaines de tuiles OpenStreetMap (audit
+      Lighthouse, insight "LCP request discovery") : la carte (MapView,
+      Leaflet) est le premier ecran vu par l'utilisateur et son plus gros
+      poste de requetes (10-30 tuiles PNG, voir le commentaire runtimeCaching
+      de vite.config.ts) - or ces requetes ne peuvent demarrer qu'une fois
+      Leaflet monte et le viewport calcule, donc apres le JS. Etablir la
+      connexion (DNS + TLS) des le parsing du HTML, avant meme ce premier
+      fetch, raccourcit d'autant le delai avant que la premiere tuile
+      (element LCP mesure) ne s'affiche.
+    -->
+    <link rel="preconnect" href="https://a.tile.openstreetmap.org" />
+    <link rel="preconnect" href="https://b.tile.openstreetmap.org" />
+    <link rel="preconnect" href="https://c.tile.openstreetmap.org" />
+
+    <!--
       Le lien <link rel="manifest"> et l'enregistrement du service worker
       sont injectes automatiquement au build par vite-plugin-pwa
       (voir vite.config.ts, injectRegister: 'auto' par defaut) : pas besoin
