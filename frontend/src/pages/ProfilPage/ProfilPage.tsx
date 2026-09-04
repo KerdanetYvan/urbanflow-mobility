@@ -11,7 +11,9 @@ import { ApiError } from '../../lib/api';
 import { deleteAccount, logout } from '../../lib/auth';
 import { formatCoordinates } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
+import type { ThemePreference } from '../../lib/theme';
 import { useAuth } from '../../lib/useAuth';
+import { useThemePreference } from '../../lib/useThemePreference';
 import {
   ACCESSIBILITY_PREFERENCES,
   TRANSPORT_MODES,
@@ -449,6 +451,51 @@ function AccountActions({ onLogout, onAccountDeleted }: AccountActionsProps) {
 }
 
 /**
+ * Trois options du reglage (issue #245) : libelle affiche + valeur
+ * ThemePreference correspondante. `as const` + `THEME_OPTIONS.map` plutot
+ * que 3 <label> ecrits a la main - meme motif que TRANSPORT_MODES/
+ * ACCESSIBILITY_PREFERENCES (lib/profile.ts) deja utilises plus bas dans ce
+ * fichier.
+ */
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'Système (par défaut)' },
+  { value: 'light', label: 'Clair' },
+  { value: 'dark', label: 'Sombre' },
+];
+
+/**
+ * Reglage de theme clair/sombre/systeme (issue #245) - commun aux deux
+ * etats de ProfilPage (onboarding et formulaire d'edition), meme motif que
+ * AccountActions ci-dessus : extrait en composant partage plutot que
+ * duplique. Volontairement HORS du <form> de preferences de mobilite (qui
+ * n'est soumis qu'au clic sur "Enregistrer", GET/PATCH /profiles/me) : ce
+ * reglage n'est pas une donnee de compte, il s'applique immediatement a
+ * chaque changement (voir useThemePreference), sans bouton "Enregistrer"
+ * dedie ni requete reseau.
+ */
+function ThemeSetting() {
+  const [preference, setPreference] = useThemePreference();
+
+  return (
+    <fieldset className="profil-fieldset">
+      <legend>Affichage</legend>
+      {THEME_OPTIONS.map((option) => (
+        <label key={option.value} className="profil-checkbox">
+          <input
+            type="radio"
+            name="theme-preference"
+            value={option.value}
+            checked={preference === option.value}
+            onChange={() => setPreference(option.value)}
+          />
+          {option.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/**
  * Ecran de gestion du profil de mobilite (F1, issue #34).
  *
  * Charge le profil existant au montage (GET /profiles/me). S'il n'existe
@@ -693,6 +740,7 @@ function ProfilPage() {
       <section className="profil-page">
         <h1>Profil de mobilité</h1>
         <ProfileOnboarding onComplete={() => navigate('/recherche')} />
+        <ThemeSetting />
         <AccountActions
           onLogout={handleLogout}
           onAccountDeleted={handleAccountDeleted}
@@ -796,7 +844,12 @@ function ProfilPage() {
 
       {/* Hors du <form> : ne doit pas pouvoir etre declenche par un Entree
           dans un champ du formulaire de profil (comportement par defaut
-          d'un bouton submit a l'interieur d'un <form>). */}
+          d'un bouton submit a l'interieur d'un <form>). Meme raison pour
+          ThemeSetting juste en dessous (issue #245), meme si elle ne
+          contient aucun bouton submit - reste hors du <form> de preferences
+          de mobilite par coherence, ce n'est pas une donnee de ce
+          formulaire. */}
+      <ThemeSetting />
       <AccountActions
         onLogout={handleLogout}
         onAccountDeleted={handleAccountDeleted}
