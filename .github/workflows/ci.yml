@@ -261,8 +261,12 @@ jobs:
         env:
           # Noms des arrets du fixture OTP (routing-engine/test-fixtures/),
           # pas les vrais lieux de la metropole - voir wcag-audit.spec.ts.
+          # "Universite" SANS accent (verifie sur le premier run reel de ce
+          # job, PR #263) : le geocodeur OTP (SandboxAPIGeocoder) renvoie ce
+          # nom de suggestion sans diacritique pour ce fixture, meme si la
+          # recherche elle-meme (prefixe) tolere l'accent en entree.
           WCAG_SEARCH_ORIGIN_QUERY: Gare
-          WCAG_SEARCH_DESTINATION_QUERY: Université
+          WCAG_SEARCH_DESTINATION_QUERY: Universite
         run: npm run test:e2e
 
       - name: Logs des services (diagnostic en cas d'échec)

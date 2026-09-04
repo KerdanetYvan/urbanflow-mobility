@@ -125,7 +125,15 @@ test.describe('Recherche avec résultats', () => {
 });
 
 test.describe('Navigation clavier', () => {
-  test('Popover "Modes de transport" : ouverture/fermeture au clavier', async ({ page }) => {
+  // fixme (audit securite/CI OWASP #262, decouvert au premier run reel de
+  // cette suite en CI) : le bouton popover "Modes de transport" cible ici a
+  // ete remplace par des chips icone+libelle (voir le commentaire "remplace
+  // l'ancien bouton dedie 'Modes de transport'" dans RecherchePage.tsx,
+  // issues #108/#109, #255) - ce test n'a jamais ete mis a jour en
+  // consequence et echoue systematiquement (bouton introuvable). A
+  // reecrire contre le nouveau pattern d'interaction clavier des chips
+  // avant de reactiver (retirer `.fixme`).
+  test.fixme('Popover "Modes de transport" : ouverture/fermeture au clavier', async ({ page }) => {
     await page.goto('/recherche');
 
     const trigger = page.getByRole('button', { name: /Modes de transport/ });
