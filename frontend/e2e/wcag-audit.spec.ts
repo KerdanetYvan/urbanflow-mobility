@@ -138,3 +138,41 @@ test.describe('Navigation clavier', () => {
     }
   });
 });
+
+test.describe('Mise en page mobile', () => {
+  test(
+    "Le CTA de l'onboarding n'est jamais recouvert par la nav fixe (issue #251)",
+    async ({ page }) => {
+      // Viewport mobile explicite (390x844, iPhone 12/13 - le reste de la
+      // suite tourne au viewport desktop par defaut de playwright.config.ts,
+      // ce bug n'existant qu'en dessous de 768px ou la nav passe en
+      // `position: fixed` bas d'ecran, voir AppLayout.css).
+      await page.setViewportSize({ width: 390, height: 844 });
+
+      // Compte volontairement sans profil (voir backend/src/seed/seed.ts)
+      // pour atterrir sur l'onboarding plutot que le formulaire d'edition -
+      // etape 1 (modes de transport, la plus longue) est celle ou le
+      // chevauchement etait mesure.
+      await page.goto('/connexion');
+      await page.getByLabel('Adresse email').fill('sans-profil@urbanflow.test');
+      await page.getByLabel('Mot de passe').fill('SansProfil123!');
+      await page.getByRole('button', { name: 'Se connecter' }).click();
+      await page.waitForURL(/\/profil/);
+
+      const nav = page.locator('.app-nav');
+      const actions = page.locator('.onboarding-actions');
+      await expect(actions).toBeVisible();
+
+      const navBox = await nav.boundingBox();
+      const actionsBox = await actions.boundingBox();
+      expect(navBox).not.toBeNull();
+      expect(actionsBox).not.toBeNull();
+
+      // Chevauchement = combien le bas du CTA depasse le haut de la nav.
+      // <= 0 signifie aucun chevauchement (le CTA s'arrete au-dessus, ou
+      // exactement a la limite, de la zone occupee par la nav).
+      const overlap = actionsBox!.y + actionsBox!.height - navBox!.y;
+      expect(overlap, 'Le CTA "Passer"/"Continuer" chevauche la nav fixe').toBeLessThanOrEqual(0);
+    },
+  );
+});

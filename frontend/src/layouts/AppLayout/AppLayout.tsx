@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import Alert from '../../components/Alert/Alert';
 import { useAuth } from '../../lib/useAuth';
@@ -61,6 +61,50 @@ const NAV_ITEMS: NavItem[] = [
 function AppLayout() {
   const { isAuthenticated } = useAuth();
   const isOnline = useOnlineStatus();
+  const navRef = useRef<HTMLElement>(null);
+
+  /**
+   * Hauteur reelle de la nav mobile fixe (issue #251) - `.app-layout`
+   * reservait un `padding-bottom` fige (`--space-8`, 48px, voir
+   * AppLayout.css) suppose couvrir `.app-nav`, mais sa hauteur REELLEMENT
+   * rendue (icone + libelle + paddings) le depasse (~59px mesures en
+   * session) : le dernier contenu actionnable d'une page - ex. les boutons
+   * "Passer"/"Continuer" de l'onboarding, le tout premier ecran qu'un
+   * nouvel utilisateur voit - se retrouvait partiellement recouvert par la
+   * nav, en violation directe de la contrainte PWA standalone de CLAUDE.md
+   * ("la navigation en propre doit rester utilisable de façon autonome").
+   *
+   * Mesure la hauteur reelle au montage ET a chaque redimensionnement
+   * (`ResizeObserver`, pas un simple calcul au montage) : couvre aussi bien
+   * une rotation d'ecran que le zoom navigateur jusqu'a 200% (WCAG 1.4.4),
+   * qui agrandit le libelle de nav (`--text-xs`, en rem) sans que la
+   * fenetre elle-meme ne se redimensionne forcement de la meme façon.
+   *
+   * Ecrit directement en variable CSS globale (`--nav-height` sur
+   * `<html>`) plutot que dans une feuille de style : c'est une mesure
+   * runtime, pas une valeur de design figee - voir AppLayout.css
+   * (`padding-bottom: var(--nav-height, var(--space-8))`, --space-8 en
+   * repli tant que cet effet n'a pas encore tourne). `useLayoutEffect`
+   * (pas `useEffect`) : applique la mesure AVANT le premier paint du
+   * navigateur, pour eviter un flash au mauvais padding le temps qu'un
+   * effet differe s'execute.
+   */
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+
+    function applyNavHeight() {
+      document.documentElement.style.setProperty(
+        '--nav-height',
+        `${nav!.offsetHeight}px`,
+      );
+    }
+
+    applyNavHeight();
+    const observer = new ResizeObserver(applyNavHeight);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, []);
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.visibility === 'authenticated-only') return isAuthenticated;
@@ -108,7 +152,7 @@ function AppLayout() {
         </Alert>
       )}
 
-      <nav className="app-nav" aria-label="Navigation principale">
+      <nav ref={navRef} className="app-nav" aria-label="Navigation principale">
         {visibleNavItems.map((item) => (
           <NavLink key={item.to} to={item.to} className="app-nav-link">
             <span className="app-nav-link-icon" aria-hidden="true">

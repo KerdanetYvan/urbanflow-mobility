@@ -183,6 +183,25 @@
 @media (max-width: 767px) {
   .onboarding-actions {
     flex-wrap: wrap;
+    /* Issue #251 : sur mobile, la nav principale est fixee en bas de
+       l'ecran (voir .app-nav, AppLayout.css) - le contenu de l'onboarding
+       (surtout l'etape 1, la plus longue avec ses 8 cases a cocher de
+       modes de transport) peut suffire a pousser ce CTA jusque dans la
+       zone occupee par la nav DES le premier affichage, AVANT tout
+       defilement. Reserver de l'espace en bas de PAGE (voir --nav-height
+       dans AppLayout.css) ne corrige pas ce cas precis : ce n'est pas le
+       DERNIER contenu de la page qui est rogne, c'est un CTA au milieu
+       d'une page plus longue que l'ecran - augmenter le padding de fin de
+       page ne le deplace pas. `position: sticky` colle ce CTA juste
+       au-dessus de la nav des qu'il atteindrait cette zone en defilant,
+       et le laisse en flux normal avant ca (contrairement a `fixed`, qui
+       le sortirait du flux en permanence et casserait sa position pour
+       les etapes plus courtes). */
+    position: sticky;
+    bottom: var(--nav-height, 3.75rem);
+    z-index: 5;
+    background: var(--color-bg);
+    padding-block: var(--space-2);
   }
 
   .onboarding-actions > .btn {

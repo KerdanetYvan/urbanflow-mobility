@@ -94,6 +94,29 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
+/**
+ * jsdom n'implemente pas non plus `ResizeObserver` (meme categorie de trou
+ * que `matchMedia` ci-dessus) - `ReferenceError: ResizeObserver is not
+ * defined` des que `AppLayout` (donc a peu pres tout arbre de test qui
+ * passe par lui, `App.spec.tsx` compris) essaie de mesurer la hauteur
+ * reelle de la nav mobile (issue #251). Stub minimal, sans callback reel :
+ * `AppLayout` appelle deja sa mesure une fois de façon synchrone au
+ * montage, independamment de l'observer - aucun test de ce projet ne
+ * verifie un comportement declenche par un VRAI redimensionnement, seul
+ * l'absence de crash au montage compte ici.
+ */
+class ResizeObserverStub {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  configurable: true,
+  value: ResizeObserverStub,
+});
+
 // Demonte l'arbre React rendu apres chaque test. @testing-library/react
 // enregistre normalement ce cleanup automatiquement quand `globals: true`,
 // mais la detection est prise en defaut dans cet environnement (Vitest 4) :

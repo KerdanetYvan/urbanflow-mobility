@@ -16,8 +16,16 @@
   flex-direction: column;
   min-height: 100vh;
   /* Espace reserve en bas pour la nav fixe mobile (voir .app-nav ci-dessous),
-     sinon le dernier contenu de page serait cache derriere elle. */
-  padding-bottom: var(--space-8);
+     sinon le dernier contenu de page serait cache derriere elle.
+     --nav-height (issue #251) : hauteur REELLE de .app-nav, mesuree et
+     posee sur <html> par AppLayout.tsx (ResizeObserver) - --space-8 sert de
+     repli tant que cette mesure n'a pas encore tourne (essentiellement
+     jamais visible, useLayoutEffect s'execute avant le premier paint) ou
+     si JS est indisponible. Un padding fige a --space-8 seul avait fini par
+     etre plus court que la nav reellement rendue (icone + libelle +
+     paddings), rognant le bas des pages dont le contenu s'approche du bord
+     (ex. les CTA de l'onboarding). */
+  padding-bottom: var(--nav-height, var(--space-8));
 }
 
 /*
