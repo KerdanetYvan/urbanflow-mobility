@@ -216,21 +216,15 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: docker compose exec -T backend npm run seed
 
-      - name: Démarrer le frontend
-        if: steps.check.outputs.exists == 'true'
-        run: docker compose up -d --no-deps frontend
-
-      - name: Attendre que le frontend réponde
-        if: steps.check.outputs.exists == 'true'
-        run: |
-          for i in $(seq 1 60); do
-            curl -sf http://localhost:5173/ > /dev/null && exit 0
-            sleep 2
-          done
-          echo "::error::Frontend indisponible après 2 minutes"
-          docker compose logs frontend
-          exit 1
-
+      # Frontend lance directement sur le runner (npm run dev), PAS via
+      # docker-compose.yml (service "frontend") : ce service declare un
+      # volume anonyme sur node_modules (`- /app/node_modules`, isolation
+      # dev classique cote conteneur) qui cree ce dossier sur l'HOTE avec
+      # les droits root des sa premiere creation - le `npm ci` du runner
+      # (utilisateur non-root) echoue ensuite dessus (EACCES, constate lors
+      # du premier run de ce job). Le frontend n'a besoin que d'un serveur
+      # Vite qui repond sur :5173, rien de plus, donc pas besoin de Docker
+      # ici - contrairement au backend/postgres/otp, qui restent en conteneur.
       - uses: actions/setup-node@v7
         if: steps.check.outputs.exists == 'true'
         with:
@@ -245,6 +239,22 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
+      - name: Démarrer le frontend (serveur Vite, pas de conteneur)
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: nohup npm run dev > /tmp/vite-dev.log 2>&1 & disown
+
+      - name: Attendre que le frontend réponde
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:5173/ > /dev/null && exit 0
+            sleep 2
+          done
+          echo "::error::Frontend indisponible après 2 minutes"
+          cat /tmp/vite-dev.log
+          exit 1
+
       - name: Lancer la suite d'audit WCAG
         if: steps.check.outputs.exists == 'true'
         working-directory: frontend
@@ -257,7 +267,10 @@ jobs:
 
       - name: Logs des services (diagnostic en cas d'échec)
         if: failure() && steps.check.outputs.exists == 'true'
-        run: docker compose logs --tail=300
+        run: |
+          docker compose logs --tail=300
+          echo "--- Vite (frontend, hors Docker) ---"
+          cat /tmp/vite-dev.log 2>/dev/null || echo "(pas de log - le serveur n'a peut-etre jamais demarre)"
 
       - name: Publier le rapport Playwright
         if: failure() && steps.check.outputs.exists == 'true'
