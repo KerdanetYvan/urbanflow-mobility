@@ -350,7 +350,7 @@ describe('ProfilPage', () => {
     it('affiche un interrupteur (pas 3 boutons radio) reflétant le theme courant', async () => {
       renderPage();
 
-      const toggle = await screen.findByRole('switch');
+      const toggle = await screen.findByRole('switch', { name: /Thème/ });
       // Stub matchMedia par defaut (test/setup.ts) : matches false -> clair.
       expect(toggle).toHaveAttribute('aria-checked', 'false');
     });
@@ -359,12 +359,50 @@ describe('ProfilPage', () => {
       const user = userEvent.setup();
       renderPage();
 
-      const toggle = await screen.findByRole('switch');
+      const toggle = await screen.findByRole('switch', { name: /Thème/ });
       await user.click(toggle);
 
       expect(toggle).toHaveAttribute('aria-checked', 'true');
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
       expect(localStorage.getItem('urbanflow.theme.v1')).toBe('dark');
+    });
+  });
+
+  describe('reglage de taille des reperes de carte (issue #246)', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: [],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it("affiche un second interrupteur, distinct de celui du theme, sur 'normal' par defaut", async () => {
+      renderPage();
+
+      const toggle = await screen.findByRole('switch', {
+        name: /Repères de carte/,
+      });
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      // Les 2 switches (theme + taille) coexistent sans se marcher dessus.
+      expect(screen.getAllByRole('switch')).toHaveLength(2);
+    });
+
+    it('un clic enregistre la preference "large"', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const toggle = await screen.findByRole('switch', {
+        name: /Repères de carte/,
+      });
+      await user.click(toggle);
+
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('large');
     });
   });
 

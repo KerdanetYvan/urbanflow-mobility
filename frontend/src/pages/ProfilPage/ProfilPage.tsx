@@ -5,11 +5,13 @@ import AddressField from '../../components/AddressField/AddressField';
 import { useAddressSuggestions } from '../../components/AddressField/useAddressSuggestions';
 import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
-import { LockIcon, MoonIcon, SunIcon } from '../../components/icons';
+import { LockIcon, MapPinIcon, MoonIcon, SunIcon } from '../../components/icons';
 import Skeleton from '../../components/Skeleton/Skeleton';
+import Switch from '../../components/Switch/Switch';
 import { ApiError } from '../../lib/api';
 import { deleteAccount, logout } from '../../lib/auth';
 import { formatCoordinates } from '../../lib/format';
+import { useGlyphSizePreference } from '../../lib/useGlyphSizePreference';
 import type { PlaceSuggestion } from '../../lib/places';
 import { useAuth } from '../../lib/useAuth';
 import { useThemeSwitch } from '../../lib/useThemeSwitch';
@@ -450,56 +452,105 @@ function AccountActions({ onLogout, onAccountDeleted }: AccountActionsProps) {
 }
 
 /**
+ * Reglages d'affichage (issue #245 puis #246) - regroupe les preferences
+ * de PRESENTATION cote appareil/navigateur (theme, taille des reperes de
+ * carte), toutes deux persistees en localStorage plutot que dans le profil
+ * de mobilite backend (voir lib/theme.ts et lib/glyphSize.ts - decision PO
+ * explicite documentee dans les deux issues : `accessibilityPreferences`
+ * du profil sert au SCORING des itineraires, pas a l'affichage). Commun aux
+ * deux etats de ProfilPage (onboarding et formulaire d'edition), meme motif
+ * que AccountActions ci-dessus : extrait en composant partage plutot que
+ * duplique. Volontairement HORS du <form> de preferences de mobilite (qui
+ * n'est soumis qu'au clic sur "Enregistrer", GET/PATCH /profiles/me) : ces
+ * reglages ne sont pas une donnee de compte, chacun s'applique
+ * immediatement a son propre clic, sans bouton "Enregistrer" dedie ni
+ * requete reseau.
+ */
+function DisplaySettings() {
+  return (
+    <fieldset className="profil-fieldset">
+      <legend>Affichage</legend>
+      <ThemeSetting />
+      <GlyphSizeSetting />
+    </fieldset>
+  );
+}
+
+/**
  * Reglage de theme (issue #245) - un vrai interrupteur a 2 positions
  * (soleil/lune), pas 3 boutons radio : decision UX prise en session apres
  * une premiere version a 3 options (Systeme/Clair/Sombre), jugee trop
  * lourde pour un reglage que la plupart des gens ne touchent qu'une fois.
- * `role="switch"`/`aria-checked` (pas une checkbox stylee en CSS pur) :
- * semantique ARIA dediee, annoncee correctement par les lecteurs d'ecran
- * comme un interrupteur ("active"/"inactif") plutot qu'une case a cocher.
  * `useThemeSwitch` gere la position initiale quand aucun choix explicite
  * n'a encore ete fait (suit le theme systeme, voir son commentaire) - au
  * premier clic ici, un choix explicite est enregistre, sans retour arriere
  * possible vers "systeme" depuis ce switch (assume, voir useThemeSwitch).
- * Commun aux deux etats de ProfilPage (onboarding et formulaire d'edition),
- * meme motif que AccountActions ci-dessus : extrait en composant partage
- * plutot que duplique. Volontairement HORS du <form> de preferences de
- * mobilite (qui n'est soumis qu'au clic sur "Enregistrer", GET/PATCH
- * /profiles/me) : ce reglage n'est pas une donnee de compte, il s'applique
- * immediatement a chaque clic, sans bouton "Enregistrer" dedie ni requete
- * reseau.
+ * Le composant `Switch` lui-meme (role="switch"/aria-checked, piste+disque)
+ * est partage avec GlyphSizeSetting ci-dessous - voir components/Switch/.
  */
 function ThemeSetting() {
   const [isDark, toggle] = useThemeSwitch();
 
   return (
-    <fieldset className="profil-fieldset">
-      <legend>Affichage</legend>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={isDark}
-        aria-label={
+    <div className="profil-switch-row">
+      <span className="profil-switch-row-label">Thème</span>
+      <Switch
+        checked={isDark}
+        onChange={toggle}
+        ariaLabel={
           isDark
             ? 'Thème sombre activé, basculer vers le thème clair'
             : 'Thème clair activé, basculer vers le thème sombre'
         }
-        className="profil-theme-switch"
-        onClick={toggle}
-      >
-        {/* Icones enveloppees individuellement (pas 2 <svg> nus) : donne un
-            crochet CSS par icone pour la mettre en valeur (--color-on-primary)
-            quand le disque la recouvre, sans dupliquer SunIcon/MoonIcon selon
-            l'etat - voir .profil-theme-switch-icon dans ProfilPage.css. */}
-        <span className="profil-theme-switch-icon profil-theme-switch-icon-light" aria-hidden="true">
-          <SunIcon />
-        </span>
-        <span className="profil-theme-switch-icon profil-theme-switch-icon-dark" aria-hidden="true">
-          <MoonIcon />
-        </span>
-        <span className="profil-theme-switch-thumb" aria-hidden="true" />
-      </button>
-    </fieldset>
+        iconOff={<SunIcon />}
+        iconOn={<MoonIcon />}
+      />
+    </div>
+  );
+}
+
+/**
+ * Reglage de taille des reperes de la carte (issue #246) - meme mecanique
+ * de switch que ThemeSetting ci-dessus, mais binaire "normal"/"large"
+ * plutot que "clair"/"sombre" (`GlyphSizePreference`, voir lib/glyphSize.ts)
+ * : contrairement au theme, il n'y a pas de "systeme" a suivre ici, la
+ * carte a deja son propre agrandissement de base selon la largeur d'ecran
+ * (voir lib/useGlyphScale.ts, consomme par MapView.tsx) - ce switch dit
+ * seulement si on veut ENCORE plus grand, par-dessus cette base. Deux
+ * `MapPinIcon` a des tailles differentes (pas 2 icones distinctes comme
+ * soleil/lune) : la meme forme que les reperes qu'on est en train
+ * d'agrandir est plus parlante ici qu'une metaphore separee. */
+function GlyphSizeSetting() {
+  const [preference, setPreference] = useGlyphSizePreference();
+  const isLarge = preference === 'large';
+
+  function toggle() {
+    setPreference(isLarge ? 'normal' : 'large');
+  }
+
+  return (
+    <div className="profil-switch-row">
+      <span className="profil-switch-row-label">Repères de la carte</span>
+      <Switch
+        checked={isLarge}
+        onChange={toggle}
+        ariaLabel={
+          isLarge
+            ? 'Repères de carte agrandis, revenir à la taille normale'
+            : 'Repères de carte en taille normale, les agrandir'
+        }
+        iconOff={
+          <span className="profil-glyph-switch-icon-small">
+            <MapPinIcon />
+          </span>
+        }
+        iconOn={
+          <span className="profil-glyph-switch-icon-large">
+            <MapPinIcon />
+          </span>
+        }
+      />
+    </div>
   );
 }
 
@@ -748,7 +799,7 @@ function ProfilPage() {
       <section className="profil-page">
         <h1>Profil de mobilité</h1>
         <ProfileOnboarding onComplete={() => navigate('/recherche')} />
-        <ThemeSetting />
+        <DisplaySettings />
         <AccountActions
           onLogout={handleLogout}
           onAccountDeleted={handleAccountDeleted}
@@ -853,11 +904,11 @@ function ProfilPage() {
       {/* Hors du <form> : ne doit pas pouvoir etre declenche par un Entree
           dans un champ du formulaire de profil (comportement par defaut
           d'un bouton submit a l'interieur d'un <form>). Meme raison pour
-          ThemeSetting juste en dessous (issue #245), meme si elle ne
-          contient aucun bouton submit - reste hors du <form> de preferences
-          de mobilite par coherence, ce n'est pas une donnee de ce
-          formulaire. */}
-      <ThemeSetting />
+          DisplaySettings juste en dessous (issue #245/#246), meme si elle
+          ne contient aucun bouton submit - reste hors du <form> de
+          preferences de mobilite par coherence, ce n'est pas une donnee de
+          ce formulaire. */}
+      <DisplaySettings />
       <AccountActions
         onLogout={handleLogout}
         onAccountDeleted={handleAccountDeleted}
