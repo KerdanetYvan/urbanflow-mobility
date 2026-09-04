@@ -28,11 +28,12 @@ import './MapView.css';
  * teinte tres claire, quasi invisible sur les tuiles OSM. Remplace par la
  * meme forme "pin" que DESTINATION_ICON (plus grande et plus lisible qu'un
  * simple disque, et se distingue mieux des autres marqueurs circulaires de
- * la carte - correspondances, stations GBFS) en rouge fixe, la meme teinte
- * que l'arrivee (decision PO explicite : ne pas reintroduire l'ambre sur ce
- * marqueur, y compris une variante fixe). Depart/arrivee restent
- * distinguables malgre la couleur partagee grace a la forme (drapeau pour
- * DESTINATION_ICON desormais, plutot que le pin qui revient a l'origine).
+ * la carte - correspondances, stations GBFS) en rouge fixe (decision PO
+ * explicite : ne pas reintroduire l'ambre sur ce marqueur, y compris une
+ * variante fixe). Depart/arrivee restent distinguables par la forme ET la
+ * couleur - DESTINATION_ICON passe a un drapeau a damier noir/blanc (issue
+ * #244, convention universelle "arrivee/ligne d'arrivee") plutot qu'un
+ * fanion de couleur.
  */
 const ORIGIN_ICON = L.divIcon({
   className: 'mapview-marker',
@@ -42,16 +43,16 @@ const ORIGIN_ICON = L.divIcon({
 });
 
 /**
- * Drapeau : hampe grise (contour blanc pour ressortir sur des tuiles OSM
- * sombres, ex. zones boisees) surmontee d'un fanion rouge (meme teinte que
- * ORIGIN_ICON, distingue par la forme plutot que la couleur - voir
- * commentaire ci-dessus). iconAnchor a la base de la hampe (le point au sol,
- * comme pour ORIGIN_ICON/l'ancien DESTINATION_ICON), pas au centre du
- * fanion.
+ * Drapeau a damier (issue #244) : hampe grise (contour blanc pour ressortir
+ * sur des tuiles OSM sombres, ex. zones boisees) surmontee d'un fanion
+ * quadrille noir/blanc (grille 4x3, alternance en damier) - convention
+ * universelle de ligne d'arrivee, plus immediatement reconnaissable qu'une
+ * simple couleur. iconAnchor a la base de la hampe (le point au sol, comme
+ * pour ORIGIN_ICON), pas au centre du fanion.
  */
 const DESTINATION_ICON = L.divIcon({
   className: 'mapview-marker',
-  html: '<svg width="20" height="24" viewBox="0 0 20 24"><path d="M5 22V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M5 22V2" stroke="#6b6375" stroke-width="2" stroke-linecap="round"/><path d="M5 3 L18 7 L5 12 Z" fill="#e23d3d" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  html: '<svg width="20" height="24" viewBox="0 0 20 24"><path d="M5 22V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M5 22V2" stroke="#6b6375" stroke-width="2" stroke-linecap="round"/><rect x="5" y="2" width="13" height="9" fill="#fff" stroke="#1a1a1a" stroke-width="1"/><rect x="5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="8.25" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="14.75" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="5" y="8" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="8" width="3.25" height="3" fill="#1a1a1a"/></svg>',
   iconSize: [20, 24],
   iconAnchor: [5, 22],
 });
