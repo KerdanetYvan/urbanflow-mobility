@@ -15,30 +15,46 @@ import './MapView.css';
 /**
  * Icones de marqueur en SVG inline (chaine HTML, pas JSX) : L.divIcon
  * attend une chaine, pas un composant React - on ne peut donc pas reutiliser
- * directement components/icons.tsx ici. Couleurs de DESTINATION_ICON/
- * TRANSFER_ICON dupliquees en dur depuis styles/tokens.css (voir le
- * commentaire de modeStyles.ts) - une chaine HTML brute injectee par
- * Leaflet est bien inseree dans le document reel, mais on evite ici de
- * dependre d'une variable pour des teintes fixes (rouge destination, gris
- * correspondance) qui n'ont pas de contrepartie theme clair/sombre a suivre.
- * ORIGIN_ICON fait exception (issue #158) : var(--color-primary-emphasis)
- * fonctionne normalement ici, les proprietes CSS personnalisees du :root
- * s'appliquent a tout noeud du document quelle que soit sa methode
- * d'insertion (innerHTML compris) - necessaire cette fois pour suivre les
- * deux valeurs distinctes du token entre themes clair et sombre.
+ * directement components/icons.tsx ici. Couleurs dupliquees en dur depuis
+ * styles/tokens.css (voir le commentaire de modeStyles.ts) plutot que
+ * `var(--color-...)` : le fond de carte (tuiles OSM) reste clair quel que
+ * soit le theme de l'app, donc AUCUN marqueur de cette liste ne doit suivre
+ * une variable qui change entre theme clair et sombre - une teinte pensee
+ * pour du texte/une bordure sur fond de PAGE (ex. --color-primary-emphasis,
+ * claire en theme sombre) devient illisible une fois posee sur un fond de
+ * carte qui, lui, ne s'assombrit jamais. ORIGIN_ICON suivait `var(--color-
+ * primary-emphasis)` avant issue #244 (ambre, introduit par #158 pour la
+ * coherence de marque) - retire ici : en theme sombre le token passe a une
+ * teinte tres claire, quasi invisible sur les tuiles OSM. Remplace par la
+ * meme forme "pin" que DESTINATION_ICON (plus grande et plus lisible qu'un
+ * simple disque, et se distingue mieux des autres marqueurs circulaires de
+ * la carte - correspondances, stations GBFS) en rouge fixe (decision PO
+ * explicite : ne pas reintroduire l'ambre sur ce marqueur, y compris une
+ * variante fixe). Depart/arrivee restent distinguables par la forme ET la
+ * couleur - DESTINATION_ICON passe a un drapeau a damier noir/blanc (issue
+ * #244, convention universelle "arrivee/ligne d'arrivee") plutot qu'un
+ * fanion de couleur.
  */
 const ORIGIN_ICON = L.divIcon({
-  className: 'mapview-marker',
-  html: '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="var(--color-primary-emphasis)" stroke="#fff" stroke-width="2.5"/></svg>',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
-
-const DESTINATION_ICON = L.divIcon({
   className: 'mapview-marker',
   html: '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 1 1 14 0C19 14.8 12 21 12 21Z" fill="#e23d3d" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="9.5" r="2.5" fill="#fff"/></svg>',
   iconSize: [22, 22],
   iconAnchor: [11, 22],
+});
+
+/**
+ * Drapeau a damier (issue #244) : hampe grise (contour blanc pour ressortir
+ * sur des tuiles OSM sombres, ex. zones boisees) surmontee d'un fanion
+ * quadrille noir/blanc (grille 4x3, alternance en damier) - convention
+ * universelle de ligne d'arrivee, plus immediatement reconnaissable qu'une
+ * simple couleur. iconAnchor a la base de la hampe (le point au sol, comme
+ * pour ORIGIN_ICON), pas au centre du fanion.
+ */
+const DESTINATION_ICON = L.divIcon({
+  className: 'mapview-marker',
+  html: '<svg width="20" height="24" viewBox="0 0 20 24"><path d="M5 22V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M5 22V2" stroke="#6b6375" stroke-width="2" stroke-linecap="round"/><rect x="5" y="2" width="13" height="9" fill="#fff" stroke="#1a1a1a" stroke-width="1"/><rect x="5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="2" width="3.25" height="3" fill="#1a1a1a"/><rect x="8.25" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="14.75" y="5" width="3.25" height="3" fill="#1a1a1a"/><rect x="5" y="8" width="3.25" height="3" fill="#1a1a1a"/><rect x="11.5" y="8" width="3.25" height="3" fill="#1a1a1a"/></svg>',
+  iconSize: [20, 24],
+  iconAnchor: [5, 22],
 });
 
 const TRANSFER_ICON = L.divIcon({
