@@ -208,17 +208,6 @@
   font-size: var(--text-sm);
 }
 
-/* "Voir le detail" : reste visible sur tous les breakpoints (issue #234) -
-   cliquer une carte affiche/actualise toujours son detail quelque part
-   (en dessous en mobile, dans un panneau a droite en desktop - voir plus
-   bas), le texte reste donc pertinent partout. */
-.resultats-card-action {
-  width: 100%;
-  color: var(--color-primary-emphasis);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
 /* Espace entre le bouton "Rechercher" (fin du formulaire) et ce qui suit -
    squelette de chargement, message d'etat vide ou liste des itineraires
    (issue #234, retour utilisateur en session : ce contenu collait

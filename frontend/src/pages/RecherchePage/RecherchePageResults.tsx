@@ -53,9 +53,14 @@ interface ItineraryCardProps {
 
 /**
  * Carte-itineraire de la liste de resultats (section 3.1 de la spec) : toute
- * la carte est l'unite tactile/clavier (un unique <button>), pas seulement
- * un lien "Voir le detail" - un <button> natif donne le comportement clavier
- * (Tab, Entree, Espace) sans code supplementaire.
+ * la carte est l'unite tactile/clavier (un unique <button>) - un <button>
+ * natif donne le comportement clavier (Tab, Entree, Espace) sans code
+ * supplementaire. Le texte "Voir le detail" (#170, masque en desktop puis
+ * retire completement ici) n'a jamais ete un lien/bouton distinct : un
+ * simple ornement textuel en bout de carte, qui laissait a tort penser
+ * qu'une action separee du tap/clic sur la carte etait necessaire (issues
+ * #279/#280, retour utilisateur) - le tap/clic sur la carte affiche deja le
+ * detail, sur mobile comme en desktop.
  *
  * Le score n'est jamais affiche (section 3.1) : aucune valeur chiffree ici.
  * La rangee de puces de mode peut neanmoins afficher un badge de ligne pour
@@ -116,9 +121,6 @@ function ItineraryCard({ itinerary, isSelected, onSelect, badge }: ItineraryCard
       </span>
       <span className="resultats-card-transfers">
         {formatTransfers(itinerary.transfers)}
-      </span>
-      <span className="resultats-card-action" aria-hidden="true">
-        Voir le détail
       </span>
     </button>
   );
