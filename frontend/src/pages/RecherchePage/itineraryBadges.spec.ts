@@ -43,6 +43,20 @@ describe('computeItineraryBadges', () => {
     expect(badges).toEqual({ 0: BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE });
   });
 
+  it("pose le badge \"le plus rapide\" sur le trajet REELLEMENT le plus rapide, meme si ce n'est pas l'index 0 (issue #274, regression constatee en verif reelle : le classement de base penalise aussi les correspondances, l'index 0 n'est pas toujours le plus rapide)", () => {
+    const itineraries = [
+      itinerary({ durationSeconds: 42 * 60, transfers: 0 }), // index 0, meilleur score (0 correspondance) mais PAS le plus rapide
+      itinerary({ durationSeconds: 46 * 60, transfers: 0 }),
+      itinerary({ durationSeconds: 32 * 60, transfers: 1 }), // le plus rapide en duree reelle
+      itinerary({ durationSeconds: 48 * 60, transfers: 1 }),
+      itinerary({ durationSeconds: 50 * 60, transfers: 0 }),
+    ];
+
+    const badges = computeItineraryBadges(itineraries, []);
+
+    expect(badges).toEqual({ 2: BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE });
+  });
+
   it("ajoute un badge cible sur l'itineraire ayant le moins de correspondances quand limit_transfers est prioritaire, meme si ce n'est pas le premier", () => {
     const itineraries = [
       itinerary({ transfers: 2 }), // premier de la liste = meilleur choix global
