@@ -71,6 +71,12 @@ Sur Windows, les événements de changement de fichier ne remontent pas toujours
 docker compose restart backend
 ```
 
+## Hook de pre-commit (lint)
+
+Un hook Husky + lint-staged (issue #269) lance ESLint (`--fix`) sur les seuls fichiers `.ts`/`.tsx` stagés de `frontend/` et `backend/` à chaque `git commit` — installé automatiquement via `npm install` à la racine (script `prepare`). Un commit contenant une erreur de lint non auto-corrigeable est bloqué avant même d'atteindre la CI.
+
+En cas d'urgence (le hook bloque à tort, ou une correction doit être commitée telle quelle) : `git commit --no-verify` saute le hook local — la CI (`.github/workflows/ci.yml`) reste le filet de sécurité final, elle relance le même lint sur l'ensemble du projet à chaque push.
+
 ## Déploiement (production)
 
 La solution est en ligne : **[urbanflow-mobility.kerdanetyvan.dev](https://urbanflow-mobility.kerdanetyvan.dev)**

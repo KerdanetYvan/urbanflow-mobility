@@ -1,0 +1,12 @@
+{
+  "name": "urbanflow-mobility",
+  "private": true,
+  "description": "Racine du monorepo - accueille uniquement les hooks git partages (Husky + lint-staged, issue #269). frontend/ et backend/ restent deux projets Node independants avec leur propre package.json/lockfile/CI - rien ici n'est cense etre importe par l'un ou l'autre.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1"
+  }
+}
