@@ -309,15 +309,15 @@ describe('RecherchePageResults', () => {
   });
 
   describe('badges qualitatifs de scoring (issue #126)', () => {
-    it("affiche le badge 'meilleur choix global' sur le premier itineraire, absent des autres, sans preference prioritaire", () => {
+    it("affiche le badge de repli 'trajet le plus rapide' (pas 'adapte a vos criteres') sur le premier itineraire, sans preference cochee (issue #274)", () => {
       renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
 
       const cards = screen.getAllByRole('button', { name: /min/ });
       expect(
-        within(cards[0]).getByText('Le plus adapté à vos critères'),
+        within(cards[0]).getByText('Trajet le plus rapide'),
       ).toBeInTheDocument();
       expect(
-        within(cards[1]).queryByText('Le plus adapté à vos critères'),
+        within(cards[1]).queryByText('Trajet le plus rapide'),
       ).not.toBeInTheDocument();
     });
 
