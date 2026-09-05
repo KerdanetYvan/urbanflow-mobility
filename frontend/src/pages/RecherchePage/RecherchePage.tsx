@@ -22,6 +22,10 @@ import { getCurrentFollowedTrip } from '../../lib/followedTrip';
 import { formatCoordinates } from '../../lib/format';
 import { getMyProfile, TRANSPORT_MODES } from '../../lib/profile';
 import type { PlaceSuggestion } from '../../lib/places';
+import {
+  loadRechercheSessionState,
+  saveRechercheSessionState,
+} from '../../lib/rechercheSessionState';
 import { getCachedTrip, saveTripToCache } from '../../lib/tripCache';
 import {
   entryToPlaces,
@@ -385,11 +389,25 @@ function RecherchePage() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [screen, setScreen] = useState<Screen>({ kind: 'formulaire' });
 
-  const [origin, setOrigin] = useState<AddressFieldState>(EMPTY_ADDRESS);
-  const [destination, setDestination] =
-    useState<AddressFieldState>(EMPTY_ADDRESS);
+  // Restauration de la recherche en cours (issue #266) - une seule lecture
+  // de sessionStorage au montage (pas un appel par useState ci-dessous),
+  // reutilisee comme valeur initiale de chaque etat concerne. `null` = pas
+  // de recherche en cours a restaurer (premiere visite de la session, ou
+  // sessionStorage indisponible) - tous les etats repartent alors de leurs
+  // valeurs par defaut habituelles.
+  const [initialSession] = useState(() => loadRechercheSessionState());
+
+  const [screen, setScreen] = useState<Screen>(
+    () => initialSession?.screen ?? { kind: 'formulaire' },
+  );
+
+  const [origin, setOrigin] = useState<AddressFieldState>(
+    () => initialSession?.origin ?? EMPTY_ADDRESS,
+  );
+  const [destination, setDestination] = useState<AddressFieldState>(
+    () => initialSession?.destination ?? EMPTY_ADDRESS,
+  );
   const originSuggestions = useAddressSuggestions(
     origin.query,
     origin.selected?.label ?? null,
@@ -399,8 +417,12 @@ function RecherchePage() {
     destination.selected?.label ?? null,
   );
 
-  const [departureTime, setDepartureTime] = useState('');
-  const [selectedModes, setSelectedModes] = useState<string[]>([]);
+  const [departureTime, setDepartureTime] = useState(
+    () => initialSession?.departureTime ?? '',
+  );
+  const [selectedModes, setSelectedModes] = useState<string[]>(
+    () => initialSession?.selectedModes ?? [],
+  );
   // Ouverture de SearchFiltersModal (issue #252) - remontee ici (au lieu
   // d'un useState interne a la modale) pour pouvoir fermer les dropdowns
   // d'AddressField des que cette modale s'ouvre : les deux overlays sont
@@ -461,16 +483,47 @@ function RecherchePage() {
     undefined,
   );
 
+  // Persistance de la recherche en cours entre deux navigations (issue
+  // #266) - voir lib/rechercheSessionState.ts pour le detail (sessionStorage,
+  // pas localStorage). Un seul effet suffit meme une fois des resultats
+  // affiches : RecherchePageResults reutilise ces memes etats leves ici
+  // (origin/destination/departureTime/selectedModes, via renderSearchForm),
+  // jamais de copie locale a synchroniser en plus.
+  // screen.kind === 'recherche' (requete en vol) volontairement exclu :
+  // pas de sens a figer un etat de chargement transitoire, l'ecran
+  // precedent (formulaire ou anciens resultats) reste alors la derniere
+  // valeur persistee jusqu'a ce que la recherche aboutisse ou echoue.
+  useEffect(() => {
+    if (screen.kind === 'recherche') return;
+    saveRechercheSessionState({
+      screen,
+      origin,
+      destination,
+      departureTime,
+      selectedModes,
+    });
+  }, [screen, origin, destination, departureTime, selectedModes]);
+
   // Pre-remplissage des modes preferes depuis le profil (F1), uniquement si
   // connecte. Echec silencieux (pas de profil, session expiree...) : la
   // recherche reste utilisable, modes vides plutot qu'un ecran bloque.
+  //
+  // N'ecrase PAS selectedModes si une recherche etait deja en cours
+  // restauree depuis sessionStorage (issue #266) : l'utilisateur avait
+  // peut-etre deliberement decoche un mode pour CETTE recherche, le
+  // reprefiller avec les preferences generales du profil effacerait ce
+  // choix a chaque retour sur la page. accessibilityPreferences n'est
+  // jamais concerne (purement informatif ici, jamais modifie par
+  // l'utilisateur sur cet ecran - voir sa docstring plus haut).
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     getMyProfile()
       .then((profile) => {
         if (!cancelled) {
-          setSelectedModes(profile.preferredTransportModes);
+          if (!initialSession) {
+            setSelectedModes(profile.preferredTransportModes);
+          }
           setAccessibilityPreferences(profile.accessibilityPreferences);
           // Domicile/travail (issue #93) : PlaceSuggestion derive du profil,
           // repli sur formatCoordinates si aucun libelle enregistre (voir
@@ -499,7 +552,11 @@ function RecherchePage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+    // initialSession est stable pour toute la duree de vie du composant
+    // (issu d'un useState jamais reaffecte, voir sa declaration) - l'ajouter
+    // en dependance ne fait donc jamais re-executer cet effet, juste
+    // satisfaire react-hooks/exhaustive-deps.
+  }, [isAuthenticated, initialSession]);
 
   // Position GPS actuelle comme origine (issue #93) : une seule lecture, pas
   // un suivi continu (contrairement a RecherchePageResults, ou la carte

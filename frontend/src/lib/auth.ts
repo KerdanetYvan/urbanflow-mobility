@@ -1,5 +1,6 @@
 import { apiPost, authDelete } from './api';
 import { clearTokens, saveTokens, type TokenPair } from './authStorage';
+import { clearRechercheSessionState } from './rechercheSessionState';
 import { clearTripCache } from './tripCache';
 
 interface RegisteredUser {
@@ -24,13 +25,16 @@ export async function login(email: string, password: string): Promise<void> {
  * de mecanisme de revocation de jetons (JWT sans etat, voir auth.service.ts)
  * - se deconnecter, c'est juste oublier les jetons stockes cote client.
  *
- * Purge aussi le cache de trajets (audit securite OWASP #262) : une
- * deconnexion explicite est le signal le plus net qu'un autre usager peut
- * reutiliser le meme appareil - voir tripCache.ts#clearTripCache.
+ * Purge aussi le cache de trajets et la recherche en cours persistee
+ * (audit securite OWASP #262, issue #266) : une deconnexion explicite est
+ * le signal le plus net qu'un autre usager peut reutiliser le meme
+ * appareil - voir tripCache.ts#clearTripCache et
+ * rechercheSessionState.ts#clearRechercheSessionState.
  */
 export function logout(): void {
   clearTokens();
   clearTripCache();
+  clearRechercheSessionState();
 }
 
 /**
@@ -68,12 +72,13 @@ export function resetPassword(
  * pas seulement une boite de dialogue cote client - voir ProfilPage.tsx).
  * Leve une ApiError (401) si le mot de passe est incorrect.
  *
- * Nettoie les jetons locaux et le cache de trajets apres coup, comme
- * logout() : le compte n'existe plus, il n'y a plus rien a rafraichir/
- * reutiliser (audit securite OWASP #262).
+ * Nettoie les jetons locaux, le cache de trajets et la recherche en cours
+ * persistee apres coup, comme logout() : le compte n'existe plus, il n'y a
+ * plus rien a rafraichir/reutiliser (audit securite OWASP #262, issue #266).
  */
 export async function deleteAccount(password: string): Promise<void> {
   await authDelete<void>('/users/me', { password });
   clearTokens();
   clearTripCache();
+  clearRechercheSessionState();
 }
