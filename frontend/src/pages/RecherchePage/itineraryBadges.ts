@@ -5,8 +5,25 @@ import type { TripItinerary } from '../../lib/trips';
  * docs/specs/f3-scoring-perturbations.md, issue #26) - renforce visuellement
  * pourquoi il est premier, sans jamais reveler la valeur de score qui l'a
  * classe ainsi (calcul reste dans ScoringService, backend/src/scoring).
+ *
+ * Affiche uniquement quand au moins une preference d'accessibilite est
+ * cochee (voir computeItineraryBadges) - sans profil ou sans preference,
+ * "adapte a vos criteres" n'a alors aucun sens (aucun critere n'existe),
+ * BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE s'affiche a la place (issue #274,
+ * retour testeur).
  */
 export const BEST_OVERALL_BADGE_LABEL = 'Le plus adapté à vos critères';
+
+/**
+ * Repli du badge ci-dessus quand aucune preference d'accessibilite n'est
+ * cochee (issue #274) : le classement reste pilote par SCORING_WEIGHTS cote
+ * backend meme sans profil (duree, correspondances, meteo, perturbation),
+ * mais la duree domine largement par defaut (poids des correspondances
+ * volontairement faible, voir scoring-weights.const.ts) - "le plus rapide"
+ * reste donc une description fidele du cas courant, contrairement a
+ * "adapte a vos criteres" qui etait FAUX a coup sur (aucun critere selectionne).
+ */
+export const BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE = 'Trajet le plus rapide';
 
 /**
  * Un critere de profil pouvant produire le badge "cible" optionnel (section
@@ -62,8 +79,12 @@ export type ItineraryBadges = Record<number, string>;
 /**
  * Calcule les badges qualitatifs de scoring a afficher sur la liste de
  * resultats (section 2.2 de la spec F3) :
- * - l'itineraire d'index 0 (deja en tete du tri backend) recoit toujours le
- *   badge "meilleur choix global" ;
+ * - l'itineraire d'index 0 (deja en tete du tri backend) recoit toujours un
+ *   badge global - BEST_OVERALL_BADGE_LABEL si au moins une preference
+ *   d'accessibilite est cochee (y compris `wheelchair_accessible` seul, qui
+ *   ne differencie pourtant aucun resultat entre eux - decision utilisateur
+ *   en session, plus simple qu'exclure ce cas precis), sinon
+ *   BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE (issue #274) ;
  * - si une preference d'`accessibilityPreferences` correspond a un critere
  *   cible connu, l'itineraire qui le satisfait le mieux recoit en plus (ou a
  *   la place, si c'est un autre itineraire) le badge dedie a ce critere.
@@ -89,8 +110,13 @@ export function computeItineraryBadges(
   if (itineraries.length === 0) return badges;
 
   // Le premier itineraire de la liste deja triee est toujours le "meilleur
-  // choix global" (c'est litteralement ce que le tri backend signifie).
-  badges[0] = BEST_OVERALL_BADGE_LABEL;
+  // choix global" (c'est litteralement ce que le tri backend signifie) -
+  // mais "adapte a VOS criteres" n'a de sens que s'il en existe au moins un
+  // (issue #274).
+  badges[0] =
+    accessibilityPreferences.length > 0
+      ? BEST_OVERALL_BADGE_LABEL
+      : BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE;
 
   // Si aucun critere n'est explicitement prioritaire pour l'utilisateur
   // (profil incomplet ou recherche sans compte), seul le badge global

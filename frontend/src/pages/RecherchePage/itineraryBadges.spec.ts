@@ -1,5 +1,9 @@
 import type { TripItinerary, TripSegment } from '../../lib/trips';
-import { BEST_OVERALL_BADGE_LABEL, computeItineraryBadges } from './itineraryBadges';
+import {
+  BEST_OVERALL_BADGE_LABEL,
+  BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE,
+  computeItineraryBadges,
+} from './itineraryBadges';
 
 /** Segment WALK minimal, seul le champ distanceMeters compte pour ces tests. */
 function walkSegment(distanceMeters: number): TripSegment {
@@ -31,12 +35,12 @@ function itinerary(overrides: Partial<TripItinerary> = {}): TripItinerary {
 }
 
 describe('computeItineraryBadges', () => {
-  it("attribue uniquement le badge global au premier itineraire quand aucune preference n'est prioritaire (profil incomplet ou recherche anonyme)", () => {
+  it("attribue le badge de repli \"le plus rapide\" (pas \"adapte a vos criteres\") quand aucune preference n'est cochee (issue #274, profil incomplet ou recherche anonyme)", () => {
     const itineraries = [itinerary({ transfers: 1 }), itinerary({ transfers: 0 })];
 
     const badges = computeItineraryBadges(itineraries, []);
 
-    expect(badges).toEqual({ 0: BEST_OVERALL_BADGE_LABEL });
+    expect(badges).toEqual({ 0: BEST_OVERALL_BADGE_LABEL_NO_PREFERENCE });
   });
 
   it("ajoute un badge cible sur l'itineraire ayant le moins de correspondances quand limit_transfers est prioritaire, meme si ce n'est pas le premier", () => {
@@ -80,7 +84,7 @@ describe('computeItineraryBadges', () => {
     expect(badges[2]).toBeUndefined();
   });
 
-  it("n'ajoute aucun badge cible pour wheelchair_accessible (filtre dur OTP, pas un critere classant)", () => {
+  it("n'ajoute aucun badge cible pour wheelchair_accessible (filtre dur OTP, pas un critere classant), mais garde le badge global standard : n'importe quelle preference cochee suffit (decision utilisateur, issue #274)", () => {
     const itineraries = [itinerary({ transfers: 3 }), itinerary({ transfers: 0 })];
 
     const badges = computeItineraryBadges(itineraries, ['wheelchair_accessible']);
