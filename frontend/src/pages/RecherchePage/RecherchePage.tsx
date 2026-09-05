@@ -17,6 +17,7 @@ import Button from '../../components/Button/Button';
 import FormField from '../../components/FormField/FormField';
 import { FunnelIcon, SwapIcon } from '../../components/icons';
 import MapView from '../../components/MapView/MapView';
+import { useMapSafeAreaPadding } from '../../components/MapView/useMapSafeAreaPadding';
 import { ApiError } from '../../lib/api';
 import { getCurrentFollowedTrip } from '../../lib/followedTrip';
 import { formatCoordinates } from '../../lib/format';
@@ -457,6 +458,12 @@ function RecherchePage() {
     'collapsed' | 'expanded'
   >('expanded');
   const formTouchStartY = useRef<number | null>(null);
+  // Espace reellement occupe par .recherche-panel-form (issue #273) - pas de
+  // panneau de detail sur cet ecran (aucun itineraire encore selectionne),
+  // voir useMapSafeAreaPadding.ts et le meme usage dans
+  // RecherchePageResults.tsx.
+  const formPanelRef = useRef<HTMLDivElement>(null);
+  const safeAreaPadding = useMapSafeAreaPadding(formPanelRef);
   // Historique des trajets (issue #112) - charge une seule fois au montage
   // (voir l'effet ci-dessous), aplati en adresses recentes pour le dropdown
   // des champs (issue #166, buildQuickEntries).
@@ -1153,12 +1160,14 @@ function RecherchePage() {
           origin={origin.selected ?? undefined}
           destination={destination.selected ?? undefined}
           variant="fullBleed"
+          safeAreaPadding={safeAreaPadding}
         />
       </div>
 
       <div
         className="recherche-panel-form"
         data-sheet-state={formSheetState}
+        ref={formPanelRef}
       >
         <button
           type="button"

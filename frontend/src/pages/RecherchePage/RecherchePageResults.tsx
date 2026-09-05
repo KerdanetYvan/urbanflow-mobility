@@ -4,6 +4,7 @@ import Badge from '../../components/Badge/Badge';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
+import { useMapSafeAreaPadding } from '../../components/MapView/useMapSafeAreaPadding';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import { getTripModeIcon } from '../../components/tripModeIcon';
 import TripFollowButton from '../../components/TripFollowButton/TripFollowButton';
@@ -450,6 +451,14 @@ function RecherchePageResults({
     'expanded',
   );
   const touchStartY = useRef<number | null>(null);
+  // Espace reellement occupe par les 2 panneaux flottants qui chevauchent la
+  // carte (issue #273) - transmis a MapView pour que son cadrage n'aille pas
+  // cacher le trajet derriere l'un des deux. `.recherche-panel-form` change
+  // de taille/position selon `sheetState` (mobile) ou reste ancre bas-gauche
+  // (desktop) ; `.resultats-detail-panel` n'existe (et n'occulte) qu'en
+  // desktop, une fois un itineraire selectionne - voir useMapSafeAreaPadding.
+  const formPanelRef = useRef<HTMLDivElement>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
   // Hook appele inconditionnellement (regle des Hooks React), avant les
   // retours anticipes ci-dessous. Activee des que la carte est sur le point
   // d'etre affichee (chargement ou resultats non vides) - pas de
@@ -556,6 +565,15 @@ function RecherchePageResults({
     </>
   );
 
+  // Voir useMapSafeAreaPadding.ts pour le detail de `detailPanelPresent` :
+  // signale (via un booleen ordinaire plutot que la seule ref) le moment ou
+  // `.resultats-detail-panel` apparait/disparait du DOM (issue #273).
+  const safeAreaPadding = useMapSafeAreaPadding(
+    formPanelRef,
+    detailPanelRef,
+    Boolean(detailContent),
+  );
+
   return (
     <div className="resultats-shell">
       {/* Titre de page toujours present pour les lecteurs d'ecran - pas
@@ -570,6 +588,7 @@ function RecherchePageResults({
             itinerary={itineraries[selectedIndex]}
             variant="fullBleed"
             userPosition={geolocation.position}
+            safeAreaPadding={safeAreaPadding}
           />
         ) : (
           <MapView
@@ -577,6 +596,7 @@ function RecherchePageResults({
             destination={destination}
             variant="fullBleed"
             userPosition={geolocation.position}
+            safeAreaPadding={safeAreaPadding}
           />
         )}
       </div>
@@ -586,7 +606,11 @@ function RecherchePageResults({
           ci-dessus. Meme classes que l'ecran "formulaire" de RecherchePage
           (`.recherche-panel-form`), deja stylees pour les deux dispositions
           (bandeau repliable en mobile, panneau flottant en desktop). */}
-      <div className="recherche-panel-form" data-sheet-state={sheetState}>
+      <div
+        className="recherche-panel-form"
+        data-sheet-state={sheetState}
+        ref={formPanelRef}
+      >
         <button
           type="button"
           className="recherche-panel-form-handle"
@@ -637,7 +661,9 @@ function RecherchePageResults({
           uniquement (masque par defaut, affiche a partir de 768px comme
           panneau flottant independant, voir RecherchePageResults.css). */}
       {detailContent && (
-        <div className="resultats-detail-panel">{detailContent}</div>
+        <div className="resultats-detail-panel" ref={detailPanelRef}>
+          {detailContent}
+        </div>
       )}
     </div>
   );

@@ -11,7 +11,14 @@ import { useGlyphScale } from '../../lib/useGlyphScale';
 import { getModeStyle } from './modeStyles';
 import { getSegmentColor } from './segmentColor';
 import { useSharedMobilityStations } from './useSharedMobilityStations';
+import type { MapSafeAreaPadding } from './useMapSafeAreaPadding';
 import './MapView.css';
+
+/** Comportement d'avant #273 (aucun panneau, ou variant 'boxed') - voir MapViewProps#safeAreaPadding. */
+const DEFAULT_SAFE_AREA_PADDING: MapSafeAreaPadding = {
+  paddingTopLeft: [24, 24],
+  paddingBottomRight: [24, 24],
+};
 
 /**
  * Icones de marqueur en SVG inline (chaine HTML, pas JSX) : L.divIcon
@@ -204,6 +211,53 @@ interface MapViewProps {
    * composant.
    */
   variant?: 'boxed' | 'fullBleed';
+  /**
+   * Espace reellement occupe par les panneaux flottants qui chevauchent la
+   * carte (issue #273), a exclure du cadrage - voir `useMapSafeAreaPadding`.
+   * Absent : padding uniforme `[24, 24]` (comportement d'avant #273,
+   * toujours utilise par le variant 'boxed' ou aucun panneau ne chevauche la
+   * carte).
+   */
+  safeAreaPadding?: MapSafeAreaPadding;
+}
+
+/**
+ * Centre la carte sur `center` au niveau de zoom `zoom`, en tenant compte
+ * d'un padding asymetrique (issue #273) : si `paddingTopLeft` et
+ * `paddingBottomRight` ne sont pas egaux, le point n'est pas place au centre
+ * BRUT du viewport (`L.Map#setView` seul ne sait pas faire autrement), mais
+ * au centre de la portion de carte REELLEMENT visible (non recouverte par
+ * les panneaux flottants) - meme padding que celui donne a `fitBounds`
+ * ci-dessous, pour un seul et meme calcul d'occultation partout dans ce
+ * fichier plutot que deux logiques separees.
+ *
+ * Calcul par projection plutot que `panBy` (qui aurait pu sembler plus
+ * direct) : `panBy` anime un deplacement RELATIF au centre courant, ce qui
+ * suppose un ordre d'appels precis et rend le sens du decalage facile a
+ * inverser par erreur. Ici, on calcule directement les coordonnees
+ * geographiques du centre DEJA decale, puis un seul `setView` - deterministe,
+ * sans dependre d'un etat de vue intermediaire.
+ */
+function setViewWithSafeAreaPadding(
+  map: L.Map,
+  center: L.LatLngExpression,
+  zoom: number,
+  paddingTopLeft: [number, number],
+  paddingBottomRight: [number, number],
+): void {
+  const shiftX = (paddingTopLeft[0] - paddingBottomRight[0]) / 2;
+  const shiftY = (paddingTopLeft[1] - paddingBottomRight[1]) / 2;
+  if (shiftX === 0 && shiftY === 0) {
+    map.setView(center, zoom);
+    return;
+  }
+  // `project`/`unproject` a un zoom donne renvoient des coordonnees dans
+  // l'espace pixel "monde" de la projection (independant du panning actuel
+  // de la carte) - ce decalage n'a donc pas besoin que la vue soit deja
+  // positionnee sur `center` au prealable.
+  const targetPoint = map.project(center, zoom);
+  const shiftedPoint = targetPoint.subtract([shiftX, shiftY]);
+  map.setView(map.unproject(shiftedPoint, zoom), zoom);
 }
 
 /**
@@ -223,13 +277,19 @@ interface MapViewProps {
  * ni de tuple `center`, recrees a chaque rendu de MapView et donc inutiles
  * en dependance d'effet) : ce sont ces scalaires eux-memes qui declenchent
  * le recadrage quand ils changent, et l'effet peut tous les lister en
- * dependances sans avertissement `react-hooks/exhaustive-deps`.
+ * dependances sans avertissement `react-hooks/exhaustive-deps`. `padding`
+ * fait exception (objet compose de deux tuples) : voir MapView plus bas,
+ * qui le recree via `useMemo` a partir de ses propres scalaires pour la
+ * meme raison.
  *
  * @param swLat,swLng,neLat,neLng  coins sud-ouest / nord-est du rectangle a
  *   cadrer ; tous `undefined` quand il n'y a pas au moins deux points.
  * @param centerLat,centerLon  centre fixe a afficher quand il n'y a pas de
  *   rectangle (un seul point, ou vue par defaut).
  * @param zoom  niveau de zoom associe au centre fixe.
+ * @param padding  marges asymetriques issues de `useMapSafeAreaPadding`
+ *   (issue #273) - espace reellement occupe par les panneaux flottants qui
+ *   chevauchent la carte, a exclure du cadrage.
  * @returns rien (composant de pilotage, pas de rendu propre).
  */
 function MapViewController({
@@ -240,6 +300,7 @@ function MapViewController({
   centerLat,
   centerLon,
   zoom,
+  padding,
 }: {
   swLat: number | undefined;
   swLng: number | undefined;
@@ -248,6 +309,7 @@ function MapViewController({
   centerLat: number;
   centerLon: number;
   zoom: number;
+  padding: MapSafeAreaPadding;
 }) {
   const map = useMap();
 
@@ -258,18 +320,37 @@ function MapViewController({
       neLat !== undefined &&
       neLng !== undefined
     ) {
-      // Meme marge que l'ancien `boundsOptions` du <MapContainer>.
       map.fitBounds(
         L.latLngBounds([
           [swLat, swLng],
           [neLat, neLng],
         ]),
-        { padding: [24, 24] },
+        {
+          paddingTopLeft: padding.paddingTopLeft,
+          paddingBottomRight: padding.paddingBottomRight,
+        },
       );
     } else {
-      map.setView([centerLat, centerLon], zoom);
+      setViewWithSafeAreaPadding(
+        map,
+        [centerLat, centerLon],
+        zoom,
+        padding.paddingTopLeft,
+        padding.paddingBottomRight,
+      );
     }
-  }, [map, swLat, swLng, neLat, neLng, centerLat, centerLon, zoom]);
+  }, [
+    map,
+    swLat,
+    swLng,
+    neLat,
+    neLng,
+    centerLat,
+    centerLon,
+    zoom,
+    padding.paddingTopLeft,
+    padding.paddingBottomRight,
+  ]);
 
   return null;
 }
@@ -297,6 +378,7 @@ function MapView({
   className,
   variant = 'boxed',
   userPosition,
+  safeAreaPadding = DEFAULT_SAFE_AREA_PADDING,
 }: MapViewProps) {
   // Stations/vehicules en libre-service (issue #13) - couche independante
   // de l'itineraire recherche, affichee en permanence (comme la carte
@@ -402,7 +484,13 @@ function MapView({
     >
       <MapContainer
         {...(bounds
-          ? { bounds, boundsOptions: { padding: [24, 24] } }
+          ? {
+              bounds,
+              boundsOptions: {
+                paddingTopLeft: safeAreaPadding.paddingTopLeft,
+                paddingBottomRight: safeAreaPadding.paddingBottomRight,
+              },
+            }
           : {
               center: fixedCenterTuple,
               zoom: singlePoint ? SINGLE_POINT_ZOOM : DEFAULT_ZOOM,
@@ -430,6 +518,7 @@ function MapView({
           centerLat={fixedCenter.lat}
           centerLon={fixedCenter.lon}
           zoom={singlePoint ? SINGLE_POINT_ZOOM : DEFAULT_ZOOM}
+          padding={safeAreaPadding}
         />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
