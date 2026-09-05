@@ -740,4 +740,57 @@ describe('RecherchePageResults', () => {
       expect(panelForm(container)).toHaveAttribute('data-sheet-state', 'collapsed');
     });
   });
+
+  describe('detail par-dessus la liste en mobile (issue #280)', () => {
+    function panelForm(container: HTMLElement) {
+      const el = container.querySelector('.recherche-panel-form');
+      if (!el) throw new Error('.recherche-panel-form introuvable');
+      return el as HTMLElement;
+    }
+
+    function mobileOverlay(container: HTMLElement) {
+      const el = container.querySelector('.resultats-mobile-detail-overlay');
+      if (!el) throw new Error('.resultats-mobile-detail-overlay introuvable');
+      return el as HTMLElement;
+    }
+
+    it("l'overlay de detail est ferme par defaut, meme si le premier itineraire est deja selectionne", () => {
+      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+
+      expect(mobileOverlay(container)).toHaveAttribute('data-open', 'false');
+      expect(panelForm(container)).toHaveAttribute(
+        'data-mobile-detail-open',
+        'false',
+      );
+    });
+
+    it('un tap sur une carte ouvre le detail par-dessus la liste, qui se masque completement', async () => {
+      const user = userEvent.setup();
+      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+
+      await user.click(screen.getAllByRole('button', { name: /min/ })[0]);
+
+      expect(mobileOverlay(container)).toHaveAttribute('data-open', 'true');
+      expect(panelForm(container)).toHaveAttribute(
+        'data-mobile-detail-open',
+        'true',
+      );
+    });
+
+    it('le bouton "Retour à la liste" referme le detail et reaffiche la liste', async () => {
+      const user = userEvent.setup();
+      const { container } = renderResults([FAST_ITINERARY, SLOW_ITINERARY]);
+
+      await user.click(screen.getAllByRole('button', { name: /min/ })[0]);
+      await user.click(
+        screen.getByRole('button', { name: 'Retour à la liste' }),
+      );
+
+      expect(mobileOverlay(container)).toHaveAttribute('data-open', 'false');
+      expect(panelForm(container)).toHaveAttribute(
+        'data-mobile-detail-open',
+        'false',
+      );
+    });
+  });
 });

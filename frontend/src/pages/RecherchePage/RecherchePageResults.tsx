@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import Alert from '../../components/Alert/Alert';
 import Badge from '../../components/Badge/Badge';
+import Button from '../../components/Button/Button';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
@@ -452,6 +453,16 @@ function RecherchePageResults({
   const [sheetState, setSheetState] = useState<'collapsed' | 'expanded'>(
     'expanded',
   );
+  // Detail affiche par-dessus la carte recherche+liste en mobile (issue
+  // #280, retour utilisateur en session) : cette derniere est alors
+  // completement masquee ("liberer l'espace"), un bouton "Retour a la
+  // liste" explicite sur la carte de detail la referme - jamais les deux
+  // visibles en meme temps, il faut fermer le detail pour re-choisir un
+  // autre itineraire (flow en 2 etats, decision utilisateur). Ignore en
+  // desktop (voir RecherchePageResults.css) : `.resultats-detail-panel`
+  // s'affiche a cote de la liste, jamais par-dessus, pas besoin de la
+  // masquer.
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const touchStartY = useRef<number | null>(null);
   // Espace reellement occupe par les 2 panneaux flottants qui chevauchent la
   // carte (issue #273) - transmis a MapView pour que son cadrage n'aille pas
@@ -478,6 +489,14 @@ function RecherchePageResults({
 
   function selectItinerary(index: number) {
     setSelectedIndex(index);
+    // Sans effet en desktop (voir la CSS - la carte overlay mobile y reste
+    // masquee quel que soit cet etat), ouvre le detail par-dessus la liste
+    // en mobile (issue #280).
+    setMobileDetailOpen(true);
+  }
+
+  function closeMobileDetail() {
+    setMobileDetailOpen(false);
   }
 
   /**
@@ -611,6 +630,9 @@ function RecherchePageResults({
       <div
         className="recherche-panel-form"
         data-sheet-state={sheetState}
+        // Masquee en mobile pendant que le detail s'affiche par-dessus
+        // (issue #280) - sans effet en desktop, voir RecherchePageResults.css.
+        data-mobile-detail-open={mobileDetailOpen}
         ref={formPanelRef}
       >
         <button
@@ -646,17 +668,36 @@ function RecherchePageResults({
               directement au bouton. */}
           <div className="recherche-panel-form-results">
             {listSection}
-            {/* Detail EN PLUS de la liste, dans la meme carte : uniquement
-                en mobile (pas de place pour un panneau separe) - masque a
-                partir de 768px, voir RecherchePageResults.css. */}
-            {detailContent && (
-              <div className="resultats-detail resultats-detail--inline">
-                {detailContent}
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Detail de l'itineraire selectionne, PAR-DESSUS la carte
+          recherche+liste (issue #280, retour utilisateur en session) -
+          mobile uniquement (masquee a partir de 768px, voir
+          RecherchePageResults.css : desktop utilise le panneau flottant a
+          droite ci-dessous). Rendue meme masquee (`mobileDetailOpen` a
+          false) plutot que demontee/remontee a chaque tap : garde le focus
+          gerable simplement et evite de reconstruire ItinerarySegments a
+          chaque ouverture. */}
+      {detailContent && (
+        <div
+          className="resultats-mobile-detail-overlay"
+          data-open={mobileDetailOpen}
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            className="resultats-mobile-detail-close"
+            onClick={closeMobileDetail}
+          >
+            Retour à la liste
+          </Button>
+          <div className="resultats-detail resultats-mobile-detail-overlay-body">
+            {detailContent}
+          </div>
+        </div>
+      )}
 
       {/* Detail de l'itineraire selectionne, a DROITE de la carte de
           recherche (issue #234, retour utilisateur en session) - desktop
