@@ -43,6 +43,9 @@ function renderApp(initialPath = '/') {
 describe('App (navigation)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Persistance de la recherche entre navigations (issue #266) - voir le
+    // meme commentaire dans RecherchePage.spec.tsx.
+    sessionStorage.clear();
     vi.mocked(sharedMobilityLib.fetchSharedMobilityStations).mockResolvedValue(
       [],
     );

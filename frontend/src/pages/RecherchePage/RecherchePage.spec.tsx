@@ -81,6 +81,11 @@ async function selectAddress(
 describe('RecherchePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Persistance de la recherche entre navigations (issue #266) - sans ce
+    // nettoyage, un test qui saisit une recherche laisse un residu dans
+    // sessionStorage que le montage du test SUIVANT restaurerait a tort
+    // (jsdom ne vide jamais sessionStorage tout seul entre deux tests).
+    sessionStorage.clear();
     vi.mocked(placesLib.searchPlaces).mockResolvedValue([]);
     // Valeur par defaut sans raccourci (issue #112) - les tests qui verifient
     // les raccourcis eux-memes ecrasent ce mock avec des entrees explicites.
@@ -1177,6 +1182,68 @@ describe('RecherchePage', () => {
           'data-sheet-state',
           'expanded',
         );
+      },
+    );
+  });
+
+  describe('persistance de la recherche entre navigations (issue #266)', () => {
+    it(
+      'restaure origine et destination apres un remontage (changement de ' +
+        'page), sans recherche lancee',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockResolvedValue([GARE]);
+        const user = userEvent.setup();
+        const { unmount } = renderPage();
+
+        await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+        await user.type(screen.getByLabelText('Destination'), 'Mairie');
+
+        // Simule un changement de route (React demonte RecherchePage) puis
+        // un retour dessus (nouveau montage) - meme mecanique que la
+        // navigation reelle via react-router.
+        unmount();
+        renderPage();
+
+        expect(
+          await screen.findByDisplayValue('Gare Part-Dieu'),
+        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue('Mairie')).toBeInTheDocument();
+      },
+    );
+
+    it(
+      "restaure l'ecran resultats apres un remontage, sans refaire l'appel " +
+        'reseau (resultats deja connus, persistes avec la recherche)',
+      async () => {
+        vi.mocked(placesLib.searchPlaces).mockImplementation((query) =>
+          Promise.resolve(query === 'Gare' ? [GARE] : [HOTEL_DE_VILLE]),
+        );
+        const itineraries = [
+          { startTime: 't0', endTime: 't1', durationSeconds: 600, transfers: 0, segments: [] },
+        ];
+        vi.mocked(tripsLib.searchTrips).mockResolvedValue({ itineraries });
+        const user = userEvent.setup();
+        const { unmount } = renderPage();
+
+        await selectAddress(user, 'Origine', 'Gare', 'Gare Part-Dieu');
+        await selectAddress(user, 'Destination', 'Mairie', 'Hôtel de Ville');
+        await user.click(screen.getByRole('button', { name: 'Rechercher' }));
+        await waitFor(() =>
+          expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1),
+        );
+
+        unmount();
+        renderPage();
+
+        expect(await screen.findByLabelText('Origine')).toHaveValue(
+          'Gare Part-Dieu',
+        );
+        expect(screen.getByLabelText('Destination')).toHaveValue(
+          'Hôtel de Ville',
+        );
+        // Toujours un seul appel : le remontage restaure l'ecran resultats
+        // depuis sessionStorage plutot que de relancer GET /trips.
+        expect(tripsLib.searchTrips).toHaveBeenCalledTimes(1);
       },
     );
   });
