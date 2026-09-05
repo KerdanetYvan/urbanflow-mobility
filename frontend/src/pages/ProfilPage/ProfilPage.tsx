@@ -682,32 +682,38 @@ function ThemeSetting() {
 }
 
 /**
- * Niveaux du reglage de taille des reperes de carte (issue #246) - tableau
- * plutot que le seul booleen `GlyphSizePreference` actuel ('normal'/'large')
- * : meme motif que TRANSPORT_MODES/THEME_OPTIONS (avant sa bascule en
- * switch pour #245), pour que GlyphSizeSetting reste ecrit une bonne fois
- * pour toutes - un 3e palier futur (ex. "Tres grande") n'ajouterait qu'une
- * entree ici, sans toucher au stepper lui-meme.
+ * Niveaux du reglage de taille des reperes de carte (issue #246, etendu de
+ * 2 a 4 paliers par #272) - tableau plutot qu'un type fige : meme motif que
+ * TRANSPORT_MODES/THEME_OPTIONS (avant sa bascule en switch pour #245).
+ * Deja ecrit une bonne fois pour toutes lors de #246 ("un 3e palier futur
+ * n'ajouterait qu'une entree ici") : ce passage a 4 paliers ne touche que ce
+ * tableau, pas le stepper ci-dessous. `'medium'` (nouveau defaut, voir
+ * glyphSize.ts) reste au 2e rang de ce tableau, pas au 1er : le stepper
+ * demarre desormais sur cette entree plutot que sur la premiere.
  */
 const GLYPH_SIZE_LEVELS: { value: GlyphSizePreference; label: string }[] = [
-  { value: 'normal', label: 'Normale' },
+  { value: 'small', label: 'Petite' },
+  { value: 'medium', label: 'Moyenne' },
   { value: 'large', label: 'Grande' },
+  { value: 'xlarge', label: 'Très grande' },
 ];
 
 /**
- * Reglage de taille des reperes de la carte (issue #246) - un stepper
- * (boutons -/+ autour du niveau courant), pas un switch comme ThemeSetting
- * ci-dessus : decision UX prise en session - contrairement a "clair/sombre"
- * (une vraie bascule binaire, bien rendue par un interrupteur physique),
- * "normale/grande" se lit plus naturellement comme un CHOIX sur une echelle
- * ordonnee, et le stepper reste utilisable tel quel si un palier
- * intermediaire est ajoute plus tard (voir GLYPH_SIZE_LEVELS) - un switch
- * ne le permettrait pas sans redesign. `aria-live="polite"` sur le libelle
- * du niveau : annonce le changement aux lecteurs d'ecran sans deplacer le
- * focus (les 2 boutons restent sur place, contrairement a un <select> qui
- * aurait avale le focus dans sa propre liste d'options). Boutons desactives
- * en butee (`disabled`) plutot qu'un comportement cyclique (revenir a
- * "Normale" apres "Grande") : plus previsible, et l'etat desactive est
+ * Reglage de taille des reperes de la carte (issue #246, 4 paliers depuis
+ * #272) - un stepper (boutons -/+ autour du niveau courant), pas un switch
+ * comme ThemeSetting ci-dessus : decision UX prise en session -
+ * contrairement a "clair/sombre" (une vraie bascule binaire, bien rendue
+ * par un interrupteur physique), une echelle de tailles ordonnee se lit
+ * plus naturellement comme un CHOIX sur un axe, et le stepper reste
+ * utilisable tel quel quel que soit le nombre de paliers (voir
+ * GLYPH_SIZE_LEVELS, deja passe de 2 a 4 sans toucher au composant) - un
+ * switch ne le permettrait pas sans redesign. `aria-live="polite"` sur le
+ * libelle du niveau : annonce le changement aux lecteurs d'ecran sans
+ * deplacer le focus (les 2 boutons restent sur place, contrairement a un
+ * <select> qui aurait avale le focus dans sa propre liste d'options).
+ * Boutons desactives en butee (`disabled`) plutot qu'un comportement
+ * cyclique (revenir a "Petite" apres "Tres grande") : plus previsible, et
+ * l'etat desactive est
  * lui-meme un signal visuel qu'on est a une extremite.
  */
 function GlyphSizeSetting() {

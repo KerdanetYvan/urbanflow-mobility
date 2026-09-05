@@ -36,18 +36,28 @@ import './MapView.css';
  * noir/blanc (issue #244, convention universelle "arrivee/ligne d'arrivee")
  * plutot qu'un fanion de couleur.
  *
- * Fonctions de fabrique (pas des constantes de module, depuis issue #246)
- * parametrees par `scale` (voir useGlyphScale.ts - combine largeur d'ecran
- * et reglage manuel du Profil) : la taille de chaque glyphe doit pouvoir
- * changer en cours de session (redimensionnement/rotation d'ecran, ou
- * reglage change dans un autre onglet), impossible avec des `L.divIcon`
- * calcules une seule fois au chargement du module. `iconSize` ET
- * `iconAnchor` sont recalcules ensemble a partir des memes proportions
- * qu'a l'origine (scale=1 reproduit exactement les valeurs d'avant #246),
- * jamais l'un sans l'autre - un anchor qui ne suit pas la taille ferait
- * deriver le point du marqueur qui touche reellement la coordonnee
- * geographique (la pointe du pin, la base de la hampe...) au lieu de rester
- * colle dessus.
+ * buildOriginIcon/buildDestinationIcon sont des fonctions de fabrique (pas
+ * des constantes de module, depuis issue #246) parametrees par `scale`
+ * (voir useGlyphScale.ts - combine largeur d'ecran et reglage manuel du
+ * Profil) : la taille de ces deux glyphes doit pouvoir changer en cours de
+ * session (redimensionnement/rotation d'ecran, ou reglage change dans un
+ * autre onglet), impossible avec des `L.divIcon` calcules une seule fois au
+ * chargement du module. `iconSize` ET `iconAnchor` sont recalcules ensemble
+ * a partir des memes proportions qu'a l'origine (scale=1 reproduit
+ * exactement les valeurs d'avant #246), jamais l'un sans l'autre - un
+ * anchor qui ne suit pas la taille ferait deriver le point du marqueur qui
+ * touche reellement la coordonnee geographique (la pointe du pin, la base
+ * de la hampe...) au lieu de rester colle dessus.
+ *
+ * Seuls ces deux marqueurs suivent le reglage de taille (issue #272, revu
+ * en session apres verification visuelle reelle) : point de depart et
+ * point d'arrivee sont les reperes de navigation que l'utilisateur a
+ * besoin de voir clairement, contrairement aux correspondances/position/
+ * stations GBFS ci-dessous, qui restent a taille fixe. Un premier essai
+ * appliquant le meme facteur a TOUS les marqueurs rendait les stations
+ * libre-service illisibles en zone dense (chevauchement complet des
+ * puces) des le palier "tres grande" en mobile - l'inverse de l'objectif
+ * accessibilite de #272.
  */
 function buildOriginIcon(scale: number): L.DivIcon {
   // Carre, ancre au centre horizontal / bas (pointe du pin) - voir le
@@ -83,37 +93,40 @@ function buildDestinationIcon(scale: number): L.DivIcon {
   });
 }
 
-function buildTransferIcon(scale: number): L.DivIcon {
-  const size = 12 * scale;
-  return L.divIcon({
-    className: 'mapview-marker',
-    html: `<svg width="${size}" height="${size}" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#fff" stroke="#6b6375" stroke-width="2.5"/></svg>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
+/**
+ * Taille fixe (issue #272) : contrairement a buildOriginIcon/
+ * buildDestinationIcon, ne suit pas le reglage de taille des reperes - voir
+ * le commentaire en tete de fichier. Constante de module plutot que fabrique
+ * appelee a chaque rendu (comme avant #246) : rien ici ne varie jamais.
+ */
+const TRANSFER_ICON_SIZE = 12;
+const TRANSFER_ICON: L.DivIcon = L.divIcon({
+  className: 'mapview-marker',
+  html: `<svg width="${TRANSFER_ICON_SIZE}" height="${TRANSFER_ICON_SIZE}" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="#fff" stroke="#6b6375" stroke-width="2.5"/></svg>`,
+  iconSize: [TRANSFER_ICON_SIZE, TRANSFER_ICON_SIZE],
+  iconAnchor: [TRANSFER_ICON_SIZE / 2, TRANSFER_ICON_SIZE / 2],
+});
 
 /**
  * Icone d'une station/vehicule en libre-service (velos, trottinettes -
  * issue #13). Deja reconstruite a chaque rendu avant #246 (le badge affiche
- * le nombre de velos disponibles a l'instant, jamais une constante figee) -
- * `scale` est juste un parametre de plus, meme raisonnement que les
- * fonctions ci-dessus. Couleur = disponibilite reelle (var(--color-success)
- * au moins un velo louable, sinon var(--color-text-muted) - station fermee
- * a la location OU a quai plein/vide) plutot qu'une seule couleur "station
- * GBFS" fixe : c'est la disponibilite, pas la simple presence d'une
- * station, qui interesse l'usager sur cette carte.
+ * le nombre de velos disponibles a l'instant, jamais une constante figee).
+ * Taille fixe depuis #272 (ne suit plus le reglage de taille des reperes -
+ * voir le commentaire en tete de fichier) : les stations sont nombreuses et
+ * denses au centre-ville, les grossir en plus de leur nombre les rend
+ * illisibles (chevauchement des puces constate en verification reelle).
+ * Couleur = disponibilite reelle (var(--color-success) au moins un velo
+ * louable, sinon var(--color-text-muted) - station fermee a la location OU
+ * a quai plein/vide) plutot qu'une seule couleur "station GBFS" fixe : c'est
+ * la disponibilite, pas la simple presence d'une station, qui interesse
+ * l'usager sur cette carte.
  */
-function sharedMobilityIcon(
-  station: SharedMobilityStation,
-  scale: number,
-): L.DivIcon {
+function sharedMobilityIcon(station: SharedMobilityStation): L.DivIcon {
   const isAvailable = station.isRenting && station.bikesAvailable > 0;
   const fill = isAvailable ? 'var(--color-success)' : 'var(--color-text-muted)';
-  const size = 20 * scale;
-  // Taille de police proportionnelle au disque (9/20 du diametre d'origine)
-  // plutot qu'une valeur fixe : sinon le chiffre deborderait du disque a
-  // l'echelle "normal" mobile (x1.25) et davantage encore en "grand" (x1.75).
+  const size = 20;
+  // Taille de police proportionnelle au disque (9/20 du diametre) - le
+  // chiffre reste toujours a l'echelle du disque qui le porte.
   const fontSize = size * (9 / 20);
   return L.divIcon({
     className: 'mapview-marker',
@@ -134,18 +147,19 @@ function sharedMobilityIcon(
  * plutot que par une largeur/hauteur SVG - l'inline gagne sur la regle de
  * la feuille de style pour ces deux proprietes, sans toucher au reste
  * (couleur, bordure, animation de pulsation) qui reste porte par la classe.
+ * Taille fixe (issue #272) : ne suit pas le reglage de taille des reperes,
+ * voir le commentaire en tete de fichier. Constante de module plutot que
+ * fabrique appelee a chaque rendu (comme avant #246) : rien ici ne varie
+ * jamais.
  */
-function buildUserPositionIcon(scale: number): L.DivIcon {
-  const size = 18 * scale;
-  const dotSize = 12 * scale; // 0.75rem = 12px au repos, voir MapView.css.
-  const dotStyle = `width:${dotSize}px;height:${dotSize}px`;
-  return L.divIcon({
-    className: 'mapview-marker mapview-user-marker',
-    html: `<span class="mapview-user-marker-ring" style="${dotStyle}"></span><span class="mapview-user-marker-dot" style="${dotStyle}"></span>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
+const USER_POSITION_ICON_SIZE = 18;
+const USER_POSITION_DOT_SIZE = 12; // 0.75rem = 12px au repos, voir MapView.css.
+const USER_POSITION_ICON: L.DivIcon = L.divIcon({
+  className: 'mapview-marker mapview-user-marker',
+  html: `<span class="mapview-user-marker-ring" style="width:${USER_POSITION_DOT_SIZE}px;height:${USER_POSITION_DOT_SIZE}px"></span><span class="mapview-user-marker-dot" style="width:${USER_POSITION_DOT_SIZE}px;height:${USER_POSITION_DOT_SIZE}px"></span>`,
+  iconSize: [USER_POSITION_ICON_SIZE, USER_POSITION_ICON_SIZE],
+  iconAnchor: [USER_POSITION_ICON_SIZE / 2, USER_POSITION_ICON_SIZE / 2],
+});
 
 /** Simple point lat/lon, sans les metadonnees d'un TripPlace (nom...). */
 interface LatLon {
@@ -292,23 +306,16 @@ function MapView({
   const sharedMobilityStations = useSharedMobilityStations();
 
   // Facteur d'echelle des glyphes (issue #246 - ecran + reglage manuel du
-  // Profil, voir useGlyphScale.ts). useMemo par icone : ne reconstruit les
-  // L.divIcon (couteux comparativement a un simple recalcul de props) que
-  // lorsque le facteur change reellement, pas a chaque rendu de MapView
-  // (ex. mise a jour des stations GBFS toutes les minutes, sans rapport
-  // avec la taille des glyphes).
+  // Profil, voir useGlyphScale.ts) - depuis #272, ne s'applique plus qu'aux
+  // marqueurs origine/destination (voir le commentaire en tete de fichier).
+  // useMemo : ne reconstruit les L.divIcon (couteux comparativement a un
+  // simple recalcul de props) que lorsque le facteur change reellement, pas
+  // a chaque rendu de MapView (ex. mise a jour des stations GBFS toutes les
+  // minutes, sans rapport avec la taille des glyphes).
   const glyphScale = useGlyphScale();
   const originIcon = useMemo(() => buildOriginIcon(glyphScale), [glyphScale]);
   const destinationIcon = useMemo(
     () => buildDestinationIcon(glyphScale),
-    [glyphScale],
-  );
-  const transferIcon = useMemo(
-    () => buildTransferIcon(glyphScale),
-    [glyphScale],
-  );
-  const userPositionIcon = useMemo(
-    () => buildUserPositionIcon(glyphScale),
     [glyphScale],
   );
 
@@ -499,7 +506,7 @@ function MapView({
           <Marker
             key={index}
             position={[point.lat, point.lon]}
-            icon={transferIcon}
+            icon={TRANSFER_ICON}
             interactive={false}
             keyboard={false}
           />
@@ -514,7 +521,7 @@ function MapView({
           <Marker
             key={station.id}
             position={[station.lat, station.lon]}
-            icon={sharedMobilityIcon(station, glyphScale)}
+            icon={sharedMobilityIcon(station)}
             interactive={false}
             keyboard={false}
           />
@@ -527,7 +534,7 @@ function MapView({
           // pour se retrouver si besoin.
           <Marker
             position={[userPosition.lat, userPosition.lon]}
-            icon={userPositionIcon}
+            icon={USER_POSITION_ICON}
             interactive={false}
             keyboard={false}
           />

@@ -3,30 +3,48 @@ import {
   setStoredGlyphSizePreference,
 } from './glyphSize';
 
-describe('glyphSize (issue #246, taille des reperes de carte)', () => {
+describe('glyphSize (issue #246, 4 paliers depuis #272)', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("renvoie 'normal' par defaut, sans rien en localStorage", () => {
-    expect(getStoredGlyphSizePreference()).toBe('normal');
+  it("renvoie 'medium' par defaut, sans rien en localStorage", () => {
+    expect(getStoredGlyphSizePreference()).toBe('medium');
   });
 
-  it("renvoie 'normal' si la valeur stockee est corrompue/inattendue", () => {
+  it("renvoie 'medium' si la valeur stockee est corrompue/inattendue", () => {
     localStorage.setItem('urbanflow.glyphSize.v1', 'huge');
 
-    expect(getStoredGlyphSizePreference()).toBe('normal');
+    expect(getStoredGlyphSizePreference()).toBe('medium');
   });
 
-  it("retrouve une preference 'large' deja enregistree", () => {
+  it("migre l'ancien 'normal' (#246) vers 'medium', le nouveau defaut (#272)", () => {
+    localStorage.setItem('urbanflow.glyphSize.v1', 'normal');
+
+    expect(getStoredGlyphSizePreference()).toBe('medium');
+  });
+
+  it("conserve un ancien 'large' (#246) tel quel : reste 'large' (#272)", () => {
     localStorage.setItem('urbanflow.glyphSize.v1', 'large');
 
     expect(getStoredGlyphSizePreference()).toBe('large');
   });
 
-  it('setStoredGlyphSizePreference enregistre en localStorage', () => {
-    setStoredGlyphSizePreference('large');
+  it("retrouve une preference 'small' deja enregistree", () => {
+    localStorage.setItem('urbanflow.glyphSize.v1', 'small');
 
-    expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('large');
+    expect(getStoredGlyphSizePreference()).toBe('small');
+  });
+
+  it("retrouve une preference 'xlarge' deja enregistree", () => {
+    localStorage.setItem('urbanflow.glyphSize.v1', 'xlarge');
+
+    expect(getStoredGlyphSizePreference()).toBe('xlarge');
+  });
+
+  it('setStoredGlyphSizePreference enregistre en localStorage', () => {
+    setStoredGlyphSizePreference('xlarge');
+
+    expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('xlarge');
   });
 });
