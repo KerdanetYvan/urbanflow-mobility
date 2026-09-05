@@ -1,23 +1,23 @@
 import { act, renderHook } from '@testing-library/react';
 import { useGlyphSizePreference } from './useGlyphSizePreference';
 
-describe('useGlyphSizePreference (issue #246)', () => {
+describe('useGlyphSizePreference (issue #246, 4 paliers depuis #272)', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("demarre sur 'normal' quand rien n'est enregistre", () => {
+  it("demarre sur 'medium' quand rien n'est enregistre", () => {
     const { result } = renderHook(() => useGlyphSizePreference());
 
-    expect(result.current[0]).toBe('normal');
+    expect(result.current[0]).toBe('medium');
   });
 
   it('demarre sur la preference deja enregistree en localStorage', () => {
-    localStorage.setItem('urbanflow.glyphSize.v1', 'large');
+    localStorage.setItem('urbanflow.glyphSize.v1', 'xlarge');
 
     const { result } = renderHook(() => useGlyphSizePreference());
 
-    expect(result.current[0]).toBe('large');
+    expect(result.current[0]).toBe('xlarge');
   });
 
   it('change la preference et le localStorage ensemble', () => {

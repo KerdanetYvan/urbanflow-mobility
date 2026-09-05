@@ -415,7 +415,7 @@ describe('ProfilPage', () => {
     });
   });
 
-  describe('reglage de taille des reperes de carte (issue #246)', () => {
+  describe('reglage de taille des reperes de carte (issue #246, 4 paliers depuis #272)', () => {
     beforeEach(() => {
       localStorage.clear();
       vi.mocked(profileLib.getMyProfile).mockResolvedValue({
@@ -428,15 +428,15 @@ describe('ProfilPage', () => {
       });
     });
 
-    it("affiche un stepper (pas un switch) sur 'Normale' par defaut, bouton '-' desactive", async () => {
+    it("affiche un stepper (pas un switch) sur 'Moyenne' par defaut (nouveau defaut #272), les deux boutons actifs", async () => {
       renderPage();
 
-      expect(await screen.findByText('Normale')).toBeInTheDocument();
+      expect(await screen.findByText('Moyenne')).toBeInTheDocument();
       expect(
         screen.getByRole('button', {
           name: 'Réduire la taille des repères de la carte',
         }),
-      ).toBeDisabled();
+      ).toBeEnabled();
       expect(
         screen.getByRole('button', {
           name: 'Agrandir les repères de la carte',
@@ -446,27 +446,7 @@ describe('ProfilPage', () => {
       expect(screen.getAllByRole('switch')).toHaveLength(1);
     });
 
-    it('un clic sur "+" enregistre la preference "large" et desactive "+" a son tour', async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      await user.click(
-        await screen.findByRole('button', {
-          name: 'Agrandir les repères de la carte',
-        }),
-      );
-
-      expect(screen.getByText('Grande')).toBeInTheDocument();
-      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('large');
-      expect(
-        screen.getByRole('button', {
-          name: 'Agrandir les repères de la carte',
-        }),
-      ).toBeDisabled();
-    });
-
-    it('un clic sur "-" depuis "Grande" revient a "Normale"', async () => {
-      localStorage.setItem('urbanflow.glyphSize.v1', 'large');
+    it("un clic sur '-' depuis 'Moyenne' descend a 'Petite', bouton '-' desactive a son tour", async () => {
       const user = userEvent.setup();
       renderPage();
 
@@ -476,8 +456,37 @@ describe('ProfilPage', () => {
         }),
       );
 
-      expect(screen.getByText('Normale')).toBeInTheDocument();
-      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('normal');
+      expect(screen.getByText('Petite')).toBeInTheDocument();
+      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('small');
+      expect(
+        screen.getByRole('button', {
+          name: 'Réduire la taille des repères de la carte',
+        }),
+      ).toBeDisabled();
+    });
+
+    it("2 clics sur '+' depuis 'Moyenne' montent jusqu'a 'Très grande', bouton '+' desactive a son tour", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const incrementButton = await screen.findByRole('button', {
+        name: 'Agrandir les repères de la carte',
+      });
+
+      await user.click(incrementButton);
+      expect(screen.getByText('Grande')).toBeInTheDocument();
+      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('large');
+
+      await user.click(incrementButton);
+      expect(screen.getByText('Très grande')).toBeInTheDocument();
+      expect(localStorage.getItem('urbanflow.glyphSize.v1')).toBe('xlarge');
+      expect(incrementButton).toBeDisabled();
+    });
+
+    it("retrouve un ancien reglage 'large' (#246) migre vers 'Grande', un cran au-dessus du nouveau defaut", async () => {
+      localStorage.setItem('urbanflow.glyphSize.v1', 'large');
+      renderPage();
+
+      expect(await screen.findByText('Grande')).toBeInTheDocument();
     });
   });
 

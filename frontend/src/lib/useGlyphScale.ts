@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { GlyphSizePreference } from './glyphSize';
 import { useGlyphSizePreference } from './useGlyphSizePreference';
 
 /**
@@ -11,24 +12,37 @@ import { useGlyphSizePreference } from './useGlyphSizePreference';
 const DESKTOP_MEDIA_QUERY = '(min-width: 768px)';
 
 /**
- * Agrandissement de base selon la largeur d'ecran (issue #246, acceptance
- * 1) : plus grand sur petit ecran (mobile, lu "de pres" en mobilite, voir
- * CLAUDE.md - mobile-first) que sur desktop, qui garde les tailles
- * d'origine (verifiees visuellement lors de #244) comme reference. Pas
- * l'inverse (desktop plus grand) : un petit ecran n'implique pas un besoin
- * de precision plus fine, au contraire.
+ * Agrandissement de base selon la largeur d'ecran (issue #246, revu a la
+ * hausse par #272 - retour testeur : "toujours trop petit meme en grande",
+ * sur mobile ET desktop, mobile percu comme encore plus petit) : plus grand
+ * sur petit ecran (mobile, lu "de pres" en mobilite, voir CLAUDE.md -
+ * mobile-first) que sur desktop. Desktop ne garde plus les tailles
+ * d'origine telles quelles (contrairement a #246) : meme le desktop devait
+ * grossir, l'ecart entre les deux se creuse simplement un peu plus qu'avant
+ * (x1.33 aujourd'hui contre x1.25 a l'origine).
  */
-const MOBILE_SCALE = 1.25;
-const DESKTOP_SCALE = 1;
+const MOBILE_SCALE = 2;
+const DESKTOP_SCALE = 1.5;
 
 /**
- * Multiplicateur du reglage manuel "agrandir les reperes" (issue #246,
- * acceptance 2) - s'applique PAR-DESSUS l'agrandissement de base ci-dessus,
- * jamais a sa place : un usager sur mobile qui active le reglage cumule les
- * deux (1.25 x 1.4 = 1.75), coherent avec "qui agrandit ENCORE les
- * glyphes" (formulation de l'issue).
+ * Multiplicateur du reglage manuel de taille (issue #246, etendu a 4
+ * paliers par #272) - s'applique PAR-DESSUS l'agrandissement de base
+ * ci-dessus, jamais a sa place. `'medium'` (nouveau defaut, voir
+ * glyphSize.ts) depasse deja `'large'` d'avant #272 une fois combine a
+ * MOBILE_SCALE/DESKTOP_SCALE ci-dessus : le testeur trouvait l'ancien
+ * maximum trop petit, ce nouveau defaut ne pouvait donc pas repartir du
+ * meme point. Valeurs de depart, a affiner apres verification visuelle
+ * reelle dans le navigateur (voir issue #272) - aucun plafond volontaire
+ * sur `'xlarge'` combine a MOBILE_SCALE : c'est precisement le cas d'usage
+ * accessibilite vise, un usager qui le choisit veut le repere le plus gros
+ * possible.
  */
-const LARGE_PREFERENCE_MULTIPLIER = 1.4;
+const PREFERENCE_MULTIPLIERS: Record<GlyphSizePreference, number> = {
+  small: 0.8,
+  medium: 1.1,
+  large: 1.4,
+  xlarge: 1.7,
+};
 
 /**
  * Facteur d'echelle combine (ecran x reglage manuel) a appliquer aux tailles
@@ -55,8 +69,7 @@ export function useGlyphScale(): number {
   }, []);
 
   const breakpointScale = isDesktop ? DESKTOP_SCALE : MOBILE_SCALE;
-  const preferenceScale =
-    preference === 'large' ? LARGE_PREFERENCE_MULTIPLIER : 1;
+  const preferenceScale = PREFERENCE_MULTIPLIERS[preference];
 
   return breakpointScale * preferenceScale;
 }
