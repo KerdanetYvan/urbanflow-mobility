@@ -13,9 +13,15 @@ coverage/
 routing-engine/data/*
 !routing-engine/data/.gitkeep
 
-# Donnes superpowers (Claude Skill)
+# Outillage local de Claude Code et des skills (specifique a la machine /
+# a la session, aucun interet dans le depot - et .claude/settings.local.json
+# porterait des regles de permission avec des adresses d'infrastructure).
+.claude/
+skills-lock.json
 superpowers/
+.impeccable/
 
-# Cache local du hook de detection Impeccable (chemins de fichiers absolus
-# specifiques a la machine, pas d'interet en dehors de la session en cours)
-.impeccable/hook.cache.json
+# Documents d'enonce fournis par l'ecole (sujet, grille, guide de soutenance) :
+# depot public, on ne redistribue pas ces PDF. Le dossier rendu en juillet
+# (UrbanFlow_Mobility_Dossier.md) reste versionne comme reference.
+docs/documents_juillet/*.pdf
