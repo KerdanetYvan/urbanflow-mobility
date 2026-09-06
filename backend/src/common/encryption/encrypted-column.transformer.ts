@@ -32,6 +32,39 @@ const ALGORITHM = 'aes-256-gcm';
 /** 12 octets recommandes pour GCM (NIST SP 800-38D) - pas la taille de bloc AES (16). */
 const IV_LENGTH_BYTES = 12;
 
+/** Nombre d'octets attendus une fois la cle decodee depuis le base64 (AES-256). */
+const KEY_LENGTH_BYTES = 32;
+
+/**
+ * Decode et valide une cle de chiffrement fournie en base64.
+ *
+ * Extraite de getEncryptionKey() pour etre reutilisable telle quelle par la
+ * validation d'environnement au demarrage (voir src/config/env.validation.ts) :
+ * une seule definition de "cle valide" (presente + 32 octets une fois decodee),
+ * partagee entre le fail-fast au boot et l'usage a chaud par le transformer.
+ *
+ * @param encoded valeur brute de GEOLOCATION_ENCRYPTION_KEY (ou undefined si absente)
+ * @returns la cle decodee, garantie longue de 32 octets
+ * @throws si la valeur est absente/vide, ou ne decode pas en exactement 32 octets
+ */
+export function decodeEncryptionKey(encoded: string | undefined): Buffer {
+  if (!encoded) {
+    throw new Error(
+      "GEOLOCATION_ENCRYPTION_KEY manquante - requise des qu'une colonne " +
+        'utilise createEncryptedColumnTransformer (voir docs/specs/rgpd-geolocalisation.md)',
+    );
+  }
+  const key = Buffer.from(encoded, 'base64');
+  if (key.length !== KEY_LENGTH_BYTES) {
+    throw new Error(
+      'GEOLOCATION_ENCRYPTION_KEY doit decoder en exactement 32 octets ' +
+        '(AES-256) une fois interpretee en base64 - generer avec ' +
+        '`openssl rand -base64 32`',
+    );
+  }
+  return key;
+}
+
 /**
  * Cle de chiffrement, lue a chaque appel plutot que mise en cache au chargement
  * du module : permet aux tests de la faire varier (voir le .spec.ts associe)
@@ -40,22 +73,7 @@ const IV_LENGTH_BYTES = 12;
  * affaibli si la variable est absente ou mal dimensionnee.
  */
 function getEncryptionKey(): Buffer {
-  const encoded = process.env.GEOLOCATION_ENCRYPTION_KEY;
-  if (!encoded) {
-    throw new Error(
-      "GEOLOCATION_ENCRYPTION_KEY manquante - requise des qu'une colonne " +
-        'utilise createEncryptedColumnTransformer (voir docs/specs/rgpd-geolocalisation.md)',
-    );
-  }
-  const key = Buffer.from(encoded, 'base64');
-  if (key.length !== 32) {
-    throw new Error(
-      'GEOLOCATION_ENCRYPTION_KEY doit decoder en exactement 32 octets ' +
-        '(AES-256) une fois interpretee en base64 - generer avec ' +
-        '`openssl rand -base64 32`',
-    );
-  }
-  return key;
+  return decodeEncryptionKey(process.env.GEOLOCATION_ENCRYPTION_KEY);
 }
 
 /**

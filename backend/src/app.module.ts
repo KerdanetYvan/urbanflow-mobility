@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { validateEnv } from './config/env.validation';
 import { GbfsModule } from './gbfs/gbfs.module';
 import { GtfsModule } from './gtfs/gtfs.module';
 import { GtfsRealtimeModule } from './gtfs-realtime/gtfs-realtime.module';
@@ -21,6 +22,11 @@ import { UsersModule } from './users/users.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../.env'],
+      // Fail-fast au demarrage si un secret critique manque ou est invalide
+      // (issue #281 : GEOLOCATION_ENCRYPTION_KEY absente du .env prod n'avait
+      // rien casse au boot, seulement fait echouer silencieusement toutes les
+      // ecritures chiffrees ensuite). Voir src/config/env.validation.ts.
+      validate: validateEnv,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
