@@ -41,11 +41,21 @@ Vérifié en conditions réelles : 12 requêtes consécutives vers `/auth/login`
 
 **Correctif.** `npm audit fix` appliqué des deux côtés (0 vulnérabilité restante, confirmé par un nouveau `npm audit`) ; `.github/dependabot.yml` ajouté (`npm` sur `backend/` et `frontend/`, `github-actions` sur le pipeline CI, vérification hebdomadaire).
 
-## 4. Limite documentée, non corrigée
+## 4. Limite documentée — levée depuis (issue #268, Sprint 5)
 
-**A07 — Pas de rotation stricte du refresh token.** `AuthService.refresh()` vérifie le refresh token présenté et émet une nouvelle paire de jetons, mais **n'invalide jamais l'ancien refresh token** : celui-ci reste valide jusqu'à sa propre expiration (7 jours), même après qu'un nouveau a été émis. Une vraie rotation (au sens OWASP) exigerait d'invalider systématiquement le jeton présenté et de détecter sa réutilisation (signal de vol) — ce qui suppose un stockage des jetons émis (ou de leur identifiant), absent aujourd'hui du modèle de données.
+**A07 — Rotation stricte du refresh token : désormais implémentée.**
 
-**Décision** : reportée en Stretch plutôt que corrigée dans le cadre de cette issue — une vraie rotation avec détection de réutilisation est une fonctionnalité à part entière (nouvelle table, logique de révocation, migration), disproportionnée par rapport au périmètre "audit + correctifs ciblés" de #21. Documentée ici pour rester visible plutôt que silencieusement oubliée.
+*État initial (Sprint 3)* : `AuthService.refresh()` vérifiait le refresh token présenté et émettait une nouvelle paire, mais **n'invalidait jamais l'ancien** — il restait valide jusqu'à sa propre expiration (7 jours). Reporté en Stretch car une vraie rotation est une fonctionnalité à part entière (nouvelle table, logique de révocation, migration), hors du périmètre "audit + correctifs ciblés" de #21.
+
+*Corrigé par [#268](https://github.com/KerdanetYvan/urbanflow-mobility/issues/268)* :
+
+- Nouvelle table `refresh_tokens` (`src/auth/refresh-token.entity.ts`, migration `1788456000000-RefreshTokens`) : un `jti` par refresh token émis, rattaché à une `family_id` (= la session), avec `consumed_at` / `revoked_at`.
+- `AuthService.refresh()` confronte le `jti` du JWT à cette table à chaque appel : **usage unique** (le jeton présenté est marqué `consumed_at` et remplacé) ; **détection de rejeu** (un jeton déjà consommé, re-présenté au-delà d'une fenêtre de grâce de 15 s, déclenche la révocation de **toute la famille** — déconnexion forcée de la session, `logger.warn`).
+- Fenêtre de grâce de 15 s + single-flight côté client (`frontend/src/lib/api.ts`) : les rafraîchissements quasi simultanés (plusieurs onglets partageant le même refresh token) ne sont pas pris pour un rejeu.
+- Purge quotidienne des lignes expirées (`@Cron`, comme `TripHistoryService`).
+- Tests : rotation nominale, rejeu → révocation famille, fenêtre de grâce, jti inconnu, jeton legacy sans `jti`, non-régression login (`src/auth/auth.service.spec.ts`) + single-flight client (`src/lib/api.spec.ts`).
+
+*Hors périmètre #268* : pas de `POST /auth/logout` révoquant la famille côté serveur (la déconnexion reste un `clearTokens()` client) — noté comme suivi possible.
 
 ## 5. Autres points déjà couverts, confirmés sans modification
 
@@ -80,9 +90,9 @@ Le constat initial (« les appels sortants... jamais une URL construite à parti
 - **A06 (dépendances)** : `npm audit` refait sur les deux sous-projets, 0 vulnérabilité (contre 4 high + 7 en #21) — Dependabot (ajouté en #21) a fait son travail depuis.
 - **A05 (secrets/config)** : job CI `gitleaks` ajouté (scan de l'historique git complet à chaque push/PR) ; `.gitignore` racine étendu à `.env*` (ne couvrait que `.env` exact).
 
-### 7.3 Limite de #21 toujours non corrigée
+### 7.3 Limite de #21, restée non corrigée à l'issue de #262
 
-**A07 — rotation du refresh token.** Toujours pas de révocation à l'émission d'un nouveau refresh token (voir section 4) — hors périmètre de #262 également, un vrai correctif suppose une nouvelle table de jetons révoqués. Reste documenté ici plutôt qu'oublié.
+**A07 — rotation du refresh token.** Toujours pas de révocation à l'émission d'un nouveau refresh token au moment de #262 — hors périmètre, un vrai correctif suppose une nouvelle table. **Levée depuis par [#268](https://github.com/KerdanetYvan/urbanflow-mobility/issues/268) (Sprint 5) : voir section 4.**
 
 ### 7.4 Gap révélé par cet audit, hors périmètre sécurité pur
 

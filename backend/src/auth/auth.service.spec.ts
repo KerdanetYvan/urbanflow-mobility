@@ -11,9 +11,47 @@ describe('AuthService', () => {
     findByValidResetToken: jest.Mock;
     resetPassword: jest.Mock;
   };
-  let jwtService: { signAsync: jest.Mock; verifyAsync: jest.Mock };
+  let jwtService: {
+    signAsync: jest.Mock;
+    verifyAsync: jest.Mock;
+    decode: jest.Mock;
+  };
   let configService: { get: jest.Mock };
   let mailService: { sendPasswordResetEmail: jest.Mock };
+  let refreshTokensRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+    findOne: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
+
+  /** Dernier appel a refreshTokensRepository.update, sous forme de tuple [filtre, patch]. */
+  function lastUpdateCall(): [
+    Record<string, unknown>,
+    Record<string, unknown>,
+  ] {
+    const calls = refreshTokensRepository.update.mock.calls;
+    return calls[calls.length - 1] as [
+      Record<string, unknown>,
+      Record<string, unknown>,
+    ];
+  }
+
+  /** Ligne `refresh_tokens` complete, seuls les champs varies par le test sont a fournir. */
+  function storedToken(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'jti-1',
+      familyId: 'fam-1',
+      userId: 'user-1',
+      expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+      consumedAt: null,
+      revokedAt: null,
+      replacedBy: null,
+      createdAt: new Date(),
+      ...overrides,
+    };
+  }
 
   // Instanciation directe (pas de module NestJS complet) : AuthService n'a
   // aucune logique liee au systeme d'injection de dependances lui-meme,
@@ -26,7 +64,14 @@ describe('AuthService', () => {
       findByValidResetToken: jest.fn(),
       resetPassword: jest.fn(),
     };
-    jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
+    jwtService = {
+      signAsync: jest.fn(),
+      verifyAsync: jest.fn(),
+      // Par defaut : un `exp` a +7 j, comme un vrai refresh token signe.
+      decode: jest.fn(() => ({
+        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      })),
+    };
     // Renvoie simplement la valeur par defaut passee en 2eme argument : se
     // comporte comme un ConfigService qui n'aurait rien de configure,
     // suffisant pour ces tests (on ne teste pas ConfigService lui-meme).
@@ -36,12 +81,20 @@ describe('AuthService', () => {
     mailService = {
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
     };
+    refreshTokensRepository = {
+      create: jest.fn((row: unknown) => row),
+      save: jest.fn().mockResolvedValue(undefined),
+      findOne: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      delete: jest.fn().mockResolvedValue({ affected: 0 }),
+    };
 
     service = new AuthService(
       usersService as never,
       jwtService as never,
       configService as never,
       mailService as never,
+      refreshTokensRepository as never,
     );
   });
 
@@ -93,12 +146,16 @@ describe('AuthService', () => {
     });
   });
 
-  describe('refresh', () => {
-    it("emet une nouvelle paire de jetons a partir d'un refresh token valide", async () => {
-      jwtService.verifyAsync.mockResolvedValue({
-        sub: 'user-1',
-        email: 'alice@example.com',
-      });
+  describe('refresh (rotation stricte, issue #268)', () => {
+    /** Claims d'un refresh token verifie : identite + jti + famille. */
+    const VALID_CLAIMS = {
+      sub: 'user-1',
+      email: 'alice@example.com',
+      jti: 'jti-1',
+      fam: 'fam-1',
+    };
+
+    beforeEach(() => {
       usersService.findById.mockResolvedValue({
         id: 'user-1',
         email: 'alice@example.com',
@@ -106,6 +163,11 @@ describe('AuthService', () => {
       jwtService.signAsync
         .mockResolvedValueOnce('new-access-token')
         .mockResolvedValueOnce('new-refresh-token');
+    });
+
+    it('emet une nouvelle paire et consomme le refresh token presente', async () => {
+      jwtService.verifyAsync.mockResolvedValue(VALID_CLAIMS);
+      refreshTokensRepository.findOne.mockResolvedValue(storedToken());
 
       const result = await service.refresh('un-refresh-token-valide');
 
@@ -113,26 +175,116 @@ describe('AuthService', () => {
         accessToken: 'new-access-token',
         refreshToken: 'new-refresh-token',
       });
+      // Le jeton courant est marque consomme et relie a son remplacant.
+      expect(refreshTokensRepository.update).toHaveBeenCalledTimes(1);
+      const [idArg, patch] = lastUpdateCall();
+      expect(idArg).toBe('jti-1');
+      expect(patch.consumedAt).toBeInstanceOf(Date);
+      expect(typeof patch.replacedBy).toBe('string');
+      // Une nouvelle ligne est persistee pour le refresh token emis.
+      expect(refreshTokensRepository.save).toHaveBeenCalled();
     });
 
-    it('rejette un refresh token invalide/expire', async () => {
+    it('rejette (et ne consomme rien) si la signature JWT est invalide/expiree', async () => {
       jwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
 
       await expect(service.refresh('token-invalide')).rejects.toThrow(
         UnauthorizedException,
       );
+      expect(refreshTokensRepository.update).not.toHaveBeenCalled();
     });
 
-    it("rejette si l'utilisateur associe au refresh token n'existe plus", async () => {
+    it('rejette un refresh token anterieur a la rotation (aucun claim jti)', async () => {
       jwtService.verifyAsync.mockResolvedValue({
-        sub: 'user-supprime',
-        email: 'parti@example.com',
+        sub: 'user-1',
+        email: 'alice@example.com',
       });
+
+      await expect(service.refresh('token-legacy')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(refreshTokensRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('revoque la famille annoncee si le jti est inconnu en base', async () => {
+      jwtService.verifyAsync.mockResolvedValue(VALID_CLAIMS);
+      refreshTokensRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.refresh('jti-fantome')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      const [filter, patch] = lastUpdateCall();
+      expect(filter).toMatchObject({ familyId: 'fam-1' });
+      expect(patch.revokedAt).toBeInstanceOf(Date);
+    });
+
+    it('rejette si la famille est deja revoquee', async () => {
+      jwtService.verifyAsync.mockResolvedValue(VALID_CLAIMS);
+      refreshTokensRepository.findOne.mockResolvedValue(
+        storedToken({ revokedAt: new Date() }),
+      );
+
+      await expect(service.refresh('token-famille-revoquee')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('REJEU : un token deja consomme (hors fenetre de grace) revoque toute la famille', async () => {
+      jwtService.verifyAsync.mockResolvedValue(VALID_CLAIMS);
+      refreshTokensRepository.findOne.mockResolvedValue(
+        storedToken({ consumedAt: new Date(Date.now() - 60_000) }),
+      );
+
+      await expect(service.refresh('token-rejoue')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      const [filter, patch] = lastUpdateCall();
+      expect(filter).toMatchObject({ familyId: 'fam-1' });
+      expect(patch.revokedAt).toBeInstanceOf(Date);
+    });
+
+    it('fenetre de grace : un token consomme il y a < 15 s re-emet une paire sans revoquer', async () => {
+      jwtService.verifyAsync.mockResolvedValue(VALID_CLAIMS);
+      refreshTokensRepository.findOne.mockResolvedValue(
+        storedToken({ consumedAt: new Date(Date.now() - 3_000) }),
+      );
+
+      const result = await service.refresh('token-refresh-concurrent');
+
+      expect(result).toEqual({
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+      });
+      // Ni revocation de famille, ni re-consommation du jeton deja consomme.
+      expect(refreshTokensRepository.update).not.toHaveBeenCalled();
+      expect(refreshTokensRepository.save).toHaveBeenCalled();
+    });
+
+    it("revoque la famille si l'utilisateur associe n'existe plus", async () => {
+      jwtService.verifyAsync.mockResolvedValue(VALID_CLAIMS);
+      refreshTokensRepository.findOne.mockResolvedValue(storedToken());
       usersService.findById.mockResolvedValue(null);
 
       await expect(
         service.refresh('token-utilisateur-supprime'),
       ).rejects.toThrow(UnauthorizedException);
+      const [filter, patch] = lastUpdateCall();
+      expect(filter).toMatchObject({ familyId: 'fam-1' });
+      expect(patch.revokedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('purgeExpiredRefreshTokens', () => {
+    it('supprime les lignes dont expires_at est passe', async () => {
+      refreshTokensRepository.delete.mockResolvedValue({ affected: 4 });
+
+      await service.purgeExpiredRefreshTokens();
+
+      expect(refreshTokensRepository.delete).toHaveBeenCalledTimes(1);
+      const [criteria] = refreshTokensRepository.delete.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
+      expect(criteria).toHaveProperty('expiresAt');
     });
   });
 
