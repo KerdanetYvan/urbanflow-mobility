@@ -23,7 +23,7 @@ Architecture : frontend SPA et backend API REST strictement séparés (pas de fr
 
 ## Fonctionnalités obligatoires (F1 à F3)
 
-1. **F1 — Comptes et profils** : inscription, connexion, gestion d'un profil de mobilité (préférences de transport, contraintes d'accessibilité comme l'évitement des escaliers).
+1. **F1 — Comptes et profils** : inscription, connexion, gestion d'un profil de mobilité (préférences de transport, contraintes d'accessibilité comme l'évitement des escaliers). Le sélecteur de modes du profil ne propose que les modes réellement produits par le routage (marche, vélo, bus, tram, métro, train régional) — covoiturage et trottinette libre-service en ont été retirés (#278), traités comme sources d'opérateurs externes intégrables via flux conforme, pas comme préférence de profil.
 2. **F2 — Planification d'itinéraires** : recherche multimodale, géolocalisation en temps réel, affichage cartographique.
 3. **F3 — Intégration transport** : connexion aux flux GTFS et GBFS des opérateurs de la métropole.
 

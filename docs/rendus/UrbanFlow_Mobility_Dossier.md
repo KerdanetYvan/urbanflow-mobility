@@ -226,6 +226,7 @@ puppeteer:
    - [6.1 Indicateurs de qualité suivis](#61-indicateurs-de-qualité-suivis)
    - [6.2 Démarche d'amélioration continue](#62-démarche-damélioration-continue)
    - [6.3 Boucle de capitalisation](#63-boucle-de-capitalisation)
+   - [6.4 Bilan quantitatif de la démarche](#64-bilan-quantitatif-de-la-démarche)
 7. [Spécifications détaillées d'une fonctionnalité clé](#7-spécifications-détaillées-dune-fonctionnalité-clé)
    - [7.1 Présentation et objectifs de la fonctionnalité](#71-présentation-et-objectifs-de-la-fonctionnalité)
    - [7.2 Spécifications fonctionnelles](#72-spécifications-fonctionnelles)
@@ -239,6 +240,7 @@ puppeteer:
    - [9.1 Détection et priorisation des anomalies](#91-détection-et-priorisation-des-anomalies)
    - [9.2 Processus de correction](#92-processus-de-correction)
    - [9.3 Approche spécifique à la phase de préproduction](#93-approche-spécifique-à -la-phase-de-préproduction)
+   - [9.4 Cas concrets de bogues traités](#94-cas-concrets-de-bogues-traités)
 10. [Contraintes transverses (sécurité, RGPD, accessibilité, éco-conception, PWA, performance)](#10-contraintes-transverses)
     - [10.1 Sécurité des données](#101-sécurité-des-données)
     - [10.2 RGPD et données de géolocalisation](#102-rgpd-et-données-de-géolocalisation)
@@ -246,6 +248,8 @@ puppeteer:
     - [10.4 Éco-conception](#104-éco-conception)
     - [10.5 PWA et performance en mobilité](#105-pwa-et-performance-en-mobilité)
 11. [Conclusion et perspectives](#11-conclusion-et-perspectives)
+    - [11.1 Perspectives et feuille de route post-MVP](#111-perspectives-et-feuille-de-route-post-mvp)
+    - [11.2 Écarts, frictions et enseignements (post-mortem)](#112-écarts-frictions-et-enseignements-post-mortem)
 12. [Annexes](#12-annexes)
 
 ---
@@ -267,7 +271,7 @@ Cette étude retrace l'ensemble de la démarche suivie, depuis l'analyse du beso
 <a id="21-présentation-du-commanditaire-et-du-contexte"></a>
 ### 2.1 Présentation du commanditaire et du contexte
 
-Le commanditaire du projet est une métropole de 500 000 habitants engagée dans une politique de transition écologique. Comme beaucoup de grandes agglomérations françaises et européennes, elle fait face à trois problématiques qui se renforcent mutuellement : une congestion routière chronique aux heures de pointe, un niveau de pollution atmosphérique et sonore préoccupant, et une offre de mobilité fragmentée où chaque mode de transport (bus, tram, vélos et trottinettes en libre-service, covoiturage) fonctionne avec ses propres outils, sans vision d'ensemble pour l'usager.
+Le commanditaire du projet est une métropole de 500 000 habitants engagée dans une politique de transition écologique. Le prototype a été développé et déployé sur les données réelles de **Rennes Métropole** (flux GTFS et GBFS du réseau STAR, données OpenStreetMap), retenue comme métropole de référence : agglomération d'environ 460 000 habitants aujourd'hui, dont la trajectoire démographique la situe autour des 500 000 à l'horizon de quelques années, avec un réseau multimodal (métro, bus, vélos en libre-service) suffisamment complet pour éprouver la plateforme en conditions réalistes. Comme beaucoup de grandes agglomérations françaises et européennes, elle fait face à trois problématiques qui se renforcent mutuellement : une congestion routière chronique aux heures de pointe, un niveau de pollution atmosphérique et sonore préoccupant, et une offre de mobilité fragmentée où chaque mode de transport (bus, tram, vélos et trottinettes en libre-service, covoiturage) fonctionne avec ses propres outils, sans vision d'ensemble pour l'usager.
 
 Dans ce contexte, la métropole souhaite se doter d'une plateforme unifiée capable de repenser la façon dont ses citoyens organisent leurs déplacements, en s'appuyant sur les technologies numériques et l'intelligence artificielle. Ce projet s'inscrit dans une démarche plus large de "Mobility as a Service" (MaaS), un modèle déjà expérimenté dans plusieurs villes européennes, qui vise à agréger l'ensemble des offres de mobilité au sein d'une application centrale.
 
@@ -456,6 +460,8 @@ Le cahier des charges impose une architecture PWA (*Progressive Web App*). Ce ch
 
 **Recommandation retenue : Scaleway ou OVHcloud.** Ce choix répond directement à deux contraintes du cahier des charges : la RGPD (données hébergées en France/UE) et l'éco-conception (engagements environnementaux documentés), tout en restant cohérent avec le profil du commanditaire — une collectivité publique française.
 
+**Mise en œuvre effective : OVHcloud.** Le prototype est déployé sur un serveur OVHcloud (VPS, data center en France), avec **Caddy** en reverse proxy sur l'hôte (terminaison TLS, en-têtes de sécurité, routage `/api` vers le backend) et les services applicatifs (backend NestJS, PostgreSQL/PostGIS, OpenTripPlanner, géocodeur, relai mail) en conteneurs Docker Compose. Le déploiement est automatisé : à chaque fusion sur la branche principale, la CI reconstruit le frontend, synchronise les fichiers statiques et redémarre les conteneurs du serveur (détail du pipeline en [partie 5.2](#52-environnement-et-outils-de-travail)).
+
 <a id="310-stack-technique-retenue--synthèse"></a>
 ### 3.10 Stack technique retenue — synthèse
 
@@ -466,8 +472,8 @@ Le cahier des charges impose une architecture PWA (*Progressive Web App*). Ce ch
 | Backend | NestJS (Node.js/TypeScript) | [3.7](#37-benchmark-des-frameworks-backend) |
 | Base de données | PostgreSQL + extension PostGIS | [3.8](#38-benchmark-des-bases-de-données) |
 | Moteur de routage | OpenTripPlanner | [3.3](#33-moteur-de-calcul-ditinéraires-multimodaux) |
-| Hébergement | Scaleway ou OVHcloud | [3.9](#39-benchmark-des-hébergeurs-cloud) |
-| Authentification | JWT avec refresh tokens, mots de passe hachés (bcrypt) | — |
+| Hébergement | OVHcloud (VPS en France), Caddy en reverse proxy, conteneurs Docker Compose | [3.9](#39-benchmark-des-hébergeurs-cloud) |
+| Authentification | JWT avec refresh tokens à rotation, mots de passe hachés (bcrypt) | [Annexe C](#annexe-c-authentification-jwt-et-refresh-tokens) |
 
 <a id="311-synthèse-des-arbitrages"></a>
 ### 3.11 Synthèse des arbitrages
@@ -502,12 +508,18 @@ config:
 ---
 flowchart TB
     subgraph Client
-        PWA[PWA React - Frontend]
+        PWA[PWA React + service worker]
     end
 
-    subgraph Backend["Backend NestJS"]
+    subgraph Edge["Serveur OVHcloud"]
+        CADDY[Caddy - reverse proxy / TLS]
+    end
+
+    subgraph Backend["Backend NestJS - conteneurs Docker Compose"]
         API[API REST]
-        SVC[Services métiers]
+        SCORE[Service de scoring]
+        RT[Caches temps réel<br/>GBFS + GTFS-Realtime]
+        PUSH[Notifications push]
     end
 
     subgraph Données
@@ -516,30 +528,41 @@ flowchart TB
 
     subgraph Externe["Services externes"]
         OTP[OpenTripPlanner]
-        GTFS[Flux GTFS / GTFS-RT]
-        GBFS[Flux GBFS vélos-trottinettes]
+        NOM[Géocodeur Nominatim]
+        METEO[API météo]
+        FLUX[Flux GTFS / GTFS-RT / GBFS<br/>opérateurs de la métropole]
     end
 
-    PWA -->|Requêtes HTTPS/REST| API
-    API --> SVC
-    SVC --> DB
-    SVC -->|Appels routage| OTP
-    OTP --> GTFS
-    OTP --> GBFS
+    PWA -->|HTTPS/REST| CADDY --> API
+    API --> DB
+    API -->|calcul d'itinéraires| OTP
+    API -->|adresses| NOM
+    API --> SCORE
+    SCORE --> METEO
+    SCORE --> RT
+    RT --> FLUX
+    OTP --> FLUX
+    RT -->|perturbation détectée| PUSH --> PWA
 ```
 
-Ce schéma en couches sépare clairement l'interface utilisateur, la logique métier et les données, avec le moteur de routage traité comme un service externe interchangeable — cohérent avec la logique d'évolutivité posée en [partie 2.6](#26-anticiper-les-évolutions-futures).
+Ce schéma sépare l'interface utilisateur, la logique métier et les données, avec le moteur de routage et les flux opérateurs traités comme des services externes interchangeables, cohérent avec la logique d'évolutivité posée en [partie 2.6](#26-anticiper-les-évolutions-futures). Le service de scoring ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)), les caches temps réel et le canal de notifications sont des modules du backend, ajoutés au fil des itérations sans remettre en cause cette structure en couches.
 
 <a id="42-description-des-composants"></a>
 ### 4.2 Description des composants
 
 | Composant | Rôle | Détaillé en |
 |---|---|---|
-| PWA (React) | Interface utilisateur, planification et suivi des trajets, installation sur l'écran d'accueil | [3.6](#36-benchmark-des-frameworks-frontend) |
-| API REST (NestJS) | Point d'entrée unique du backend, expose les ressources (utilisateurs, trajets, réservations) | [3.7](#37-benchmark-des-frameworks-backend) |
-| Services métiers | Logique applicative (calcul d'itinéraire, gestion des réservations, calcul d'empreinte carbone) | — |
-| Base de données (PostgreSQL/PostGIS) | Stockage des utilisateurs, trajets, réservations, données géospatiales | [3.8](#38-benchmark-des-bases-de-données) |
+| PWA (React) | Interface utilisateur, planification et suivi des trajets, affichage cartographique, installation sur l'écran d'accueil | [3.6](#36-benchmark-des-frameworks-frontend) |
+| Caddy (reverse proxy) | Terminaison TLS, en-têtes de sécurité HTTP, routage `/api` vers le backend et service des fichiers statiques du frontend | [3.9](#39-benchmark-des-hébergeurs-cloud) |
+| API REST (NestJS) | Point d'entrée unique du backend : comptes et profils, recherche et historique de trajets, trajet suivi, abonnements de notification | [3.7](#37-benchmark-des-frameworks-backend) |
+| Service de scoring | Classement pondéré des itinéraires renvoyés par OpenTripPlanner selon la météo, les perturbations et le profil de l'usager | [7.3](#73-spécifications-techniques) |
+| Caches temps réel (GBFS, GTFS-Realtime) | Disponibilité des vélos/trottinettes en station et perturbations en cours, rafraîchis en tâche de fond et servis depuis la mémoire | [7.3](#73-spécifications-techniques) |
+| Notifications push (Web Push / VAPID) | Alerte l'usager qui suit un trajet dès qu'une perturbation est détectée sur sa ligne | [7.2](#72-spécifications-fonctionnelles) |
+| Base de données (PostgreSQL/PostGIS) | Comptes, profils de mobilité, historique et trajets suivis, données géospatiales ; coordonnées et libellés d'adresse chiffrés au repos | [3.8](#38-benchmark-des-bases-de-données) |
 | OpenTripPlanner | Calcul des itinéraires multimodaux à partir des flux GTFS/GBFS | [3.3](#33-moteur-de-calcul-ditinéraires-multimodaux) |
+| Géocodeur (Nominatim) | Résolution des adresses saisies en coordonnées, sur les données OpenStreetMap de la métropole | — |
+
+La **réservation unifiée** et le **calculateur d'empreinte carbone**, évoqués dans la demande initiale ([partie 2.2](#22-analyse-de-la-demande-client)), ne font pas partie du périmètre implémenté : le cahier des charges n'impose qu'une fonctionnalité au choix ([partie 2.5](#25-recueil-et-hiérarchisation-des-besoins)), et celle retenue est le classement personnalisé ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)). Ces deux briques sont replacées comme évolutions en [partie 11.1](#111-perspectives-et-feuille-de-route-post-mvp).
 
 <a id="43-nomenclature-et-conventions"></a>
 ### 4.3 Nomenclature et conventions
@@ -566,6 +589,8 @@ Cette homogénéité facilite la lecture du code lors des revues et réduit le r
 | Fonctionnalité complémentaire | Détaillée en [partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé) | Au choix |
 
 Le profil de mobilité (F1) et le planificateur (F2) couvrent directement les besoins des deux personas présentés en [partie 2.3](#23-cibles-et-personas) : le premier permet de préciser des préférences comme l'évitement des escaliers ou un mode de transport prioritaire, utile pour un usager comme Muriel, tandis que le second doit rester utilisable sans apprentissage préalable du réseau, condition posée par le profil d'Antoine.
+
+Les préférences de mode du profil portent sur les modes réellement produits par le moteur de routage dans cette version (marche, vélo, bus, tram, métro, train régional). Le vélo/trottinette en libre-service et le covoiturage restent traités comme des **sources de données d'opérateurs externes**, intégrables via un flux GBFS/GTFS conforme sans modification du code applicatif ([partie 4.5](#45-évolutivité-et-maintenabilité)) : le libre-service en station est déjà affiché sur la carte (disponibilité temps réel), son intégration au calcul d'itinéraire multimodal et le covoiturage dynamique relèvent des évolutions listées en [partie 11.1](#111-perspectives-et-feuille-de-route-post-mvp).
 
 Le détail fonctionnel et technique complet de la fonctionnalité complémentaire retenue est traité spécifiquement en [partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé), pour éviter les redites : cette partie 4 se concentre sur l'architecture d'ensemble et les modules du socle commun.
 
@@ -599,15 +624,18 @@ Ce choix permet d'intégrer progressivement les fonctionnalités obligatoires pu
 |---|---|---|
 | Gestion de version | Git / GitHub | Historique du code, branches par fonctionnalité |
 | Suivi de l'avancement | GitHub Projects (tableau Kanban) | Backlog, sprint en cours, colonnes À faire / En cours / En revue / Terminé |
-| Intégration continue | GitHub Actions | Lancement automatique des tests et du linter à chaque push |
+| Intégration et déploiement continus | GitHub Actions | Tests, lint, audit WCAG et scan de secrets à chaque push ; déploiement automatique sur fusion vers la branche principale |
 | Tests d'API | Postman | Vérification manuelle et automatisée des endpoints REST |
 | Tests unitaires | Jest (backend), Vitest (frontend) | Tests du backend NestJS et des composants React |
 | Tests d'accessibilité end-to-end | Playwright + axe-core | Audit WCAG 2.1 AA en conditions réelles, exécuté automatiquement en CI |
-| Documentation | README + Notion | Documentation technique du dépôt et suivi de projet |
+| Scan de secrets | gitleaks | Détection de secrets commités, sur l'historique complet, à chaque push |
+| Documentation | README + dossier `docs/` versionné dans le dépôt | Spécifications, décisions d'architecture, plans et rétrospectives de sprint |
 | Design d'interface | Figma | Maquettes des écrans avant développement frontend |
 | Assistance au développement | Assistant IA de codage | Accélération de l'écriture de code sous supervision directe, relecture et validation systématiques avant intégration |
 
 Ces outils ont été choisis pour leur gratuité (ou leur plan gratuit suffisant à l'échelle du projet), leur bonne intégration avec la stack retenue en partie 3, et leur usage répandu dans l'industrie, ce qui limite le risque de dépendre d'un outil peu documenté ou abandonné.
+
+**Pipeline d'intégration et de déploiement.** Chaque push déclenche, en parallèle : lint et tests unitaires des deux sous-projets, audit d'accessibilité WCAG de bout en bout (Playwright + axe-core, sur une pile applicative montée pour l'occasion), et scan de secrets sur l'historique git complet. Toute fusion vers la branche principale enchaîne, si ces vérifications passent, sur un déploiement automatique du serveur OVHcloud (reconstruction du frontend, synchronisation des fichiers statiques, redémarrage des conteneurs). Deux garde-fous ont été ajoutés en cours de projet à la suite d'incidents réels (voir [partie 9.4](#94-cas-concrets-de-bogues-traités)) : une file d'attente empêchant deux déploiements concurrents de se disputer les mêmes conteneurs, et une vérification qui compare les variables d'environnement du serveur à celles attendues par le code et alerte en cas d'écart.
 
 Le recours à un assistant IA de codage mérite une précision : il est utilisé comme un outil d'accélération de la production de code, au même titre qu'un autocomplete avancé ou qu'un pair-programmeur, mais chaque ligne produite est relue, comprise et validée avant d'être intégrée. La responsabilité du code, sa correction et sa justification restent entièrement assumées dans le cadre du projet, y compris lors des revues de code en face-à-face.
 
@@ -697,7 +725,7 @@ Cette logique rejoint l'esprit du Kaizen : privilégier une série de petites am
 <a id="63-boucle-de-capitalisation"></a>
 ### 6.3 Boucle de capitalisation
 
-Pour que chaque cycle profite réellement au suivant, les décisions prises en rétrospective sont consignées (README technique, tickets GitHub Projects), plutôt que de rester une remarque orale vite oubliée.
+Pour que chaque cycle profite réellement au suivant, les décisions prises en rétrospective sont consignées, plutôt que de rester une remarque orale vite oubliée. Concrètement, l'historique des décisions du projet est **consultable en continu** à travers quatre traces croisées, versionnées dans le dépôt : les messages de commits et les *pull requests* (une par unité de travail, avec sa justification), les tickets GitHub fermés (127 à ce jour, reliés aux commits qui les traitent), les plans de sprint (`docs/sprints/sprint-N-plan.md`, qui figent l'ordre et le raisonnement décidés en séance) et les rétrospectives de fin de sprint (`docs/sprints/sprint-N-retro.md`). Toute décision d'architecture argumentée renvoie à ce dossier ; toute convention qui évolue est répercutée dans `CLAUDE.md`, le fichier de contexte de conception à la racine du dépôt.
 
 ```mermaid
 ---
@@ -706,7 +734,7 @@ config:
   theme: neo
 ---
 flowchart TB
-    A[Rétrospective de sprint] --> B[Décision consignee]
+    A[Rétrospective de sprint] --> B[Décision consignée]
     B --> C{Type de problème}
     C -->|Ponctuel| D[Traitement dans le sprint suivant]
     C -->|Récurrent| E[Ajustement structurel]
@@ -722,6 +750,23 @@ Deux cas sont distingués :
 
 Cette distinction évite de traiter chaque problème comme un cas isolé et permet à la démarche qualité de rester utile sur la durée du projet plutôt que de se limiter à un contrôle final avant livraison.
 
+<a id="64-bilan-quantitatif-de-la-démarche"></a>
+### 6.4 Bilan quantitatif de la démarche
+
+Au terme du projet, la démarche qualité se traduit par les indicateurs suivants (état à la clôture, dépôt public sur GitHub) :
+
+| Indicateur | Valeur |
+|---|---|
+| Durée du projet | 7 semaines, 5 sprints de 2 semaines |
+| Tickets fermés / ouverts | 127 / 2 |
+| *Pull requests* fusionnées | 151 (une par unité de travail, chacune passée en revue avant fusion) |
+| Tests automatisés | ~272 tests backend (Jest, 35 suites), ~345 tests frontend (Vitest, 36 suites) |
+| Tests end-to-end | 2 suites API (dont une de non-régression sur le rate limiting), 1 suite d'audit WCAG 2.1 AA (Playwright + axe-core) exécutée à chaque push |
+| Audits transverses | Audit OWASP en deux passes (cadrage initial puis audit dédié approfondi), audit d'accessibilité WCAG automatisé en CI, scan de secrets sur l'historique git |
+| Corrections issues des tests en conditions réelles | Plusieurs constats remontés par des revues manuelles de bout en bout ont donné lieu à des sprints de correction dédiés (voir [partie 9.4](#94-cas-concrets-de-bogues-traités)) |
+
+Ces chiffres ne valent pas pour eux-mêmes : ils traduisent surtout que la vérification a été **continue** (à chaque push, à chaque fin de sprint) plutôt que concentrée dans un contrôle final, et que chaque anomalie détectée a laissé une trace exploitable : un ticket, une *pull request*, souvent un test de non-régression.
+
 ---
 
 <a id="7-spécifications-détaillées-dune-fonctionnalité-clé"></a>
@@ -730,7 +775,7 @@ Cette distinction évite de traiter chaque problème comme un cas isolé et perm
 <a id="71-présentation-et-objectifs-de-la-fonctionnalité"></a>
 ### 7.1 Présentation et objectifs de la fonctionnalité
 
-La fonctionnalité complémentaire choisie est l'**optimisation d'itinéraires par IA en temps réel**, identifiée comme besoin secondaire en [partie 2.5](#25-recueil-et-hiérarchisation-des-besoins). Elle vient s'ajouter au planificateur multimodal de base ([partie 3.3](#33-moteur-de-calcul-ditinéraires-multimodaux)) plutôt que le remplacer : OpenTripPlanner reste responsable du calcul des itinéraires possibles à partir des flux GTFS/GBFS, et cette fonctionnalité ajoute une couche d'ajustement au-dessus, capable de tenir compte de conditions changeantes (perturbations, météo) et des préférences propres à chaque usager.
+La fonctionnalité complémentaire choisie est l'**optimisation d'itinéraires par IA en temps réel**, reprise telle quelle de la liste des fonctionnalités au choix du cahier des charges et identifiée comme besoin secondaire en [partie 2.5](#25-recueil-et-hiérarchisation-des-besoins). La [partie 7.3](#73-spécifications-techniques) précise ce que recouvre ici le terme d'IA : une aide à la décision par pondération explicite, pas un modèle d'apprentissage. Elle vient s'ajouter au planificateur multimodal de base ([partie 3.3](#33-moteur-de-calcul-ditinéraires-multimodaux)) plutôt que le remplacer : OpenTripPlanner reste responsable du calcul des itinéraires possibles à partir des flux GTFS/GBFS, et cette fonctionnalité ajoute une couche d'ajustement au-dessus, capable de tenir compte de conditions changeantes (perturbations, météo) et des préférences propres à chaque usager.
 
 L'objectif n'est pas de calculer "LE" meilleur trajet dans l'absolu, mais le trajet le plus pertinent pour une personne donnée, à un instant donné. C'est exactement ce que recherche un usager comme [Antoine](#23-cibles-et-personas) : un trajet fiable proposé sans qu'il ait à comparer lui-même plusieurs options.
 
@@ -739,7 +784,7 @@ L'objectif n'est pas de calculer "LE" meilleur trajet dans l'absolu, mais le tra
 
 Deux cas d'usage principaux sont couverts :
 
-**Recherche avec classement personnalisé.** Lorsqu'un usager demande un itinéraire, plusieurs propositions issues du moteur de routage sont comparées et classées selon plusieurs critères, chacun avec un niveau d'importance réglable, plutôt que par le seul temps de trajet théorique :
+**Recherche avec classement personnalisé.** Lorsqu'un usager demande un itinéraire, plusieurs propositions issues du moteur de routage sont comparées et classées selon plusieurs critères, chacun affecté d'un poids explicite et modifiable, plutôt que par le seul temps de trajet théorique :
 
 | Critère | Exemple d'impact |
 |---|---|
@@ -749,7 +794,7 @@ Deux cas d'usage principaux sont couverts :
 | Perturbations en cours | Déprioritise une ligne signalée en incident via GTFS-Realtime |
 | Préférences enregistrées | Priorise ou évite un mode de transport selon le profil de mobilité ([partie 4.4](#44-spécifications-fonctionnelles-des-modules-principaux)) |
 
-**Ajustement en cours de trajet.** Si un incident survient après le départ (ligne interrompue, retard important), une notification est envoyée avec un itinéraire de substitution recalculé, plutôt que de laisser l'usager découvrir le problème une fois bloqué sur place — un point qui rejoint directement la situation vécue par [Muriel](#23-cibles-et-personas) lors d'un imprévu sur son trajet.
+**Ajustement en cours de trajet.** Si un incident est signalé sur la ligne d'un trajet suivi après le départ (ligne interrompue, retard important), le backend relance un calcul d'itinéraire tenant compte de la perturbation et envoie une notification push ; à l'ouverture de l'application, l'usager retrouve des itinéraires réévalués, plutôt que de découvrir le problème une fois bloqué sur place. C'est la situation vécue par [Muriel](#23-cibles-et-personas) lors d'un imprévu sur son trajet.
 
 <a id="73-spécifications-techniques"></a>
 ### 7.3 Spécifications techniques
@@ -762,16 +807,18 @@ config:
 ---
 flowchart LR
     OTP[OpenTripPlanner] --> SCORE[Service de scoring]
-    METEO[API meteo] --> SCORE
+    METEO[API météo] --> SCORE
     GTFSRT[GTFS-Realtime] --> SCORE
-    PROFIL[Profil de mobilite] --> SCORE
-    SCORE --> RESULT[Itineraires classes]
+    PROFIL[Profil de mobilité] --> SCORE
+    SCORE --> RESULT[Itinéraires classés]
     RESULT --> APP[PWA]
 ```
 
-Le service de scoring est un module backend dédié (NestJS), interrogé après chaque appel au moteur de routage. Il attribue à chaque critère du tableau précédent un niveau d'importance clair et modifiable, plutôt qu'un modèle de machine learning opaque : ce choix a été fait pour rester réaliste sur un projet individuel, tout en gardant un résultat justifiable et modifiable.
+**Ce que fait, et ne fait pas, cette IA.** OpenTripPlanner conserve le calcul d'itinéraires proprement dit : il explore le graphe des transports (algorithmes de plus court chemin de type Dijkstra, et RAPTOR pour le volet transports en commun) et renvoie plusieurs itinéraires candidats. La brique ajoutée ici n'est pas un moteur de graphe supplémentaire, ni un modèle d'apprentissage : c'est une **fonction de coût par somme pondérée** appliquée aux itinéraires déjà calculés. Chaque critère du tableau ci-dessus reçoit un poids explicite, défini dans un unique fichier de configuration (`scoring-weights.const.ts`). Le coût total de chaque itinéraire est la combinaison linéaire de ces critères, et le classement est le tri par coût croissant. Cette approche relève de l'**analyse multicritère d'aide à la décision** (*weighted sum model*), pas du *machine learning*.
 
-Ces niveaux d'importance par défaut sont calibrés manuellement, mais chaque usager peut les affiner via son profil de mobilité (par exemple, donner plus de poids à la fiabilité qu'à la rapidité). Le réajustement en cours de trajet s'appuie sur un abonnement aux mises à jour GTFS-Realtime : une perturbation détectée sur la ligne empruntée déclenche un nouveau calcul et une notification push vers la PWA.
+Ce choix est délibéré sur un projet individuel. Le résultat est **justifiable** (on peut expliquer au tableau pourquoi tel trajet passe devant tel autre), **débogable**, **ajustable** sans ré-entraînement, et il ne dépend d'aucun volume de données d'entraînement qui n'existe pas encore. Le terme d'IA est employé ici au sens large d'aide à la décision automatisée ; la trajectoire vers un modèle prédictif entraîné sur l'usage réel est traitée en [partie 7.4](#74-limites-et-évolutions-possibles).
+
+Les poids par défaut sont calibrés manuellement. L'usager les ajuste indirectement via les **préférences de son profil de mobilité** : cocher un mode de transport préféré ajoute un bonus aux itinéraires qui l'empruntent, cocher la limitation des correspondances ou de la distance de marche augmente la pénalité correspondante. Ce ne sont pas des curseurs numériques mais des préférences catégorielles, qui restent le levier de personnalisation du classement. Le réajustement en cours de trajet s'appuie sur un abonnement aux mises à jour GTFS-Realtime : une perturbation détectée sur la ligne empruntée déclenche un nouveau calcul et une notification push vers la PWA.
 
 <a id="74-limites-et-évolutions-possibles"></a>
 ### 7.4 Limites et évolutions possibles
@@ -887,10 +934,10 @@ config:
   theme: neo
 ---
 flowchart TB
-    A[Anomalie detectee] --> B[Classification par severite]
+    A[Anomalie détectée] --> B[Classification par sévérité]
     B --> C[Ticket GitHub Projects]
-    C --> D[Correction sur branche dediee]
-    D --> E[Test de non-regression ajoute]
+    C --> D[Correction sur branche dédiée]
+    D --> E[Test de non-régression ajouté]
     E --> F[Revue de code]
     F --> G[Fusion sur la branche principale]
 ```
@@ -908,6 +955,19 @@ La phase de préproduction concentre une vigilance particulière, car c'est le d
 
 Un gel des nouvelles fonctionnalités est observé dans les derniers jours précédant chaque mise en production : seules les corrections de bogues bloquants ou majeurs sont encore acceptées, afin de ne pas introduire un nouveau risque au moment même où l'on cherche à en réduire.
 
+<a id="94-cas-concrets-de-bogues-traités"></a>
+### 9.4 Cas concrets de bogues traités
+
+Trois exemples réels illustrent le processus des parties 9.1 à 9.3, du symptôme à la mesure de fond.
+
+**Historique de trajets vide en production : variable d'environnement manquante.** *Symptôme :* l'écran d'historique restait vide alors que des recherches avaient bien été faites. *Investigation :* reproduction locale, puis diagnostic sur le serveur : la clé de chiffrement au repos (`GEOLOCATION_ENCRYPTION_KEY`, [annexe E](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation)) était **absente du fichier de configuration du serveur**. Comme ce fichier est maintenu à la main (hors dépôt, pour ne pas versionner de secrets), l'ajout d'une nouvelle variable au code ne se propage pas tout seul. Chaque écriture chiffrée échouait donc en silence, la fonction d'enregistrement de l'historique avalant l'erreur par conception (pour ne jamais faire échouer une recherche). *Correctif :* ajout de la variable côté serveur. *Mesure de fond :* une validation au démarrage qui **fait échouer le lancement** si un secret critique manque ou est mal dimensionné (plutôt qu'une dégradation invisible), et une étape de CI qui compare les variables du serveur à celles attendues et alerte en cas d'écart. Le même diagnostic a révélé que les clés de notifications push manquaient aussi, corrigé dans la foulée.
+
+**Rotation du refresh token : écart dossier / code.** *Symptôme :* l'annexe C du dossier décrivait la rotation du refresh token comme un principe appliqué, alors que le code se contentait d'émettre un nouveau jeton sans invalider l'ancien (limite explicitement notée lors de l'audit OWASP). *Traitement :* traité comme une fonctionnalité à part entière : nouvelle table de suivi des jetons, détection de rejeu, tests dédiés (rotation nominale, rejeu, non-régression du flux de connexion). *Mesure de fond :* mise à jour du dossier pour que l'annexe C reflète l'état réel du code, et pas l'intention.
+
+**Repli "trajet à pied" partout : données de transport périmées.** *Symptôme :* pendant une courte période, toutes les recherches ne renvoyaient qu'un itinéraire à pied. *Cause :* le flux GTFS chargé dans le moteur de routage a une fenêtre de validité glissante ; une fois dépassée, le moteur n'a plus aucun service à proposer et se rabat silencieusement sur la marche. *Mesure de fond :* un rafraîchissement automatique hebdomadaire du flux GTFS en production, pour que la fenêtre de validité ne se referme jamais sans intervention.
+
+Point commun aux trois : le correctif ponctuel ne suffit pas : chaque cas se conclut par une mesure qui empêche la classe de problème de se reproduire silencieusement (validation au démarrage, vérification de CI, tâche planifiée), dans la logique de distinction entre anomalie ponctuelle et problème récurrent de la [partie 6.3](#63-boucle-de-capitalisation).
+
 ---
 
 <a id="10-contraintes-transverses"></a>
@@ -918,7 +978,7 @@ Ces contraintes s'appliquent à l'ensemble de la plateforme plutôt qu'à un mod
 <a id="101-sécurité-des-données"></a>
 ### 10.1 Sécurité des données
 
-La sécurité s'appuie sur les standards OWASP déjà mentionnés en partie 2.5, déclinés en pratiques concrètes : authentification par JWT avec refresh tokens et mots de passe hachés (bcrypt), déjà posée comme choix technique en [partie 3.10](#310-stack-technique-retenue--synthèse) *(fonctionnement détaillé en [annexe C](#annexe-c-authentification-jwt-et-refresh-tokens) et [annexe D](#annexe-d-hachage-des-mots-de-passe-avec-bcrypt))* ; validation systématique des données entrantes côté API pour se prémunir des injections ; communications chiffrées en HTTPS de bout en bout ; et une limitation du nombre de requêtes (rate limiting) sur les endpoints sensibles, notamment ceux liés à l'authentification.
+La sécurité s'appuie sur les standards OWASP déjà mentionnés en partie 2.5, déclinés en pratiques concrètes : authentification par JWT avec refresh tokens **à rotation et détection de rejeu** et mots de passe hachés (bcrypt), déjà posée comme choix technique en [partie 3.10](#310-stack-technique-retenue--synthèse) *(fonctionnement détaillé en [annexe C](#annexe-c-authentification-jwt-et-refresh-tokens) et [annexe D](#annexe-d-hachage-des-mots-de-passe-avec-bcrypt))* ; validation systématique des données entrantes côté API pour se prémunir des injections ; communications chiffrées en HTTPS de bout en bout ; en-têtes de sécurité HTTP standards ; et une limitation du nombre de requêtes (rate limiting) sur les endpoints sensibles, notamment ceux liés à l'authentification. Ces points ont fait l'objet d'un audit OWASP dédié en cours de projet, qui a donné lieu à plusieurs correctifs (rate limiting, en-têtes, restriction explicite de l'algorithme de signature des jetons).
 
 Les données de géolocalisation méritent une vigilance particulière : elles permettent de reconstituer des habitudes de déplacement (domicile, lieu de travail, horaires), ce qui en fait une catégorie de données particulièrement sensible si elle venait à fuiter. *(Cartographie détaillée des risques en [annexe E](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation).)*
 
@@ -939,7 +999,7 @@ Cette exigence dépasse le seul champ de l'interface : le profil de mobilité (F
 <a id="104-éco-conception"></a>
 ### 10.4 Éco-conception
 
-L'éco-conception s'appuie sur le référentiel RGESN (Référentiel Général d'Écoconception de Services Numériques), avec plusieurs leviers concrets : hébergement chez un fournisseur français aux engagements environnementaux documentés (Scaleway ou OVHcloud, déjà argumenté en [partie 3.9](#39-benchmark-des-hébergeurs-cloud)), allègement du frontend (chargement différé des composants peu utilisés, compression des assets), et mise en cache des résultats d'itinéraires récents pour limiter les appels redondants au moteur de routage.
+L'éco-conception s'appuie sur le référentiel RGESN (Référentiel Général d'Écoconception de Services Numériques), avec plusieurs leviers concrets : hébergement chez un fournisseur français aux engagements environnementaux documentés (OVHcloud, déjà argumenté en [partie 3.9](#39-benchmark-des-hébergeurs-cloud)), allègement du frontend (chargement différé des composants peu utilisés via `React.lazy`, compression des assets au build), mise en cache des résultats d'itinéraires récents pour limiter les appels redondants au moteur de routage, et caches en mémoire côté backend pour les flux temps réel (GBFS, GTFS-Realtime) rafraîchis en tâche de fond plutôt qu'à chaque requête. Ces leviers restent des choix de conception : leur effet n'a pas été mesuré avec un outil dédié (type EcoIndex) sur ce périmètre.
 
 Au-delà de ces leviers techniques, la plateforme sert par nature une cause écologique : chaque trajet reporté vers un mode de transport doux plutôt que la voiture individuelle constitue, à l'échelle de la métropole, un impact positif plus significatif que l'empreinte de l'application elle-même.
 
@@ -986,9 +1046,47 @@ flowchart LR
 
 C'est cette manière de raisonner, plus que la stack technique retenue, qui recoupe directement les compétences visées par le Titre 6 Concepteur Développeur de Solutions Digitales.
 
-Deux évolutions restent ouvertes pour la suite. L'ajout de nouveaux opérateurs ou l'extension à d'autres villes, qui ne demanderait qu'un flux GTFS/GBFS de plus à brancher sur un écosystème déjà pensé pour ça ([partie 4.5](#45-évolutivité-et-maintenabilité)). Et un service de scoring qui pourrait, une fois assez de données d'usage accumulées, évoluer vers un modèle prédictif ([partie 7.4](#74-limites-et-évolutions-possibles)).
+<a id="111-perspectives-et-feuille-de-route-post-mvp"></a>
+### 11.1 Perspectives et feuille de route post-MVP
 
-Deux évolutions différentes, une même logique : faire grandir l'écosystème sans jamais complexifier ce que l'usager, lui, continue de voir.
+Le périmètre livré est un socle : les fonctionnalités obligatoires (F1–F3) et une fonctionnalité au choix ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)). L'architecture a été pensée pour que les extensions suivantes se branchent sans réécriture (découplage [3.5](#35-architecture-applicative-full-stack-intégré-ou-frontendbackend-séparés), sources de données interchangeables [2.6](#26-anticiper-les-évolutions-futures) / [4.5](#45-évolutivité-et-maintenabilité)).
+
+| Évolution | Ce que ça demande | Dépendances |
+|---|---|---|
+| **Nouveaux opérateurs / autres villes** | Brancher un flux GTFS/GBFS conforme supplémentaire ; aucun code applicatif à modifier | — |
+| **Vélo/trottinette libre-service dans le calcul d'itinéraire** | Aujourd'hui affichés sur la carte (disponibilité temps réel) mais pas encore intégrés au routage multimodal ; nécessite de configurer OpenTripPlanner avec le volet GBFS | Données GBFS déjà consommées |
+| **Réservation unifiée** (vélos, trottinettes, places de covoiturage) | Nouveau module backend + tables dédiées ; s'appuie sur la même API et les comptes existants | API opérateurs (réservation), selon des conventions avec chaque opérateur |
+| **Calculateur d'empreinte carbone avec suivi personnel** | Facteurs d'émission par mode (barème ADEME) appliqués aux segments d'un itinéraire, puis agrégation dans un tableau de bord citoyen | Historique de trajets (déjà persisté) |
+| **Covoiturage dynamique** avec *matching* | Module de mise en relation + géomatching (PostGIS déjà en place) ; enjeu principal = masse critique d'usagers | — |
+| **Scoring prédictif** | Passer de la somme pondérée à un modèle entraîné sur l'historique d'usage réel ([partie 7.4](#74-limites-et-évolutions-possibles)) | Volume de données d'usage suffisant |
+| **Canal collectivité** (tableau de bord agrégé) | Exposer des statistiques agrégées et anonymisées à la métropole ([partie 10.2](#102-rgpd-et-données-de-géolocalisation)) | Cadre RGPD du traitement statistique à formaliser |
+| **Gamification / signalement collaboratif** | Modules d'engagement, moindre priorité produit | — |
+
+Une même logique traverse cette liste : faire grandir l'écosystème sans jamais complexifier ce que l'usager, lui, continue de voir.
+
+<a id="112-écarts-frictions-et-enseignements-post-mortem"></a>
+### 11.2 Écarts, frictions et enseignements (post-mortem)
+
+Ce dossier a d'abord été rédigé comme un document de conception amont (juillet), puis mis à jour en fin de projet : il fait aussi office de point de clôture. Ce bilan croise ce qui a bien fonctionné, les frictions rencontrées, les écarts entre la conception initiale et le produit livré, et ce qui serait fait autrement.
+
+**Ce qui a bien fonctionné**
+
+- Le **découplage frontend / backend** et le traitement des flux comme sources interchangeables ont tenu : aucune des fonctionnalités ajoutées en cours de route (scoring, suivi de perturbation, notifications) n'a demandé de revenir sur la structure en couches.
+- Le **cycle itératif** avec revue de code systématique et tests de non-régression a permis de livrer en continu sans accumuler de dette bloquante : 151 *pull requests*, chacune revue, sur 7 semaines.
+- Les **revues manuelles de bout en bout** en conditions réelles (mêmes données, mêmes contraintes réseau que la production) ont détecté des défauts qu'aucun test automatisé n'aurait vus (mauvais cadrage de carte, glyphes trop petits, messages d'erreur indifférenciés), et ont directement alimenté les sprints suivants.
+
+**Frictions et écarts**
+
+- **Configuration de production maintenue à la main.** Le fichier de configuration du serveur étant hors dépôt (pas de secrets versionnés), l'ajout d'une variable au code ne se propageait pas automatiquement : deux fonctionnalités (chiffrement de l'historique, notifications push) ont été cassées en silence en production avant d'être diagnostiquées ([partie 9.4](#94-cas-concrets-de-bogues-traités)). Corrigé par une validation au démarrage et une vérification de CI, mais le coût de diagnostic aurait été évité par une gestion de configuration plus rigoureuse dès le départ.
+- **Écarts dossier / code.** Certaines sections du dossier de juillet décrivaient des mécanismes comme acquis alors qu'ils étaient encore à l'état d'intention (rotation du refresh token, traitement statistique agrégé). Ces écarts ont été résorbés, soit en implémentant (rotation), soit en requalifiant explicitement en principe de conception (canal collectivité). Ils rappellent qu'un document de conception doit distinguer nettement ce qui est prévu de ce qui est fait.
+- **Portée initiale surdimensionnée.** La demande client listait une dizaine de fonctionnalités ; le cadrage a resserré à F1–F3 + une fonctionnalité au choix. Ce resserrement a été le bon choix, mais il aurait pu être posé plus tôt et plus explicitement dans le dossier de juillet.
+- **Estimation de la charge d'intégration.** Le déploiement d'OpenTripPlanner avec de vraies données GTFS/OSM et sa maintenance (fenêtre de validité glissante du flux) ont demandé plus de mise au point que prévu, d'où le rafraîchissement automatique hebdomadaire ajouté en cours de route.
+
+**Ce qui serait fait autrement**
+
+- Traiter la **configuration de production comme du code** dès le premier déploiement (fichier d'exemple versionné + vérification d'écart en CI en place *avant* la première mise en production, pas après un incident).
+- **Figer la portée dans le dossier** en distinguant systématiquement, pour chaque fonctionnalité, si elle est conçue, en cours, livrée ou hors périmètre.
+- Mettre en place l'**audit d'accessibilité automatisé** dès le premier écran plutôt qu'à mi-parcours : plusieurs corrections auraient été prises en compte au fil de l'eau au lieu d'un rattrapage groupé.
 
 ---
 
@@ -1003,6 +1101,7 @@ Les annexes qui suivent n'ont pas vocation à être lues pour comprendre les par
 - [Annexe D — Hachage des mots de passe avec bcrypt](#annexe-d-hachage-des-mots-de-passe-avec-bcrypt)
 - [Annexe E — Cartographie des risques sur les données de géolocalisation](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation)
 - [Annexe F — Grille de conformité WCAG 2.1 AA](#annexe-f-grille-de-conformité-wcag-21-aa)
+- [Annexe G — Glossaire](#annexe-g-glossaire)
 
 <a id="annexe-a-standards-de-données-de-transport"></a>
 ### Annexe A — Standards de données de transport, origine et adoption
@@ -1041,9 +1140,11 @@ Sources :
 
 **Deux jetons, deux durées de vie.** Le jeton d'accès (*access token*) est volontairement court (recommandation OWASP : entre 5 et 15 minutes selon la sensibilité des données), pour limiter la fenêtre d'exposition en cas de vol. Il est utilisé à chaque appel à l'API. Le jeton de rafraîchissement (*refresh token*), plus long à vivre, sert uniquement à obtenir un nouveau jeton d'accès une fois celui-ci expiré, sans redemander l'identifiant et le mot de passe à l'usager.
 
-**Rotation du refresh token.** Pour limiter les conséquences d'un vol de jeton, l'OWASP recommande de faire tourner (*rotate*) le refresh token à chaque utilisation : un nouveau jeton est émis et l'ancien est immédiatement invalidé. Si un jeton déjà utilisé est présenté une seconde fois, cela signale une tentative de réutilisation frauduleuse (rejeu) et permet de révoquer l'ensemble de la session concernée.
+**Rotation du refresh token (implémentée).** Pour limiter les conséquences d'un vol de jeton, l'OWASP recommande de faire tourner (*rotate*) le refresh token à chaque utilisation : un nouveau jeton est émis et l'ancien est immédiatement invalidé. Si un jeton déjà utilisé est présenté une seconde fois, cela signale une tentative de réutilisation frauduleuse (rejeu) et permet de révoquer l'ensemble de la session concernée.
 
-Cette combinaison — jeton d'accès très court, refresh token à rotation, hébergement des données en France ([partie 3.9](#39-benchmark-des-hébergeurs-cloud)) — est particulièrement pertinente pour UrbanFlow Mobility, dont les données de géolocalisation figurent parmi les plus sensibles de la plateforme (voir [partie 10.1](#101-sécurité-des-données)) : réduire la durée de validité d'un jeton d'accès réduit d'autant la fenêtre pendant laquelle un jeton intercepté pourrait être exploité pour accéder à l'historique de déplacement d'un usager.
+Cette rotation a d'abord été documentée comme limite connue lors de l'audit OWASP, puis implémentée dans une itération suivante : chaque refresh token émis est tracé en base et rattaché à une *famille* (une session). À l'échange, le jeton présenté est marqué comme consommé et remplacé ; s'il est re-présenté au-delà d'une courte fenêtre de tolérance (qui absorbe les rafraîchissements quasi simultanés de plusieurs onglets), toute la famille est révoquée : la session entière est déconnectée. Les jetons expirés sont purgés automatiquement.
+
+Cette combinaison (jeton d'accès très court, refresh token à rotation avec détection de rejeu, hébergement des données en France, [partie 3.9](#39-benchmark-des-hébergeurs-cloud)) est particulièrement pertinente pour UrbanFlow Mobility, dont les données de géolocalisation figurent parmi les plus sensibles de la plateforme (voir [partie 10.1](#101-sécurité-des-données)) : réduire la durée de validité d'un jeton d'accès réduit d'autant la fenêtre pendant laquelle un jeton intercepté pourrait être exploité pour accéder à l'historique de déplacement d'un usager.
 
 Sources :
 - [JSON Web Token Cheat Sheet — OWASP](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html)
@@ -1075,7 +1176,7 @@ Cette cartographie détaille les principaux risques identifiés autour des donn�
 | Risque | Scénario | Solution retenue |
 |---|---|---|
 | Interception réseau | Un trajet est capté en clair entre la PWA et l'API, par exemple sur un réseau Wi-Fi public non sécurisé | Chiffrement HTTPS de bout en bout sur l'ensemble des échanges ([partie 10.1](#101-sécurité-des-données)) |
-| Fuite de la base de données | Un accès non autorisé à la base PostgreSQL/PostGIS expose l'historique de trajets de l'ensemble des usagers | Chiffrement des données sensibles au repos, accès à la base restreint aux seuls services qui en ont besoin |
+| Fuite de la base de données | Un accès non autorisé à la base PostgreSQL/PostGIS expose l'historique de trajets de l'ensemble des usagers | Chiffrement applicatif au repos des coordonnées et libellés d'adresse (AES-256-GCM, clé dédiée hors base, vecteur d'initialisation aléatoire à chaque écriture) : historique de trajets, adresses domicile/travail du profil, trajet suivi. Accès à la base restreint aux seuls services qui en ont besoin |
 | Ré-identification par recoupement | Même anonymisées, des données de trajets agrégées à un niveau trop fin (ex. un trajet domicile-travail unique) peuvent permettre de ré-identifier une personne | Agrégation à un niveau géographique et temporel suffisamment large avant tout usage statistique ([partie 10.2](#102-rgpd-et-données-de-géolocalisation)) |
 | Compromission de l'appareil de l'usager | Le cache hors-ligne de la PWA (partie 10.5) contient les derniers trajets consultés ; un vol ou un accès physique au téléphone expose ces données | Durée de vie limitée du cache local, contenu minimal (pas d'historique complet, seulement les derniers trajets utiles au mode dégradé) |
 | Exposition via un service tiers | Un appel mal conçu vers un service externe (météo, GTFS-Realtime) transmettrait une position précise plutôt qu'une zone générale | Les appels aux services tiers ([partie 7.3](#73-spécifications-techniques)) sont limités aux données strictement nécessaires à leur fonction, sans transmission de l'identité de l'usager |
@@ -1104,8 +1205,31 @@ Le WCAG 2.1 (Web Content Accessibility Guidelines) est le référentiel de réf�
 | 3.3.1 / 3.3.2 Identification des erreurs et instructions | Les erreurs de saisie doivent être signalées clairement, et les champs doivent être accompagnés d'instructions | Le formulaire d'inscription et la recherche d'itinéraire indiquent explicitement le champ en erreur et la nature du problème, plutôt qu'un message générique |
 | 4.1.2 Nom, rôle, valeur | Les composants d'interface personnalisés (carte interactive, sélecteurs) doivent exposer correctement leur état aux technologies d'assistance | Les composants non standards (carte, sélecteur de préférences du profil de mobilité) sont construits avec les attributs ARIA nécessaires plutôt qu'en HTML non sémantique |
 
-Cette sélection n'a pas vocation à remplacer un audit d'accessibilité complet, mais à intégrer les critères les plus structurants dès la conception plutôt que de les traiter en correction a posteriori.
+Cette sélection n'a pas vocation à remplacer un audit d'accessibilité complet, mais à intégrer les critères les plus structurants dès la conception plutôt que de les traiter en correction a posteriori. En complément, une suite d'audit automatisée (Playwright + axe-core) rejoue ces vérifications sur les écrans clés à chaque push ([partie 5.2](#52-environnement-et-outils-de-travail)) et fait échouer la CI en cas de régression d'accessibilité.
 
 Sources :
 - [W3C — Web Content Accessibility Guidelines (WCAG) 2.1](https://www.w3.org/TR/WCAG21/)
 - [W3C — WCAG 2.1 Quick Reference (liste filtrable des critères de succès)](https://www.w3.org/WAI/WCAG21/quickref/)
+
+---
+
+<a id="annexe-g-glossaire"></a>
+### Annexe G — Glossaire
+
+| Terme | Définition |
+|---|---|
+| **GTFS** (*General Transit Feed Specification*) | Format ouvert décrivant l'offre de transport en commun *théorique* (lignes, arrêts, horaires planifiés). Standard de fait, alimenté par la plupart des autorités de transport. |
+| **GTFS-Realtime** (GTFS-RT) | Extension temps réel de GTFS : perturbations, retards, positions de véhicules. Utilisée ici pour détecter un incident sur une ligne suivie. |
+| **GBFS** (*General Bikeshare Feed Specification*) | Équivalent de GTFS pour les mobilités en libre-service : position et disponibilité en temps réel des vélos et trottinettes en station. |
+| **OpenTripPlanner** (OTP) | Moteur open source de calcul d'itinéraires multimodaux, à partir des flux GTFS/GBFS et des données OpenStreetMap ([annexe B](#annexe-b-comparatif-des-moteurs-de-routage)). |
+| **RAPTOR** (*Round-bAsed Public Transit Optimized Router*) | Algorithme de calcul d'itinéraires en transport en commun par tours successifs, optimisé pour les correspondances. Utilisé par OpenTripPlanner. |
+| **Dijkstra / A\*** | Algorithmes classiques de plus court chemin dans un graphe, utilisés pour le routage sur le réseau piéton/cyclable. |
+| **Somme pondérée multicritère** (*Weighted Sum Model*) | Méthode d'aide à la décision : chaque critère reçoit un poids explicite, le score global est leur combinaison linéaire. Base du service de scoring ([partie 7.3](#73-spécifications-techniques)). |
+| **PWA** (*Progressive Web App*) | Application web installable, dotée d'un *service worker* pour le fonctionnement hors ligne partiel, sans passer par un magasin d'applications. |
+| **Service worker** | Script exécuté par le navigateur en arrière-plan de la page : gère le cache hors ligne et la réception des notifications push. |
+| **JWT** (*JSON Web Token*) | Jeton d'authentification auto-porteur et signé, vérifiable sans consulter la base ([annexe C](#annexe-c-authentification-jwt-et-refresh-tokens)). |
+| **VAPID** (*Voluntary Application Server Identification*) | Paire de clés identifiant le serveur applicatif auprès du service de push du navigateur, requise pour l'envoi de notifications Web Push. |
+| **PostGIS** | Extension géospatiale de PostgreSQL : types géométriques, index et requêtes spatiales natives. |
+| **AES-256-GCM** | Algorithme de chiffrement symétrique *authentifié* (détecte toute altération du texte chiffré). Utilisé pour le chiffrement au repos des données de géolocalisation ([annexe E](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation)). |
+| **MaaS** (*Mobility as a Service*) | Modèle agrégeant l'ensemble des offres de mobilité d'un territoire dans une application unique ([partie 2.1](#21-présentation-du-commanditaire-et-du-contexte)). |
+| **RGESN** | Référentiel Général d'Écoconception de Services Numériques (référentiel public français). |
