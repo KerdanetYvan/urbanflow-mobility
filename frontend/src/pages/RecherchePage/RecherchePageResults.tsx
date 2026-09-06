@@ -472,6 +472,9 @@ function RecherchePageResults({
   // desktop, une fois un itineraire selectionne - voir useMapSafeAreaPadding.
   const formPanelRef = useRef<HTMLDivElement>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
+  // `.resultats-mobile-detail-overlay` (issue #280) : prend la place de
+  // formPanelRef une fois ouverte, voir useMapSafeAreaPadding.
+  const mobileOverlayRef = useRef<HTMLDivElement>(null);
   // Hook appele inconditionnellement (regle des Hooks React), avant les
   // retours anticipes ci-dessous. Activee des que la carte est sur le point
   // d'etre affichee (chargement ou resultats non vides) - pas de
@@ -593,6 +596,8 @@ function RecherchePageResults({
     formPanelRef,
     detailPanelRef,
     Boolean(detailContent),
+    mobileOverlayRef,
+    mobileDetailOpen,
   );
 
   return (
@@ -684,6 +689,7 @@ function RecherchePageResults({
         <div
           className="resultats-mobile-detail-overlay"
           data-open={mobileDetailOpen}
+          ref={mobileOverlayRef}
         >
           <button
             type="button"

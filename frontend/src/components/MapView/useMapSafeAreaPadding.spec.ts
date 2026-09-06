@@ -206,4 +206,66 @@ describe('useMapSafeAreaPadding (issue #273, cadrage carte vs panneaux flottants
 
     expect(result.current.paddingBottomRight).toEqual([24, 68]);
   });
+
+  describe("overlay de detail mobile (issue #280 - regression sur le cadrage carte de l'issue #273)", () => {
+    it("mobile, overlay ouverte : reserve depuis SON sommet, pas celui du bandeau (hors ecran a ce moment-la)", () => {
+      stubDesktopMediaQuery(false);
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800);
+      const formEl = document.createElement('div');
+      // Bandeau recherche+liste hors ecran pendant que le detail est ouvert
+      // (translateY(100%), voir RecherchePageResults.css) - sommet bien
+      // au-dela du bas du viewport.
+      mockRect(formEl, { top: 1200 });
+      const overlayEl = document.createElement('div');
+      mockRect(overlayEl, { top: 500 });
+      const formPanelRef = { current: formEl };
+      const mobileOverlayRef = { current: overlayEl };
+
+      const { result } = renderHook(() =>
+        useMapSafeAreaPadding(formPanelRef, null, false, mobileOverlayRef, true),
+      );
+
+      expect(result.current.paddingBottomRight).toEqual([24, 324]); // (800 - 500) + 24
+    });
+
+    it("mobile, overlay presente mais FERMEE (mobileOverlayOpen=false) : reserve toujours depuis le bandeau, comme avant #280", () => {
+      stubDesktopMediaQuery(false);
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800);
+      const formEl = document.createElement('div');
+      mockRect(formEl, { top: 600 });
+      const overlayEl = document.createElement('div');
+      mockRect(overlayEl, { top: 1200 }); // hors ecran, overlay fermee
+      const formPanelRef = { current: formEl };
+      const mobileOverlayRef = { current: overlayEl };
+
+      const { result } = renderHook(() =>
+        useMapSafeAreaPadding(formPanelRef, null, false, mobileOverlayRef, false),
+      );
+
+      expect(result.current.paddingBottomRight).toEqual([24, 224]); // (800 - 600) + 24
+    });
+
+    it("recalcule a la fin de la transition CSS de l'overlay (ouverture/fermeture du detail)", () => {
+      stubDesktopMediaQuery(false);
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800);
+      const formEl = document.createElement('div');
+      mockRect(formEl, { top: 1200 });
+      const overlayEl = document.createElement('div');
+      mockRect(overlayEl, { top: 800 }); // en cours de glissement, pas encore arrivee
+      const formPanelRef = { current: formEl };
+      const mobileOverlayRef = { current: overlayEl };
+
+      const { result } = renderHook(() =>
+        useMapSafeAreaPadding(formPanelRef, null, false, mobileOverlayRef, true),
+      );
+      expect(result.current.paddingBottomRight).toEqual([24, 24]); // (800-800)+24
+
+      mockRect(overlayEl, { top: 500 }); // glissement termine
+      act(() => {
+        overlayEl.dispatchEvent(new Event('transitionend'));
+      });
+
+      expect(result.current.paddingBottomRight).toEqual([24, 324]);
+    });
+  });
 });

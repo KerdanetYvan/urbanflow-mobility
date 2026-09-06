@@ -38,7 +38,7 @@ const DEFAULT_PADDING: MapSafeAreaPadding = {
  * breakpoint (une constante ignorerait la hauteur reelle du panneau, qui
  * depend de son contenu - nombre de resultats, detail ouvert ou non...).
  *
- * Disposition connue des deux panneaux (voir RecherchePageResults.css) :
+ * Disposition connue des panneaux (voir RecherchePageResults.css) :
  * - `formPanelRef` (`.recherche-panel-form`) : bandeau plein largeur ancre en
  *   bas sur mobile (n'occulte que depuis le BAS) ; panneau flottant ancre en
  *   bas-gauche sur desktop (n'occulte que depuis la GAUCHE - traite comme
@@ -49,16 +49,26 @@ const DEFAULT_PADDING: MapSafeAreaPadding = {
  *   l'ecran "formulaire" de RecherchePage.tsx) : panneau desktop uniquement,
  *   plus a droite du precedent - etend simplement l'occultation "gauche"
  *   jusqu'a son propre bord droit quand il est present.
+ * - `mobileOverlayRef` (`.resultats-mobile-detail-overlay`, optionnel -
+ *   absent sur l'ecran "formulaire", qui n'a pas de detail a montrer) :
+ *   carte de detail mobile qui prend la place de `formPanelRef` une fois
+ *   ouverte (issue #280) - correctif issue #280 (regression constatee en
+ *   verification reelle) : `formPanelRef` se retrouve alors hors ecran
+ *   (`translateY(100%)`), son inset calcule tombe a ~0, alors que c'est
+ *   DESORMAIS `mobileOverlayRef` qui occupe reellement l'espace en bas.
+ *   `mobileOverlayOpen` bascule laquelle des deux geometries fait foi.
  *
  * Recalcule sur : changement de taille des panneaux observes (contenu qui
  * grandit/retrecit, `ResizeObserver`), fin de transition CSS du bandeau
- * mobile (`transitionend` sur `transform` - repli/deploiement du sheet,
- * voir RecherchePageResults.css), et redimensionnement de fenetre (bascule
- * de breakpoint). Le changement d'attribut `data-sheet-state` lui-meme
- * (`MutationObserver`) est ecoute en plus de `transitionend` : sous
- * `prefers-reduced-motion: reduce`, la transition est desactivee
- * (`transition: none`) et `transitionend` ne se declenche jamais - la
- * mutation d'attribut reste le seul signal disponible dans ce cas.
+ * mobile ou de l'overlay de detail (`transitionend` sur `transform` -
+ * repli/deploiement du sheet ou ouverture/fermeture du detail, voir
+ * RecherchePageResults.css), et redimensionnement de fenetre (bascule de
+ * breakpoint). Le changement d'attribut (`data-sheet-state` sur le
+ * formulaire, `data-open` sur l'overlay) est ecoute en plus de
+ * `transitionend` via `MutationObserver` : sous `prefers-reduced-motion:
+ * reduce`, la transition est desactivee (`transition: none`) et
+ * `transitionend` ne se declenche jamais - la mutation d'attribut reste le
+ * seul signal disponible dans ce cas.
  *
  * `detailPanelPresent` (au lieu de deduire sa presence de `detailPanelRef.
  * current`) : un ref React reste la MEME reference tout au long de la vie du
@@ -69,12 +79,17 @@ const DEFAULT_PADDING: MapSafeAreaPadding = {
  * que la condition qui monte ou non l'element : il change de valeur au bon
  * moment et force donc l'effet a se re-executer (a desabonner les anciens
  * observateurs, en reabonner sur la ref desormais a jour) exactement quand
- * le panneau apparait ou disparait.
+ * le panneau apparait ou disparait. `mobileOverlayOpen` a le meme role pour
+ * `mobileOverlayRef` (deja monte, meme masque, des que le detail existe -
+ * seule sa valeur `.current` de geometrie change) : sans lui en dependance,
+ * le `recompute` referme sur une valeur perimee.
  */
 export function useMapSafeAreaPadding(
   formPanelRef: RefObject<HTMLElement | null>,
   detailPanelRef: RefObject<HTMLElement | null> | null = null,
   detailPanelPresent = false,
+  mobileOverlayRef: RefObject<HTMLElement | null> | null = null,
+  mobileOverlayOpen = false,
 ): MapSafeAreaPadding {
   const [padding, setPadding] = useState<MapSafeAreaPadding>(DEFAULT_PADDING);
 
@@ -96,7 +111,14 @@ export function useMapSafeAreaPadding(
           paddingBottomRight: [BASE_MARGIN, BASE_MARGIN],
         });
       } else {
-        const panelTop = formRect?.top ?? window.innerHeight;
+        // Le detail mobile (#280) prend la place du bandeau recherche+liste
+        // une fois ouvert - c'est alors SA geometrie qui occulte le bas de
+        // la carte, pas celle (hors ecran) du bandeau.
+        const activeRect =
+          mobileOverlayOpen && mobileOverlayRef?.current
+            ? mobileOverlayRef.current.getBoundingClientRect()
+            : formRect;
+        const panelTop = activeRect?.top ?? window.innerHeight;
         const bottomInset = Math.max(window.innerHeight - panelTop, 0);
         setPadding({
           paddingTopLeft: [BASE_MARGIN, BASE_MARGIN],
@@ -111,6 +133,9 @@ export function useMapSafeAreaPadding(
     if (formPanelRef.current) resizeObserver.observe(formPanelRef.current);
     if (detailPanelPresent && detailPanelRef?.current) {
       resizeObserver.observe(detailPanelRef.current);
+    }
+    if (mobileOverlayRef?.current) {
+      resizeObserver.observe(mobileOverlayRef.current);
     }
 
     const formEl = formPanelRef.current;
@@ -130,15 +155,36 @@ export function useMapSafeAreaPadding(
       });
     }
 
+    // Meme paire transitionend/MutationObserver pour l'overlay de detail
+    // mobile (issue #280) - il glisse lui aussi via `transform` avec sa
+    // propre transition, cf. `data-open` dans RecherchePageResults.css.
+    const overlayEl = mobileOverlayRef?.current;
+    overlayEl?.addEventListener('transitionend', recompute);
+    const overlayMutationObserver = new MutationObserver(recompute);
+    if (overlayEl) {
+      overlayMutationObserver.observe(overlayEl, {
+        attributes: true,
+        attributeFilter: ['data-open'],
+      });
+    }
+
     window.addEventListener('resize', recompute);
 
     return () => {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
+      overlayMutationObserver.disconnect();
       formEl?.removeEventListener('transitionend', recompute);
+      overlayEl?.removeEventListener('transitionend', recompute);
       window.removeEventListener('resize', recompute);
     };
-  }, [formPanelRef, detailPanelRef, detailPanelPresent]);
+  }, [
+    formPanelRef,
+    detailPanelRef,
+    detailPanelPresent,
+    mobileOverlayRef,
+    mobileOverlayOpen,
+  ]);
 
   return padding;
 }
