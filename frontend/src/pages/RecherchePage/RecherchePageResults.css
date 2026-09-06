@@ -238,13 +238,17 @@
 
 /* Copie mobile : carte independante ancree en bas (memes proportions que
    .recherche-panel-form, dont elle prend temporairement la place - issue
-   #280), masquee par defaut (`[data-open]` absent/false) et par-dessus
-   tout le reste (`z-index` superieur a .recherche-panel-form) quand
-   ouverte. Masquee a partir de 768px (voir plus bas) : c'est alors
-   .resultats-detail-panel qui prend le relais, cote a cote plutot que
-   par-dessus. */
+   #280), par-dessus tout le reste (`z-index` superieur a
+   .recherche-panel-form) quand ouverte. Fermee par defaut : coulissee hors
+   de l'ecran par `transform` (jamais `display: none`, voir le commentaire
+   de .recherche-panel-form plus haut - meme raisonnement, transitions
+   composites plutot qu'un `display` qui ne s'anime pas) - glisse en sens
+   inverse de .recherche-panel-form au tap sur une carte (l'une descend
+   pendant que l'autre monte). Masquee pour de bon a partir de 768px (voir
+   plus bas) : c'est alors .resultats-detail-panel qui prend le relais,
+   cote a cote plutot que par-dessus, sans animation necessaire. */
 .resultats-mobile-detail-overlay {
-  display: none;
+  display: flex;
   position: absolute;
   left: 0;
   right: 0;
@@ -259,10 +263,20 @@
   border-top-right-radius: var(--radius-md);
   box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
   overflow: hidden;
+  transform: translateY(100%);
+  visibility: hidden;
+  transition: transform 0.22s ease-out;
 }
 
 .resultats-mobile-detail-overlay[data-open='true'] {
-  display: flex;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultats-mobile-detail-overlay {
+    transition: none;
+  }
 }
 
 .resultats-mobile-detail-close {
@@ -400,12 +414,20 @@
 /* Masquee en mobile tant que le detail s'affiche par-dessus (issue #280,
    retour utilisateur en session) : "liberer l'espace" pour
    .resultats-mobile-detail-overlay plutot que de la laisser visible sous
-   quelque forme que ce soit (ni carte, ni poignee) - `display: none` plutot
-   qu'un simple repli (`data-sheet-state`), qui garderait la poignee
-   visible. Reannulee en desktop (media query plus bas) : la, le detail vit
-   dans .resultats-detail-panel, jamais par-dessus cette carte. */
+   quelque forme que ce soit (ni carte, ni poignee). `transform`
+   (coulisse hors de l'ecran, toute sa hauteur) + `visibility` plutot que
+   `display: none` : meme raisonnement que le repli ci-dessus (transitions
+   composites, jamais de `display`/`height` anime, voir issue #181) - la
+   carte glisse proprement hors de vue au lieu de disparaitre d'un coup,
+   pendant que .resultats-mobile-detail-overlay glisse en sens inverse.
+   Priorite sur `data-sheet-state` ci-dessus par ordre de cascade (meme
+   specificite, regle plus loin dans le fichier) : peu importe l'etat de
+   repli/deploiement, ouvrir le detail l'emporte toujours. Reannulee en
+   desktop (media query plus bas) : la, le detail vit dans
+   .resultats-detail-panel, jamais par-dessus cette carte. */
 .recherche-panel-form[data-mobile-detail-open='true'] {
-  display: none;
+  transform: translateY(100%);
+  visibility: hidden;
 }
 
 /* Corps retire du parcours de tabulation et de l'arbre d'accessibilite
@@ -497,9 +519,10 @@
   /* Meme raisonnement que ci-dessus, pour le masquage mobile pendant le
      detail par-dessus (issue #280) : sans objet en desktop, ou le detail
      vit a cote (.resultats-detail-panel) et ne recouvre jamais cette
-     carte. */
+     carte - annule `transform`/`visibility` plutot qu'un `display`. */
   .recherche-panel-form[data-mobile-detail-open='true'] {
-    display: flex;
+    transform: none;
+    visibility: visible;
   }
 
   /* Pas de repli en desktop (assez de place pour la carte entiere) - la
