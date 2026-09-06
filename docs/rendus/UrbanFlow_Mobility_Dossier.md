@@ -734,7 +734,7 @@ config:
   theme: neo
 ---
 flowchart TB
-    A[Rétrospective de sprint] --> B[Décision consignee]
+    A[Rétrospective de sprint] --> B[Décision consignée]
     B --> C{Type de problème}
     C -->|Ponctuel| D[Traitement dans le sprint suivant]
     C -->|Récurrent| E[Ajustement structurel]
@@ -807,10 +807,10 @@ config:
 ---
 flowchart LR
     OTP[OpenTripPlanner] --> SCORE[Service de scoring]
-    METEO[API meteo] --> SCORE
+    METEO[API météo] --> SCORE
     GTFSRT[GTFS-Realtime] --> SCORE
-    PROFIL[Profil de mobilite] --> SCORE
-    SCORE --> RESULT[Itineraires classes]
+    PROFIL[Profil de mobilité] --> SCORE
+    SCORE --> RESULT[Itinéraires classés]
     RESULT --> APP[PWA]
 ```
 
@@ -934,10 +934,10 @@ config:
   theme: neo
 ---
 flowchart TB
-    A[Anomalie detectee] --> B[Classification par severite]
+    A[Anomalie détectée] --> B[Classification par sévérité]
     B --> C[Ticket GitHub Projects]
-    C --> D[Correction sur branche dediee]
-    D --> E[Test de non-regression ajoute]
+    C --> D[Correction sur branche dédiée]
+    D --> E[Test de non-régression ajouté]
     E --> F[Revue de code]
     F --> G[Fusion sur la branche principale]
 ```
