@@ -721,7 +721,7 @@ Cette logique rejoint l'esprit du Kaizen : privilégier une série de petites am
 <a id="63-boucle-de-capitalisation"></a>
 ### 6.3 Boucle de capitalisation
 
-Pour que chaque cycle profite réellement au suivant, les décisions prises en rétrospective sont consignées (README technique, tickets GitHub Projects), plutôt que de rester une remarque orale vite oubliée.
+Pour que chaque cycle profite réellement au suivant, les décisions prises en rétrospective sont consignées, plutôt que de rester une remarque orale vite oubliée. Concrètement, l'historique des décisions du projet est **consultable en continu** à travers quatre traces croisées, versionnées dans le dépôt : les messages de commits et les *pull requests* (une par unité de travail, avec sa justification), les tickets GitHub fermés (127 à ce jour, reliés aux commits qui les traitent), les plans de sprint (`docs/sprints/sprint-N-plan.md`, qui figent l'ordre et le raisonnement décidés en séance) et les rétrospectives de fin de sprint (`docs/sprints/sprint-N-retro.md`). Toute décision d'architecture argumentée renvoie à ce dossier ; toute convention qui évolue est répercutée dans `CLAUDE.md`, le fichier de contexte de conception à la racine du dépôt.
 
 ```mermaid
 ---
@@ -745,6 +745,23 @@ Deux cas sont distingués :
 - un problème récurrent (même type d'erreur qui revient, convention mal respectée), qui déclenche un ajustement plus structurel — évolution d'une règle de lint, ajout d'un test de non-régression, mise à jour d'une convention posée en [partie 4.3](#43-nomenclature-et-conventions).
 
 Cette distinction évite de traiter chaque problème comme un cas isolé et permet à la démarche qualité de rester utile sur la durée du projet plutôt que de se limiter à un contrôle final avant livraison.
+
+<a id="64-bilan-quantitatif-de-la-démarche"></a>
+### 6.4 Bilan quantitatif de la démarche
+
+Au terme du projet, la démarche qualité se traduit par les indicateurs suivants (état à la clôture, dépôt public sur GitHub) :
+
+| Indicateur | Valeur |
+|---|---|
+| Durée du projet | 7 semaines, 5 sprints de 2 semaines |
+| Tickets fermés / ouverts | 127 / 2 |
+| *Pull requests* fusionnées | 151 (une par unité de travail, chacune passée en revue avant fusion) |
+| Tests automatisés | ~272 tests backend (Jest, 35 suites), ~345 tests frontend (Vitest, 36 suites) |
+| Tests end-to-end | 2 suites API (dont une de non-régression sur le rate limiting), 1 suite d'audit WCAG 2.1 AA (Playwright + axe-core) exécutée à chaque push |
+| Audits transverses | Audit OWASP en deux passes (cadrage initial puis audit dédié approfondi), audit d'accessibilité WCAG automatisé en CI, scan de secrets sur l'historique git |
+| Corrections issues des tests en conditions réelles | Plusieurs constats remontés par des revues manuelles de bout en bout ont donné lieu à des sprints de correction dédiés (voir [partie 9.4](#94-cas-concrets-de-bogues-traités)) |
+
+Ces chiffres ne valent pas pour eux-mêmes : ils traduisent surtout que la vérification a été **continue** (à chaque push, à chaque fin de sprint) plutôt que concentrée dans un contrôle final, et que chaque anomalie détectée a laissé une trace exploitable — un ticket, une *pull request*, souvent un test de non-régression.
 
 ---
 
@@ -933,6 +950,19 @@ La fusion sur la branche principale reste enfin soumise à la même revue de cod
 La phase de préproduction concentre une vigilance particulière, car c'est le dernier point de contrôle avant qu'un usager réel comme [Antoine](#23-cibles-et-personas) ou [Muriel](#23-cibles-et-personas) ne soit exposé à une régression. Trois pratiques structurent cette phase : un parcours de test manuel, où l'on utilise soi-même l'application comme le ferait un usager réel, sur un environnement proche de la production (mêmes flux GTFS/GBFS, mêmes contraintes réseau), un jeu de données réaliste plutôt que des données de test simplifiées, et un passage prioritaire sur les parcours critiques — inscription et profil de mobilité (F1), recherche d'itinéraire (F2), intégration transport (F3), et classement personnalisé par IA ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)).
 
 Un gel des nouvelles fonctionnalités est observé dans les derniers jours précédant chaque mise en production : seules les corrections de bogues bloquants ou majeurs sont encore acceptées, afin de ne pas introduire un nouveau risque au moment même où l'on cherche à en réduire.
+
+<a id="94-cas-concrets-de-bogues-traités"></a>
+### 9.4 Cas concrets de bogues traités
+
+Trois exemples réels illustrent le processus des parties 9.1 à 9.3, du symptôme à la mesure de fond.
+
+**Historique de trajets vide en production — variable d'environnement manquante.** *Symptôme :* l'écran d'historique restait vide alors que des recherches avaient bien été faites. *Investigation :* reproduction locale, puis diagnostic sur le serveur — la clé de chiffrement au repos (`GEOLOCATION_ENCRYPTION_KEY`, [annexe E](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation)) était **absente du fichier de configuration du serveur**. Comme ce fichier est maintenu à la main (hors dépôt, pour ne pas versionner de secrets), l'ajout d'une nouvelle variable au code ne se propage pas tout seul. Chaque écriture chiffrée échouait donc en silence, la fonction d'enregistrement de l'historique avalant l'erreur par conception (pour ne jamais faire échouer une recherche). *Correctif :* ajout de la variable côté serveur. *Mesure de fond :* une validation au démarrage qui **fait échouer le lancement** si un secret critique manque ou est mal dimensionné (plutôt qu'une dégradation invisible), et une étape de CI qui compare les variables du serveur à celles attendues et alerte en cas d'écart. Le même diagnostic a révélé que les clés de notifications push manquaient aussi — corrigé dans la foulée.
+
+**Rotation du refresh token — écart dossier / code.** *Symptôme :* l'annexe C du dossier décrivait la rotation du refresh token comme un principe appliqué, alors que le code se contentait d'émettre un nouveau jeton sans invalider l'ancien (limite explicitement notée lors de l'audit OWASP). *Traitement :* traité comme une fonctionnalité à part entière — nouvelle table de suivi des jetons, détection de rejeu, tests dédiés (rotation nominale, rejeu, non-régression du flux de connexion). *Mesure de fond :* mise à jour du dossier pour que l'annexe C reflète l'état réel du code, et pas l'intention.
+
+**Repli « trajet à pied » partout — données de transport périmées.** *Symptôme :* pendant une courte période, toutes les recherches ne renvoyaient qu'un itinéraire à pied. *Cause :* le flux GTFS chargé dans le moteur de routage a une fenêtre de validité glissante ; une fois dépassée, le moteur n'a plus aucun service à proposer et se rabat silencieusement sur la marche. *Mesure de fond :* un rafraîchissement automatique hebdomadaire du flux GTFS en production, pour que la fenêtre de validité ne se referme jamais sans intervention.
+
+Point commun aux trois : le correctif ponctuel ne suffit pas — chaque cas se conclut par une mesure qui empêche la classe de problème de se reproduire silencieusement (validation au démarrage, vérification de CI, tâche planifiée), dans la logique « anomalie ponctuelle vs problème récurrent » de la [partie 6.3](#63-boucle-de-capitalisation).
 
 ---
 
