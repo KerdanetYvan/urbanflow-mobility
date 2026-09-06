@@ -360,6 +360,62 @@ describe('ScoringService', () => {
       expect(nonMarque?.disrupted).toBeUndefined();
     });
 
+    it('remonte le detail de la perturbation (kind + headerText) dans disruptionDetails (issue #275)', async () => {
+      const perturbe = buildItinerary({
+        segments: [buildSegment({ mode: 'BUS', tripId: 'course-1' })],
+      });
+      gtfsRealtimeCache.findDisruptions.mockImplementation(
+        ({ tripId }: { tripId?: string }) =>
+          tripId === 'course-1'
+            ? [
+                {
+                  kind: 'alert',
+                  headerText: 'Rénovation ascenseur - Triangle',
+                  // routeId/tripId/stopId ci-dessous : identifiants GTFS
+                  // bruts, ne doivent PAS se retrouver dans
+                  // disruptionDetails (voir TripDisruptionDetail).
+                  routeId: 'ligne-secrete',
+                  tripId: 'course-1',
+                },
+              ]
+            : [],
+      );
+
+      const [result] = await service.rank([perturbe], null);
+
+      expect(result.disruptionDetails).toEqual([
+        { kind: 'alert', headerText: 'Rénovation ascenseur - Triangle' },
+      ]);
+      expect(result.disruptionDetails![0]).not.toHaveProperty('routeId');
+      expect(result.disruptionDetails![0]).not.toHaveProperty('tripId');
+    });
+
+    it("absence de headerText (cancellation/skipped_stop) : disruptionDetails garde quand meme l'entree, headerText undefined", async () => {
+      const perturbe = buildItinerary({
+        segments: [buildSegment({ mode: 'BUS', tripId: 'course-1' })],
+      });
+      gtfsRealtimeCache.findDisruptions.mockImplementation(
+        ({ tripId }: { tripId?: string }) =>
+          tripId === 'course-1' ? [{ kind: 'cancellation' }] : [],
+      );
+
+      const [result] = await service.rank([perturbe], null);
+
+      expect(result.disruptionDetails).toEqual([
+        { kind: 'cancellation', headerText: undefined },
+      ]);
+    });
+
+    it('aucune perturbation : disruptionDetails absent (pas un tableau vide)', async () => {
+      const propre = buildItinerary({
+        segments: [buildSegment({ mode: 'BUS', tripId: 'course-2' })],
+      });
+
+      const [result] = await service.rank([propre], null);
+
+      expect(result.disruptionDetails).toBeUndefined();
+    });
+
     it("transmet routeId ET tripId du segment a findDisruptions (recoupement par l'un ou l'autre)", async () => {
       const itinerary = buildItinerary({
         segments: [

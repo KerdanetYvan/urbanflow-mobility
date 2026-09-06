@@ -37,6 +37,20 @@ export interface TripSegment {
   geometry: TripGeoPoint[];
 }
 
+/**
+ * Detail d'une perturbation touchant un itineraire (issue #275, voir
+ * backend/src/trips/dto/trip-itinerary.dto.ts#TripDisruptionDetail) -
+ * permet d'afficher un message specifique plutot qu'un encadre generique.
+ * `headerText` n'est renseigne que pour `kind === 'alert'` (texte operateur
+ * deja pense pour l'usager) - absent pour 'cancellation'/'skipped_stop',
+ * un libelle generique par kind suffit dans ces cas (voir
+ * RecherchePageResults.tsx, disruptionMessage()).
+ */
+export interface TripDisruptionDetail {
+  kind: 'cancellation' | 'skipped_stop' | 'alert';
+  headerText?: string;
+}
+
 /** Un itineraire multimodal complet, decoupe en segments. */
 export interface TripItinerary {
   startTime: string;
@@ -48,6 +62,8 @@ export interface TripItinerary {
   nextDepartures?: string[];
   /** true si un segment est actuellement touche par une perturbation GTFS-Realtime (issue #18, ScoringService) - absent (pas juste false) sinon. Affiche le marqueur "Perturbation en cours", distinct des badges qualitatifs. */
   disrupted?: boolean;
+  /** Detail de chaque perturbation trouvee (issue #275) - present uniquement quand `disrupted` est true. */
+  disruptionDetails?: TripDisruptionDetail[];
 }
 
 /**
