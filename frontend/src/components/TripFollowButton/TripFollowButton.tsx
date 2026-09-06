@@ -9,7 +9,11 @@ import {
   toStartFollowingTripInput,
   type FollowedTrip,
 } from '../../lib/followedTrip';
-import { subscribeBrowserToPush, subscribeToPush } from '../../lib/push';
+import {
+  subscribeBrowserToPush,
+  subscribeToPush,
+  type PushSubscribeOutcome,
+} from '../../lib/push';
 import type { TripItinerary } from '../../lib/trips';
 import { useAuth } from '../../lib/useAuth';
 import './TripFollowButton.css';
@@ -26,6 +30,53 @@ interface TripFollowButtonProps {
  * trajet (deux trajets identiques ne peuvent pas avoir la meme destination
  * ET la meme heure d'arrivee par coincidence dans l'usage normal de l'app).
  */
+/** Cause d'echec de l'abonnement push (tout sauf le succes). */
+type PushIssue = Exclude<PushSubscribeOutcome['status'], 'subscribed'>;
+
+/**
+ * Titre + corps de la bannière de repli affichee quand l'abonnement aux
+ * notifications n'a pas abouti (issue #277). Un message par cause : ne
+ * jamais laisser croire qu'aucune demande n'a eu lieu quand ce n'est pas le
+ * cas, et guider vers les reglages du navigateur quand c'est la seule issue.
+ *
+ * @param issue la cause d'echec renvoyee par subscribeBrowserToPush
+ * @returns le `title` et le `body` a passer au composant Alert
+ */
+function pushIssueAlert(issue: PushIssue): { title: string; body: string } {
+  switch (issue) {
+    case 'unsupported':
+      return {
+        title: 'Notifications indisponibles',
+        body: 'Ce navigateur ne gère pas les notifications push. Gardez l’application ouverte pour être prévenu·e d’une perturbation sur ce trajet.',
+      };
+    case 'server-unconfigured':
+      return {
+        title: 'Notifications indisponibles',
+        body: 'Le service de notifications n’est pas disponible pour le moment. Gardez l’application ouverte pour rester informé·e des perturbations sur ce trajet.',
+      };
+    case 'permission-blocked':
+      return {
+        title: 'Notifications bloquées pour ce site',
+        body: 'Votre navigateur a mémorisé un refus des notifications pour UrbanFlow et ne réaffiche plus la demande. Pour recevoir les alertes de perturbation, réautorisez les notifications dans les réglages du navigateur, puis relancez le suivi.',
+      };
+    case 'permission-denied':
+      return {
+        title: 'Notifications refusées',
+        body: 'Vous venez de refuser les notifications. Vous ne recevrez pas d’alerte automatique en cas de perturbation ; gardez l’application ouverte pour rester informé·e.',
+      };
+    case 'permission-dismissed':
+      return {
+        title: 'Autorisation non accordée',
+        body: 'La demande d’autorisation a été fermée sans réponse. Relancez le suivi pour l’afficher à nouveau et activer les alertes de perturbation.',
+      };
+    case 'error':
+      return {
+        title: 'Notifications indisponibles',
+        body: 'L’activation des notifications a échoué. Vous ne recevrez pas d’alerte automatique ; gardez l’application ouverte pour rester informé·e.',
+      };
+  }
+}
+
 function matches(
   followedTrip: FollowedTrip | null,
   itinerary: TripItinerary,
@@ -62,7 +113,9 @@ function TripFollowButton({ itinerary }: TripFollowButtonProps) {
   const navigate = useNavigate();
   const [followedTrip, setFollowedTrip] = useState<FollowedTrip | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [permissionDenied, setPermissionDenied] = useState(false);
+  // Cause d'echec de l'abonnement push a afficher en repli (issue #277),
+  // `null` tant qu'aucune tentative n'a echoue.
+  const [pushIssue, setPushIssue] = useState<PushIssue | null>(null);
 
   // Etat initial du suivi (utile si l'utilisateur revient sur cet
   // itineraire apres l'avoir deja suivi, ou apres un tap sur la
@@ -79,6 +132,7 @@ function TripFollowButton({ itinerary }: TripFollowButtonProps) {
   }, [isAuthenticated]);
 
   const isFollowingThis = matches(followedTrip, itinerary);
+  const pushAlert = pushIssue ? pushIssueAlert(pushIssue) : null;
 
   async function handleFollow() {
     if (!isAuthenticated) {
@@ -87,17 +141,17 @@ function TripFollowButton({ itinerary }: TripFollowButtonProps) {
     }
 
     setIsSubmitting(true);
-    setPermissionDenied(false);
+    setPushIssue(null);
     try {
       // Le suivi lui-meme n'est jamais bloque par un refus de permission
       // (section 2 du spec de cadrage) - seule la notification systeme en
       // est privee, repli bannière Alert ci-dessous (section 3.4 du spec
-      // principal).
-      const subscription = await subscribeBrowserToPush();
-      if (subscription) {
-        await subscribeToPush(subscription).catch(() => {});
+      // principal). Le `status` precis alimente le message de repli (#277).
+      const outcome = await subscribeBrowserToPush();
+      if (outcome.status === 'subscribed') {
+        await subscribeToPush(outcome.subscription).catch(() => {});
       } else {
-        setPermissionDenied(true);
+        setPushIssue(outcome.status);
       }
 
       const result = await startFollowingTrip(
@@ -130,10 +184,9 @@ function TripFollowButton({ itinerary }: TripFollowButtonProps) {
       >
         {isFollowingThis ? 'Arrêter le suivi' : 'Suivre ce trajet'}
       </Button>
-      {permissionDenied && (
-        <Alert variant="warning" title="Notifications désactivées">
-          Vous ne recevrez pas d’alerte automatique en cas de perturbation sur
-          ce trajet. Gardez l’application ouverte pour rester informé·e.
+      {pushAlert && (
+        <Alert variant="warning" title={pushAlert.title}>
+          {pushAlert.body}
         </Alert>
       )}
     </div>

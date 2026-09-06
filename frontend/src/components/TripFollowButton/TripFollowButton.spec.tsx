@@ -91,8 +91,11 @@ describe('TripFollowButton', () => {
         setAuthenticated: vi.fn(),
       });
       vi.mocked(pushLib.subscribeBrowserToPush).mockResolvedValue({
-        endpoint: 'https://push.example/1',
-        keys: { p256dh: 'p', auth: 'a' },
+        status: 'subscribed',
+        subscription: {
+          endpoint: 'https://push.example/1',
+          keys: { p256dh: 'p', auth: 'a' },
+        },
       });
       vi.mocked(pushLib.subscribeToPush).mockResolvedValue({ id: 'sub-1' });
       // destinationLat/Lon/endTime doivent correspondre a ITINERARY (voir
@@ -130,13 +133,15 @@ describe('TripFollowButton', () => {
 
   it(
     "demarre quand meme le suivi si la permission de notification est " +
-      'refusee (subscribeBrowserToPush resout null), avec une banniere de repli',
+      'refusee a l\'instant, avec une banniere "Notifications refusees"',
     async () => {
       vi.mocked(useAuthLib.useAuth).mockReturnValue({
         isAuthenticated: true,
         setAuthenticated: vi.fn(),
       });
-      vi.mocked(pushLib.subscribeBrowserToPush).mockResolvedValue(null);
+      vi.mocked(pushLib.subscribeBrowserToPush).mockResolvedValue({
+        status: 'permission-denied',
+      });
       vi.mocked(followedTripLib.startFollowingTrip).mockResolvedValue({
         id: 'followed-1',
       } as FollowedTrip);
@@ -151,9 +156,70 @@ describe('TripFollowButton', () => {
         expect(followedTripLib.startFollowingTrip).toHaveBeenCalled();
       });
       expect(pushLib.subscribeToPush).not.toHaveBeenCalled();
+      expect(screen.getByText('Notifications refusées')).toBeInTheDocument();
+    },
+  );
+
+  it(
+    'affiche un message qui oriente vers les reglages du navigateur quand ' +
+      'le refus est deja memorise (status "permission-blocked", #277)',
+    async () => {
+      vi.mocked(useAuthLib.useAuth).mockReturnValue({
+        isAuthenticated: true,
+        setAuthenticated: vi.fn(),
+      });
+      vi.mocked(pushLib.subscribeBrowserToPush).mockResolvedValue({
+        status: 'permission-blocked',
+      });
+      vi.mocked(followedTripLib.startFollowingTrip).mockResolvedValue({
+        id: 'followed-1',
+      } as FollowedTrip);
+      const user = userEvent.setup();
+      renderButton();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Suivre ce trajet' }),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Notifications bloquées pour ce site'),
+        ).toBeInTheDocument();
+      });
       expect(
-        screen.getByText('Notifications désactivées'),
+        screen.getByText(/réglages du navigateur/),
       ).toBeInTheDocument();
+    },
+  );
+
+  it(
+    'distingue le cas "serveur sans config VAPID" (status ' +
+      '"server-unconfigured", #277) du refus utilisateur',
+    async () => {
+      vi.mocked(useAuthLib.useAuth).mockReturnValue({
+        isAuthenticated: true,
+        setAuthenticated: vi.fn(),
+      });
+      vi.mocked(pushLib.subscribeBrowserToPush).mockResolvedValue({
+        status: 'server-unconfigured',
+      });
+      vi.mocked(followedTripLib.startFollowingTrip).mockResolvedValue({
+        id: 'followed-1',
+      } as FollowedTrip);
+      const user = userEvent.setup();
+      renderButton();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Suivre ce trajet' }),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Notifications indisponibles'),
+        ).toBeInTheDocument();
+      });
+      // Pas de formulation qui laisse croire a un refus de l'utilisateur.
+      expect(screen.queryByText(/refusé/)).not.toBeInTheDocument();
     },
   );
 
