@@ -456,6 +456,8 @@ Le cahier des charges impose une architecture PWA (*Progressive Web App*). Ce ch
 
 **Recommandation retenue : Scaleway ou OVHcloud.** Ce choix répond directement à deux contraintes du cahier des charges : la RGPD (données hébergées en France/UE) et l'éco-conception (engagements environnementaux documentés), tout en restant cohérent avec le profil du commanditaire — une collectivité publique française.
 
+**Mise en œuvre effective : OVHcloud.** Le prototype est déployé sur un serveur OVHcloud (VPS, data center en France), avec **Caddy** en reverse proxy sur l'hôte (terminaison TLS, en-têtes de sécurité, routage `/api` vers le backend) et les services applicatifs (backend NestJS, PostgreSQL/PostGIS, OpenTripPlanner, géocodeur, relai mail) en conteneurs Docker Compose. Le déploiement est automatisé : à chaque fusion sur la branche principale, la CI reconstruit le frontend, synchronise les fichiers statiques et redémarre les conteneurs du serveur (détail du pipeline en [partie 5.2](#52-environnement-et-outils-de-travail)).
+
 <a id="310-stack-technique-retenue--synthèse"></a>
 ### 3.10 Stack technique retenue — synthèse
 
@@ -466,8 +468,8 @@ Le cahier des charges impose une architecture PWA (*Progressive Web App*). Ce ch
 | Backend | NestJS (Node.js/TypeScript) | [3.7](#37-benchmark-des-frameworks-backend) |
 | Base de données | PostgreSQL + extension PostGIS | [3.8](#38-benchmark-des-bases-de-données) |
 | Moteur de routage | OpenTripPlanner | [3.3](#33-moteur-de-calcul-ditinéraires-multimodaux) |
-| Hébergement | Scaleway ou OVHcloud | [3.9](#39-benchmark-des-hébergeurs-cloud) |
-| Authentification | JWT avec refresh tokens, mots de passe hachés (bcrypt) | — |
+| Hébergement | OVHcloud (VPS en France), Caddy en reverse proxy, conteneurs Docker Compose | [3.9](#39-benchmark-des-hébergeurs-cloud) |
+| Authentification | JWT avec refresh tokens à rotation, mots de passe hachés (bcrypt) | [Annexe C](#annexe-c-authentification-jwt-et-refresh-tokens) |
 
 <a id="311-synthèse-des-arbitrages"></a>
 ### 3.11 Synthèse des arbitrages
@@ -599,15 +601,18 @@ Ce choix permet d'intégrer progressivement les fonctionnalités obligatoires pu
 |---|---|---|
 | Gestion de version | Git / GitHub | Historique du code, branches par fonctionnalité |
 | Suivi de l'avancement | GitHub Projects (tableau Kanban) | Backlog, sprint en cours, colonnes À faire / En cours / En revue / Terminé |
-| Intégration continue | GitHub Actions | Lancement automatique des tests et du linter à chaque push |
+| Intégration et déploiement continus | GitHub Actions | Tests, lint, audit WCAG et scan de secrets à chaque push ; déploiement automatique sur fusion vers la branche principale |
 | Tests d'API | Postman | Vérification manuelle et automatisée des endpoints REST |
 | Tests unitaires | Jest (backend), Vitest (frontend) | Tests du backend NestJS et des composants React |
 | Tests d'accessibilité end-to-end | Playwright + axe-core | Audit WCAG 2.1 AA en conditions réelles, exécuté automatiquement en CI |
-| Documentation | README + Notion | Documentation technique du dépôt et suivi de projet |
+| Scan de secrets | gitleaks | Détection de secrets commités, sur l'historique complet, à chaque push |
+| Documentation | README + dossier `docs/` versionné dans le dépôt | Spécifications, décisions d'architecture, plans et rétrospectives de sprint |
 | Design d'interface | Figma | Maquettes des écrans avant développement frontend |
 | Assistance au développement | Assistant IA de codage | Accélération de l'écriture de code sous supervision directe, relecture et validation systématiques avant intégration |
 
 Ces outils ont été choisis pour leur gratuité (ou leur plan gratuit suffisant à l'échelle du projet), leur bonne intégration avec la stack retenue en partie 3, et leur usage répandu dans l'industrie, ce qui limite le risque de dépendre d'un outil peu documenté ou abandonné.
+
+**Pipeline d'intégration et de déploiement.** Chaque push déclenche, en parallèle : lint et tests unitaires des deux sous-projets, audit d'accessibilité WCAG de bout en bout (Playwright + axe-core, sur une pile applicative montée pour l'occasion), et scan de secrets sur l'historique git complet. Toute fusion vers la branche principale enchaîne, si ces vérifications passent, sur un déploiement automatique du serveur OVHcloud (reconstruction du frontend, synchronisation des fichiers statiques, redémarrage des conteneurs). Deux garde-fous ont été ajoutés en cours de projet à la suite d'incidents réels (voir [partie 9.4](#94-cas-concrets-de-bogues-traités)) : une file d'attente empêchant deux déploiements concurrents de se disputer les mêmes conteneurs, et une vérification qui compare les variables d'environnement du serveur à celles attendues par le code et alerte en cas d'écart.
 
 Le recours à un assistant IA de codage mérite une précision : il est utilisé comme un outil d'accélération de la production de code, au même titre qu'un autocomplete avancé ou qu'un pair-programmeur, mais chaque ligne produite est relue, comprise et validée avant d'être intégrée. La responsabilité du code, sa correction et sa justification restent entièrement assumées dans le cadre du projet, y compris lors des revues de code en face-à-face.
 
@@ -941,7 +946,7 @@ Cette exigence dépasse le seul champ de l'interface : le profil de mobilité (F
 <a id="104-éco-conception"></a>
 ### 10.4 Éco-conception
 
-L'éco-conception s'appuie sur le référentiel RGESN (Référentiel Général d'Écoconception de Services Numériques), avec plusieurs leviers concrets : hébergement chez un fournisseur français aux engagements environnementaux documentés (Scaleway ou OVHcloud, déjà argumenté en [partie 3.9](#39-benchmark-des-hébergeurs-cloud)), allègement du frontend (chargement différé des composants peu utilisés, compression des assets), et mise en cache des résultats d'itinéraires récents pour limiter les appels redondants au moteur de routage.
+L'éco-conception s'appuie sur le référentiel RGESN (Référentiel Général d'Écoconception de Services Numériques), avec plusieurs leviers concrets : hébergement chez un fournisseur français aux engagements environnementaux documentés (OVHcloud, déjà argumenté en [partie 3.9](#39-benchmark-des-hébergeurs-cloud)), allègement du frontend (chargement différé des composants peu utilisés via `React.lazy`, compression des assets au build), mise en cache des résultats d'itinéraires récents pour limiter les appels redondants au moteur de routage, et caches en mémoire côté backend pour les flux temps réel (GBFS, GTFS-Realtime) rafraîchis en tâche de fond plutôt qu'à chaque requête. Ces leviers restent des choix de conception : leur effet n'a pas été mesuré avec un outil dédié (type EcoIndex) sur ce périmètre.
 
 Au-delà de ces leviers techniques, la plateforme sert par nature une cause écologique : chaque trajet reporté vers un mode de transport doux plutôt que la voiture individuelle constitue, à l'échelle de la métropole, un impact positif plus significatif que l'empreinte de l'application elle-même.
 
