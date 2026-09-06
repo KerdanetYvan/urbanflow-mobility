@@ -295,3 +295,20 @@ export function FunnelIcon() {
     </svg>
   );
 }
+
+/**
+ * Fleche retour (issue #280, bouton "Retour a la liste" de l'overlay de
+ * detail de trajet en mobile) - meme silhouette que l'icone "arrow-left" de
+ * Feather/Lucide (deja la reference citee pour FunnelIcon ci-dessus).
+ * Remplace un bouton texte pleine largeur par une affordance de navigation
+ * compacte et reconnaissable, plus proche des conventions natives
+ * "retour" que d'un bouton d'action classique.
+ */
+export function ArrowLeftIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
+}

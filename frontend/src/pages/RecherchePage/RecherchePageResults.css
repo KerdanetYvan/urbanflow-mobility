@@ -283,8 +283,44 @@
   }
 }
 
+/* Bouton icone circulaire (issue #280, retour utilisateur en session -
+   remplace un bouton texte pleine largeur par une affordance de
+   navigation compacte, plus proche des conventions natives "retour").
+   Memes valeurs que .profil-stepper-btn (ProfilPage.css) : meme famille
+   de composant "bouton icone rond" dans l'app, pas de raison de diverger. */
 .resultats-mobile-detail-close {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.resultats-mobile-detail-close:hover {
+  border-color: var(--color-primary-emphasis);
+}
+
+.resultats-mobile-detail-close:active {
+  transform: scale(0.92);
+}
+
+.resultats-mobile-detail-close:focus-visible {
+  outline: 2px solid var(--color-primary-emphasis);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultats-mobile-detail-close {
+    transition: none;
+  }
 }
 
 .resultats-mobile-detail-overlay-body {

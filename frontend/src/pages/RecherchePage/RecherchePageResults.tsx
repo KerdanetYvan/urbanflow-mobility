@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import Alert from '../../components/Alert/Alert';
 import Badge from '../../components/Badge/Badge';
-import Button from '../../components/Button/Button';
+import { ArrowLeftIcon } from '../../components/icons';
 import LineBadge from '../../components/LineBadge/LineBadge';
 import MapView from '../../components/MapView/MapView';
 import { getModeStyle } from '../../components/MapView/modeStyles';
@@ -685,14 +685,14 @@ function RecherchePageResults({
           className="resultats-mobile-detail-overlay"
           data-open={mobileDetailOpen}
         >
-          <Button
+          <button
             type="button"
-            variant="secondary"
             className="resultats-mobile-detail-close"
             onClick={closeMobileDetail}
+            aria-label="Retour à la liste"
           >
-            Retour à la liste
-          </Button>
+            <ArrowLeftIcon />
+          </button>
           <div className="resultats-detail resultats-mobile-detail-overlay-body">
             {detailContent}
           </div>
