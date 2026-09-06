@@ -784,7 +784,7 @@ L'objectif n'est pas de calculer "LE" meilleur trajet dans l'absolu, mais le tra
 
 Deux cas d'usage principaux sont couverts :
 
-**Recherche avec classement personnalisé.** Lorsqu'un usager demande un itinéraire, plusieurs propositions issues du moteur de routage sont comparées et classées selon plusieurs critères, chacun avec un niveau d'importance réglable, plutôt que par le seul temps de trajet théorique :
+**Recherche avec classement personnalisé.** Lorsqu'un usager demande un itinéraire, plusieurs propositions issues du moteur de routage sont comparées et classées selon plusieurs critères, chacun affecté d'un poids explicite et modifiable, plutôt que par le seul temps de trajet théorique :
 
 | Critère | Exemple d'impact |
 |---|---|
@@ -794,7 +794,7 @@ Deux cas d'usage principaux sont couverts :
 | Perturbations en cours | Déprioritise une ligne signalée en incident via GTFS-Realtime |
 | Préférences enregistrées | Priorise ou évite un mode de transport selon le profil de mobilité ([partie 4.4](#44-spécifications-fonctionnelles-des-modules-principaux)) |
 
-**Ajustement en cours de trajet.** Si un incident survient après le départ (ligne interrompue, retard important), une notification est envoyée avec un itinéraire de substitution recalculé, plutôt que de laisser l'usager découvrir le problème une fois bloqué sur place — un point qui rejoint directement la situation vécue par [Muriel](#23-cibles-et-personas) lors d'un imprévu sur son trajet.
+**Ajustement en cours de trajet.** Si un incident est signalé sur la ligne d'un trajet suivi après le départ (ligne interrompue, retard important), le backend relance un calcul d'itinéraire tenant compte de la perturbation et envoie une notification push ; à l'ouverture de l'application, l'usager retrouve des itinéraires réévalués, plutôt que de découvrir le problème une fois bloqué sur place — un point qui rejoint directement la situation vécue par [Muriel](#23-cibles-et-personas) lors d'un imprévu sur son trajet.
 
 <a id="73-spécifications-techniques"></a>
 ### 7.3 Spécifications techniques
