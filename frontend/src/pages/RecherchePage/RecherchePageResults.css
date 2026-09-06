@@ -256,7 +256,11 @@
   z-index: 2;
   flex-direction: column;
   gap: var(--space-3);
-  max-height: 88vh;
+  /* Meme valeur que .recherche-panel-form (issue #280, retour utilisateur
+     en session : la carte laissait a peine la carte geographique visible
+     en dessous) - garde toujours une portion de carte visible au-dessus,
+     quel que soit le volume de contenu du detail. */
+  max-height: 70vh;
   padding: var(--space-4);
   background: var(--color-bg);
   border-top-left-radius: var(--radius-md);
@@ -284,6 +288,13 @@
 }
 
 .resultats-mobile-detail-overlay-body {
+  /* `flex: 1` manquait (retour utilisateur en session) : sans lui, ce
+     corps se dimensionnait a la hauteur naturelle de son contenu plutot
+     que de se contraindre a l'espace restant sous le bouton "Retour a la
+     liste" - `overflow: hidden` du parent rognait alors le contenu en trop
+     au lieu de le rendre atteignable au scroll. Meme motif exact que
+     .recherche-panel-form-body ci-dessus. */
+  flex: 1;
   min-height: 0; /* necessaire pour qu'overflow-y fonctionne dans un flex item */
   overflow-y: auto;
 }
