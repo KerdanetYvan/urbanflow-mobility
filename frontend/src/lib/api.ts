@@ -97,7 +97,7 @@ export function apiGetWithOptionalAuth<T>(path: string): Promise<T> {
  * les sauvegarde. Levee interne uniquement (voir authRequest) : jamais
  * appelee directement par les pages.
  */
-async function refreshAccessToken(): Promise<string> {
+async function doRefreshAccessToken(): Promise<string> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
     throw new ApiError('Session expirée', 401);
@@ -108,6 +108,26 @@ async function refreshAccessToken(): Promise<string> {
   });
   saveTokens(tokens);
   return tokens.accessToken;
+}
+
+/**
+ * Promesse de rafraichissement en cours, ou `null`. Depuis la rotation
+ * stricte du refresh token cote backend (issue #268), rejouer `/auth/refresh`
+ * avec un token deja consomme est traite comme un rejeu et revoque toute la
+ * session. Or plusieurs appels authentifies peuvent tomber en 401 quasi
+ * simultanement (access token expire) et tenter chacun un rafraichissement.
+ * Single-flight : le premier lance l'echange, les suivants attendent la meme
+ * promesse au lieu d'en declencher un second avec le meme token.
+ */
+let inFlightRefresh: Promise<string> | null = null;
+
+function refreshAccessToken(): Promise<string> {
+  if (!inFlightRefresh) {
+    inFlightRefresh = doRefreshAccessToken().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
 }
 
 /**

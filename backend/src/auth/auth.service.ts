@@ -6,15 +6,19 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import type { StringValue } from 'ms';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service';
 import { UsersService } from '../users/users.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { JwtPayload } from './jwt-payload.interface';
+import { JwtPayload, RefreshTokenPayload } from './jwt-payload.interface';
+import { RefreshToken } from './refresh-token.entity';
 
 /** Paire de jetons renvoyee au client apres une authentification reussie. */
 export interface TokenPair {
@@ -24,6 +28,20 @@ export interface TokenPair {
 
 /** Meme sel bcrypt que UsersService.create - coherence du cout de hachage sur tout mot de passe stocke. */
 const BCRYPT_SALT_ROUNDS = 10;
+
+/**
+ * Fenetre de grace (issue #268) : un refresh token deja consomme, re-presente
+ * dans ce delai, est tolere (une nouvelle paire est emise dans la meme
+ * famille SANS rien revoquer) plutot que traite comme un rejeu. Couvre les
+ * rafraichissements quasi simultanes - plusieurs onglets partageant le meme
+ * refresh token en localStorage tombent en 401 en meme temps - sans ouvrir
+ * de vraie fenetre de reutilisation exploitable (15 s, cote client un
+ * single-flight limite deja le cas, voir frontend/src/lib/api.ts).
+ */
+const REFRESH_REUSE_GRACE_MS = 15_000;
+
+/** Repli si le refresh token signe n'expose pas de claim `exp` decodable (ne devrait pas arriver - `expiresIn` est toujours fourni). */
+const REFRESH_FALLBACK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Message renvoye par POST /auth/forgot-password, que l'email existe ou non (pas d'enumeration). */
 const FORGOT_PASSWORD_MESSAGE =
@@ -51,6 +69,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokensRepository: Repository<RefreshToken>,
   ) {}
 
   /**
@@ -70,18 +90,37 @@ export class AuthService {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
-    return this.issueTokenPair({ sub: user.id, email: user.email });
+    // Nouvelle connexion = nouvelle famille de session (issue #268).
+    const { tokens } = await this.issueTokenPair(
+      { sub: user.id, email: user.email },
+      randomUUID(),
+    );
+    return tokens;
   }
 
   /**
-   * Echange un refresh token valide contre une nouvelle paire de jetons.
-   * Verifie avec JWT_REFRESH_SECRET (pas JWT_SECRET) : un access token
-   * expire ne peut pas etre reutilise ici pour se faire passer pour un
-   * refresh token.
+   * Echange un refresh token valide contre une nouvelle paire de jetons, avec
+   * ROTATION stricte (issue #268, A07 OWASP) :
+   *
+   * 1. Verifie la signature/expiration du JWT (JWT_REFRESH_SECRET, pas
+   *    JWT_SECRET : un access token expire ne peut pas servir de refresh
+   *    token).
+   * 2. Confronte le `jti` a la table `refresh_tokens` :
+   *    - inconnu / famille revoquee => rejet ;
+   *    - deja consomme AU-DELA de la fenetre de grace => REJEU : revocation
+   *      de toute la famille (deconnexion forcee de la session), rejet ;
+   *    - deja consomme DANS la fenetre de grace => rafraichissements quasi
+   *      simultanes, on emet une nouvelle paire sans rien revoquer ;
+   *    - valide et non consomme => on le marque consomme et on emet le
+   *      suivant dans la meme famille.
+   *
+   * Le message d'erreur est volontairement identique dans tous les cas de
+   * rejet (pas d'indice sur la raison exacte a un attaquant).
    */
   async refresh(refreshToken: string): Promise<TokenPair> {
+    let claims: RefreshTokenPayload;
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(
+      claims = await this.jwtService.verifyAsync<RefreshTokenPayload>(
         refreshToken,
         {
           secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
@@ -90,17 +129,104 @@ export class AuthService {
           algorithms: ['HS256'],
         },
       );
-
-      // On s'assure que l'utilisateur existe toujours (pas supprime depuis
-      // l'emission du refresh token) avant de renouveler les jetons.
-      const user = await this.usersService.findById(payload.sub);
-      if (!user) {
-        throw new UnauthorizedException('Utilisateur introuvable');
-      }
-
-      return this.issueTokenPair({ sub: user.id, email: user.email });
     } catch {
       throw new UnauthorizedException('Refresh token invalide ou expire');
+    }
+
+    // Refresh token emis avant l'introduction de la rotation (#268) : aucun
+    // `jti`. On le refuse pour forcer une reconnexion propre - la fenetre est
+    // bornee par l'expiration du refresh (7 j).
+    if (!claims.jti || !claims.fam) {
+      throw new UnauthorizedException('Refresh token invalide ou expire');
+    }
+
+    const stored = await this.refreshTokensRepository.findOne({
+      where: { id: claims.jti },
+    });
+
+    // `jti` absent de la table (purge, ou jeton forge malgre une signature
+    // valide - improbable) : par prudence on brule la famille annoncee si
+    // elle existe, puis on rejette.
+    if (
+      !stored ||
+      stored.familyId !== claims.fam ||
+      stored.userId !== claims.sub
+    ) {
+      await this.revokeFamily(claims.fam);
+      throw new UnauthorizedException('Refresh token invalide ou expire');
+    }
+
+    if (stored.revokedAt) {
+      throw new UnauthorizedException('Refresh token invalide ou expire');
+    }
+
+    const alreadyConsumed = stored.consumedAt !== null;
+    if (alreadyConsumed) {
+      const consumedSinceMs = Date.now() - stored.consumedAt!.getTime();
+      if (consumedSinceMs > REFRESH_REUSE_GRACE_MS) {
+        // Rejeu avere d'un jeton deja consomme : signal de vol. On revoque
+        // toute la famille - la session legitime ET l'attaquant sont
+        // deconnectes, l'utilisateur devra se reconnecter.
+        await this.revokeFamily(stored.familyId);
+        this.logger.warn(
+          `Rejeu de refresh token detecte (famille ${stored.familyId}, utilisateur ${stored.userId}) - session revoquee`,
+        );
+        throw new UnauthorizedException('Refresh token invalide ou expire');
+      }
+      // Dans la fenetre de grace : rafraichissements concurrents, on laisse
+      // passer sans revoquer ni re-consommer `stored`.
+    }
+
+    // L'utilisateur existe-t-il toujours (pas supprime depuis l'emission) ?
+    const user = await this.usersService.findById(stored.userId);
+    if (!user) {
+      await this.revokeFamily(stored.familyId);
+      throw new UnauthorizedException('Refresh token invalide ou expire');
+    }
+
+    const issued = await this.issueTokenPair(
+      { sub: user.id, email: user.email },
+      stored.familyId,
+    );
+
+    // Marque le jeton courant consomme (sauf s'il l'etait deja - cas fenetre
+    // de grace) et le relie a son remplacant (chaine d'audit).
+    if (!alreadyConsumed) {
+      await this.refreshTokensRepository.update(stored.id, {
+        consumedAt: new Date(),
+        replacedBy: issued.jti,
+      });
+    }
+
+    return issued.tokens;
+  }
+
+  /**
+   * Marque comme revoquees toutes les lignes encore actives d'une famille de
+   * session. Idempotent (le `WHERE revoked_at IS NULL` evite d'ecraser une
+   * date de revocation anterieure). Aucun effet si la famille est inconnue.
+   */
+  private async revokeFamily(familyId: string): Promise<void> {
+    await this.refreshTokensRepository.update(
+      { familyId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
+  }
+
+  /**
+   * Purge quotidienne des refresh tokens expires (leur JWT est de toute
+   * facon deja rejete par la verification de signature/expiration - ces
+   * lignes ne servent plus a rien). Meme approche que
+   * TripHistoryService#handleDailyPurge. Necessite ScheduleModule.forRoot()
+   * (enregistre globalement dans AppModule).
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async purgeExpiredRefreshTokens(): Promise<void> {
+    const result = await this.refreshTokensRepository.delete({
+      expiresAt: LessThan(new Date()),
+    });
+    if (result.affected && result.affected > 0) {
+      this.logger.log(`Purge de ${result.affected} refresh token(s) expire(s)`);
     }
   }
 
@@ -183,7 +309,31 @@ export class AuthService {
     return createHash('sha256').update(rawToken).digest('hex');
   }
 
-  private async issueTokenPair(payload: JwtPayload): Promise<TokenPair> {
+  /**
+   * Emet une paire access + refresh et enregistre le refresh token dans la
+   * table `refresh_tokens` (issue #268).
+   *
+   * L'access token reste `{ sub, email }`. Le refresh token porte en plus
+   * `jti` (son identifiant unique, genere ici) et `fam` (la famille de
+   * session passee par l'appelant : nouvelle a `login()`, reprise a chaque
+   * rotation dans `refresh()`).
+   *
+   * @param payload identite de l'utilisateur (`sub` = id, `email`)
+   * @param familyId identifiant de la famille de session
+   * @returns la paire de jetons et le `jti` du refresh emis (pour renseigner
+   *   `replaced_by` sur le jeton precedent lors d'une rotation)
+   */
+  private async issueTokenPair(
+    payload: JwtPayload,
+    familyId: string,
+  ): Promise<{ tokens: TokenPair; jti: string }> {
+    const jti = randomUUID();
+    const refreshPayload: RefreshTokenPayload = {
+      ...payload,
+      jti,
+      fam: familyId,
+    };
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_SECRET'),
@@ -192,7 +342,7 @@ export class AuthService {
           '15m',
         ) as StringValue,
       }),
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get<string>(
           'JWT_REFRESH_EXPIRATION',
@@ -201,6 +351,29 @@ export class AuthService {
       }),
     ]);
 
-    return { accessToken, refreshToken };
+    // `expires_at` recopie depuis le claim `exp` du refresh token qu'on vient
+    // de signer, pour que la ligne en base et le JWT expirent exactement au
+    // meme instant (et pouvoir purger sans redecoder chaque jeton).
+    const decoded = this.jwtService.decode<{ exp?: number } | null>(
+      refreshToken,
+    );
+    const expiresAt =
+      decoded && typeof decoded.exp === 'number'
+        ? new Date(decoded.exp * 1000)
+        : new Date(Date.now() + REFRESH_FALLBACK_TTL_MS);
+
+    await this.refreshTokensRepository.save(
+      this.refreshTokensRepository.create({
+        id: jti,
+        familyId,
+        userId: payload.sub,
+        expiresAt,
+        consumedAt: null,
+        revokedAt: null,
+        replacedBy: null,
+      }),
+    );
+
+    return { tokens: { accessToken, refreshToken }, jti };
   }
 }

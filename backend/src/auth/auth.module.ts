@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import type { StringValue } from 'ms';
 import { MailModule } from '../mail/mail.module';
 import { UsersModule } from '../users/users.module';
@@ -10,6 +11,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
+import { RefreshToken } from './refresh-token.entity';
 
 @Module({
   imports: [
@@ -19,6 +21,9 @@ import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
     forwardRef(() => UsersModule),
     MailModule,
     PassportModule,
+    // Table refresh_tokens (issue #268) : rotation stricte du refresh token
+    // avec detection de rejeu, voir AuthService.
+    TypeOrmModule.forFeature([RefreshToken]),
     // JwtModule est configure ici avec le secret d'ACCES par defaut ;
     // AuthService fournit explicitement JWT_REFRESH_SECRET a chaque appel
     // signAsync/verifyAsync concernant le refresh token (voir auth.service.ts).

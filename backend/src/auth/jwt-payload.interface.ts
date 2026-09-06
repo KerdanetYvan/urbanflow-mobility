@@ -8,3 +8,14 @@ export interface JwtPayload {
   sub: string;
   email: string;
 }
+
+/**
+ * Claims supplementaires portes UNIQUEMENT par le refresh token (issue #268,
+ * rotation stricte) : `jti` identifie ce refresh token precis, `fam` sa
+ * famille de session. L'access token reste un simple `{ sub, email }` - ces
+ * champs n'ont de sens que face a la table `refresh_tokens`.
+ */
+export interface RefreshTokenPayload extends JwtPayload {
+  jti: string;
+  fam: string;
+}
