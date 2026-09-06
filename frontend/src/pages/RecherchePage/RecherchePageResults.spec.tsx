@@ -237,6 +237,84 @@ describe('RecherchePageResults', () => {
         screen.queryByText('Perturbation en cours'),
       ).not.toBeInTheDocument();
     });
+
+    it("affiche le texte de l'alerte operateur tel quel pour une perturbation de type 'alert' (issue #275)", () => {
+      renderResults([
+        {
+          ...FAST_ITINERARY,
+          disrupted: true,
+          disruptionDetails: [
+            { kind: 'alert', headerText: 'Rénovation ascenseur - Triangle' },
+          ],
+        },
+      ]);
+
+      expect(
+        screen.getAllByText('Rénovation ascenseur - Triangle').length,
+      ).toBeGreaterThan(0);
+      // Le texte generique d'avant #275 ne doit plus apparaitre.
+      expect(
+        screen.queryByText(/actuellement touché par une perturbation/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("affiche un libelle specifique pour une annulation de ligne (issue #275)", () => {
+      renderResults([
+        {
+          ...FAST_ITINERARY,
+          disrupted: true,
+          disruptionDetails: [{ kind: 'cancellation' }],
+        },
+      ]);
+
+      expect(
+        screen.getAllByText('Une ligne de ce trajet est annulée.').length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("affiche un libelle specifique pour un arret saute (issue #275)", () => {
+      renderResults([
+        {
+          ...FAST_ITINERARY,
+          disrupted: true,
+          disruptionDetails: [{ kind: 'skipped_stop' }],
+        },
+      ]);
+
+      expect(
+        screen.getAllByText('Un arrêt de ce trajet est actuellement supprimé.')
+          .length,
+      ).toBeGreaterThan(0);
+    });
+
+    it('affiche un message par perturbation quand plusieurs sont presentes sur le meme itineraire (issue #275)', () => {
+      renderResults([
+        {
+          ...FAST_ITINERARY,
+          disrupted: true,
+          disruptionDetails: [
+            { kind: 'cancellation' },
+            { kind: 'alert', headerText: 'Trafic perturbé ligne C1' },
+          ],
+        },
+      ]);
+
+      expect(
+        screen.getAllByText('Une ligne de ce trajet est annulée.').length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText('Trafic perturbé ligne C1').length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("repli generique si disrupted est vrai sans disruptionDetails (backend pas encore redeploye)", () => {
+      renderResults([{ ...FAST_ITINERARY, disrupted: true }]);
+
+      expect(
+        screen.getAllByText('Ce trajet est actuellement touché par une perturbation.')
+          .length,
+      ).toBeGreaterThan(0);
+    });
   });
 
   describe('mode degrade - resultats servis depuis le cache local (issue #10)', () => {

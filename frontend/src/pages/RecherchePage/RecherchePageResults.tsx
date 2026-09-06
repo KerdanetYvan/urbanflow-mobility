@@ -18,7 +18,11 @@ import {
 } from '../../lib/format';
 import type { PlaceSuggestion } from '../../lib/places';
 import { chipLabel, isLineMode, tripModeChips } from '../../lib/tripModeChips';
-import type { TripFallback, TripItinerary } from '../../lib/trips';
+import type {
+  TripDisruptionDetail,
+  TripFallback,
+  TripItinerary,
+} from '../../lib/trips';
 import { useGeolocation, type GeolocationStatus } from '../../lib/useGeolocation';
 import { computeItineraryBadges, type ItineraryBadges } from './itineraryBadges';
 import './RecherchePageResults.css';
@@ -259,6 +263,28 @@ interface ItinerarySegmentsProps {
 }
 
 /**
+ * Libelle specifique par nature de perturbation (issue #275) - remplace
+ * l'ancien texte generique ("touche par une perturbation") qui ne disait
+ * jamais QUELLE perturbation. Pour `kind === 'alert'`, `headerText` est le
+ * texte de l'operateur lui-meme (deja pense pour l'usager, voir
+ * GtfsRealtimeClientService cote backend) : affiche tel quel plutot que
+ * reformule - un texte generique de repli existe si jamais absent
+ * (ne devrait pas arriver, voir TripDisruptionDetail).
+ */
+function disruptionMessage(detail: TripDisruptionDetail): string {
+  switch (detail.kind) {
+    case 'cancellation':
+      return 'Une ligne de ce trajet est annulée.';
+    case 'skipped_stop':
+      return 'Un arrêt de ce trajet est actuellement supprimé.';
+    case 'alert':
+      return detail.headerText ?? 'Ce trajet est concerné par une alerte en cours.';
+    default:
+      return 'Ce trajet est actuellement touché par une perturbation.';
+  }
+}
+
+/**
  * Detail de l'itineraire selectionne, segment par segment (mode, duree,
  * arret de correspondance) - section 3.2 de la spec. Ne contient plus sa
  * propre carte (contrairement a la v1 de #36) : la carte de fond plein
@@ -275,9 +301,20 @@ function ItinerarySegments({ itinerary, origin, destination }: ItinerarySegments
         // des badges qualitatifs (Badge, section 2.2 du meme spec) :
         // alerte de securite/actualite de trajet, visuellement distincte
         // (Alert, pas Badge), affichee independamment de leurs regles.
+        // Message specifique par perturbation (issue #275, retour testeur :
+        // le texte etait generique quelle que soit la nature reelle du
+        // probleme) plutot qu'une phrase fixe - voir disruptionMessage().
         <Alert variant="warning" title="Perturbation en cours">
-          Ce trajet est actuellement touché par une perturbation - le
-          classement des itinéraires en tient déjà compte.
+          {itinerary.disruptionDetails && itinerary.disruptionDetails.length > 0 ? (
+            itinerary.disruptionDetails.map((detail, index) => (
+              <p key={index}>{disruptionMessage(detail)}</p>
+            ))
+          ) : (
+            // Repli defensif (ne devrait pas arriver, ScoringService pose
+            // toujours les deux ensemble) : un backend/cache pas encore
+            // redeploye pourrait renvoyer disrupted sans disruptionDetails.
+            <p>Ce trajet est actuellement touché par une perturbation.</p>
+          )}
         </Alert>
       )}
       <TripFollowButton itinerary={itinerary} />

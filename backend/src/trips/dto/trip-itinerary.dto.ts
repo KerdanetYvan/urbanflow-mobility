@@ -85,6 +85,31 @@ export class TripSegment {
   geometry: GeoPoint[];
 }
 
+/**
+ * Detail d'une perturbation touchant un itineraire (issue #275, retour
+ * testeur : l'encadre "Perturbation en cours" etait generique, sans dire
+ * QUELLE perturbation). Sous-ensemble volontairement restreint de
+ * RealtimeDisruption (backend/src/gtfs-realtime/interfaces/
+ * realtime-disruption.interface.ts) : routeId/tripId/stopId sont des
+ * identifiants GTFS bruts, jamais destines a l'affichage - seuls `kind` et
+ * `headerText` (deja pense pour l'usager par GtfsRealtimeClientService) le
+ * sont.
+ */
+export class TripDisruptionDetail {
+  @ApiProperty({
+    enum: ['cancellation', 'skipped_stop', 'alert'],
+    description:
+      "Nature de la perturbation, memes valeurs que RealtimeDisruptionKind - permet au frontend d'afficher un message specifique par cas plutot qu'un texte generique.",
+  })
+  kind: 'cancellation' | 'skipped_stop' | 'alert';
+
+  @ApiPropertyOptional({
+    description:
+      "Texte court destine a l'usager, present uniquement pour kind='alert' (traduction francaise si l'operateur la publie) - absent pour 'cancellation'/'skipped_stop', ou un libelle generique par kind suffit (aucun texte operateur equivalent n'existe pour ces cas dans le flux GTFS-Realtime).",
+  })
+  headerText?: string;
+}
+
 export class TripItinerary {
   @ApiProperty()
   startTime: string;
@@ -115,6 +140,14 @@ export class TripItinerary {
     example: true,
   })
   disrupted?: boolean;
+
+  @ApiPropertyOptional({
+    type: TripDisruptionDetail,
+    isArray: true,
+    description:
+      'Detail des perturbations trouvees (issue #275) - present uniquement quand `disrupted` est true (un element par segment touche, jamais un tableau vide). Permet au frontend de remplacer le message generique par un texte specifique a la nature reelle de la perturbation.',
+  })
+  disruptionDetails?: TripDisruptionDetail[];
 }
 
 /**

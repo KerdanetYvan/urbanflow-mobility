@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { GtfsRealtimeCacheService } from '../gtfs-realtime/gtfs-realtime-cache.service';
+import type { RealtimeDisruption } from '../gtfs-realtime/interfaces/realtime-disruption.interface';
 import { AccessibilityPreference } from '../profiles/accessibility-preference.enum';
 import { MobilityProfile } from '../profiles/mobility-profile.entity';
 import type {
@@ -34,10 +35,11 @@ export class ScoringService {
   /**
    * Trie les itineraires du meilleur au moins bon (score croissant). Ne
    * mute jamais le tableau/les objets recus (nouveau tableau, itineraires
-   * copies) - seul ajout au passage : `disrupted: true` sur tout itineraire
-   * touche par une perturbation GTFS-Realtime en cours (issue #18, voir
-   * TripItinerary#disrupted), absent (pas juste `false`) sinon. Tri stable
-   * a egalite de score.
+   * copies) - seuls ajouts au passage : `disrupted: true` sur tout
+   * itineraire touche par une perturbation GTFS-Realtime en cours (issue
+   * #18, voir TripItinerary#disrupted) et `disruptionDetails` (issue #275)
+   * avec le detail de chaque perturbation trouvee - absents (pas juste
+   * `false`/`[]`) sinon. Tri stable a egalite de score.
    *
    * Interroge la meteo une seule fois par appel (pas par itineraire) -
    * WeatherService la met deja en cache, mais autant eviter les appels
@@ -51,12 +53,26 @@ export class ScoringService {
     const weather = await this.weatherService.getCurrentConditions();
     return itineraries
       .map((itinerary) => {
-        const disrupted = this.hasActiveDisruption(itinerary);
-        // Etale d'abord l'itineraire recu (jamais mute), `disrupted`
-        // ajoute seulement si vrai - voir TripItinerary#disrupted, pas de
-        // champ present-mais-false pour ne pas alourdir les itineraires
-        // (grande majorite) qui n'en ont pas besoin.
-        return disrupted ? { ...itinerary, disrupted } : { ...itinerary };
+        const disruptions = this.findItineraryDisruptions(itinerary);
+        const disrupted = disruptions.length > 0;
+        // Etale d'abord l'itineraire recu (jamais mute), `disrupted`/
+        // `disruptionDetails` ajoutes seulement si des perturbations
+        // existent - voir TripItinerary#disrupted/#disruptionDetails, pas
+        // de champ present-mais-vide pour ne pas alourdir les itineraires
+        // (grande majorite) qui n'en ont pas besoin. Seuls `kind`/
+        // `headerText` sont retenus (voir TripDisruptionDetail) :
+        // routeId/tripId/stopId de RealtimeDisruption sont des identifiants
+        // GTFS bruts, jamais destines a l'affichage.
+        return disrupted
+          ? {
+              ...itinerary,
+              disrupted,
+              disruptionDetails: disruptions.map((disruption) => ({
+                kind: disruption.kind,
+                headerText: disruption.headerText,
+              })),
+            }
+          : { ...itinerary };
       })
       .sort(
         (a, b) =>
@@ -165,21 +181,24 @@ export class ScoringService {
   }
 
   /**
-   * `true` si au moins un segment de transport en commun de l'itineraire
-   * est actuellement touche par une perturbation GTFS-Realtime (issue #18) -
-   * recoupe route_id/trip_id de chaque segment (TripSegment#routeId/tripId,
-   * issue #18) avec GtfsRealtimeCacheService#findDisruptions (issue #14).
-   * Un segment a pied n'a ni routeId ni tripId : `findDisruptions({})`
-   * renvoie deliberement `[]` sans routeId/tripId (voir sa docstring), donc
-   * jamais de faux positif sur ces segments.
+   * Perturbations GTFS-Realtime actuellement actives sur l'itineraire
+   * (issue #18, detail remonte au frontend par #275) - recoupe route_id/
+   * trip_id de chaque segment (TripSegment#routeId/tripId, issue #18) avec
+   * GtfsRealtimeCacheService#findDisruptions (issue #14). Tableau vide (pas
+   * juste `false`) si aucune : le nombre d'elements n'a plus a etre
+   * recalcule separement pour `disrupted` (voir rank()). Un segment a pied
+   * n'a ni routeId ni tripId : `findDisruptions({})` renvoie deliberement
+   * `[]` sans routeId/tripId (voir sa docstring), donc jamais de faux
+   * positif sur ces segments.
    */
-  private hasActiveDisruption(itinerary: TripItinerary): boolean {
-    return itinerary.segments.some(
-      (segment) =>
-        this.gtfsRealtimeCache.findDisruptions({
-          routeId: segment.routeId,
-          tripId: segment.tripId,
-        }).length > 0,
+  private findItineraryDisruptions(
+    itinerary: TripItinerary,
+  ): RealtimeDisruption[] {
+    return itinerary.segments.flatMap((segment) =>
+      this.gtfsRealtimeCache.findDisruptions({
+        routeId: segment.routeId,
+        tripId: segment.tripId,
+      }),
     );
   }
 }
