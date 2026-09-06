@@ -504,12 +504,18 @@ config:
 ---
 flowchart TB
     subgraph Client
-        PWA[PWA React - Frontend]
+        PWA[PWA React + service worker]
     end
 
-    subgraph Backend["Backend NestJS"]
+    subgraph Edge["Serveur OVHcloud"]
+        CADDY[Caddy - reverse proxy / TLS]
+    end
+
+    subgraph Backend["Backend NestJS - conteneurs Docker Compose"]
         API[API REST]
-        SVC[Services métiers]
+        SCORE[Service de scoring]
+        RT[Caches temps réel<br/>GBFS + GTFS-Realtime]
+        PUSH[Notifications push]
     end
 
     subgraph Données
@@ -518,30 +524,41 @@ flowchart TB
 
     subgraph Externe["Services externes"]
         OTP[OpenTripPlanner]
-        GTFS[Flux GTFS / GTFS-RT]
-        GBFS[Flux GBFS vélos-trottinettes]
+        NOM[Géocodeur Nominatim]
+        METEO[API météo]
+        FLUX[Flux GTFS / GTFS-RT / GBFS<br/>opérateurs de la métropole]
     end
 
-    PWA -->|Requêtes HTTPS/REST| API
-    API --> SVC
-    SVC --> DB
-    SVC -->|Appels routage| OTP
-    OTP --> GTFS
-    OTP --> GBFS
+    PWA -->|HTTPS/REST| CADDY --> API
+    API --> DB
+    API -->|calcul d'itinéraires| OTP
+    API -->|adresses| NOM
+    API --> SCORE
+    SCORE --> METEO
+    SCORE --> RT
+    RT --> FLUX
+    OTP --> FLUX
+    RT -->|perturbation détectée| PUSH --> PWA
 ```
 
-Ce schéma en couches sépare clairement l'interface utilisateur, la logique métier et les données, avec le moteur de routage traité comme un service externe interchangeable — cohérent avec la logique d'évolutivité posée en [partie 2.6](#26-anticiper-les-évolutions-futures).
+Ce schéma sépare l'interface utilisateur, la logique métier et les données, avec le moteur de routage et les flux opérateurs traités comme des services externes interchangeables — cohérent avec la logique d'évolutivité posée en [partie 2.6](#26-anticiper-les-évolutions-futures). Le service de scoring ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)), les caches temps réel et le canal de notifications sont des modules du backend, ajoutés au fil des itérations sans remettre en cause cette structure en couches.
 
 <a id="42-description-des-composants"></a>
 ### 4.2 Description des composants
 
 | Composant | Rôle | Détaillé en |
 |---|---|---|
-| PWA (React) | Interface utilisateur, planification et suivi des trajets, installation sur l'écran d'accueil | [3.6](#36-benchmark-des-frameworks-frontend) |
-| API REST (NestJS) | Point d'entrée unique du backend, expose les ressources (utilisateurs, trajets, réservations) | [3.7](#37-benchmark-des-frameworks-backend) |
-| Services métiers | Logique applicative (calcul d'itinéraire, gestion des réservations, calcul d'empreinte carbone) | — |
-| Base de données (PostgreSQL/PostGIS) | Stockage des utilisateurs, trajets, réservations, données géospatiales | [3.8](#38-benchmark-des-bases-de-données) |
+| PWA (React) | Interface utilisateur, planification et suivi des trajets, affichage cartographique, installation sur l'écran d'accueil | [3.6](#36-benchmark-des-frameworks-frontend) |
+| Caddy (reverse proxy) | Terminaison TLS, en-têtes de sécurité HTTP, routage `/api` vers le backend et service des fichiers statiques du frontend | [3.9](#39-benchmark-des-hébergeurs-cloud) |
+| API REST (NestJS) | Point d'entrée unique du backend : comptes et profils, recherche et historique de trajets, trajet suivi, abonnements de notification | [3.7](#37-benchmark-des-frameworks-backend) |
+| Service de scoring | Classement pondéré des itinéraires renvoyés par OpenTripPlanner selon la météo, les perturbations et le profil de l'usager | [7.3](#73-spécifications-techniques) |
+| Caches temps réel (GBFS, GTFS-Realtime) | Disponibilité des vélos/trottinettes en station et perturbations en cours, rafraîchis en tâche de fond et servis depuis la mémoire | [7.3](#73-spécifications-techniques) |
+| Notifications push (Web Push / VAPID) | Alerte l'usager qui suit un trajet dès qu'une perturbation est détectée sur sa ligne | [7.2](#72-spécifications-fonctionnelles) |
+| Base de données (PostgreSQL/PostGIS) | Comptes, profils de mobilité, historique et trajets suivis, données géospatiales — coordonnées et libellés d'adresse chiffrés au repos | [3.8](#38-benchmark-des-bases-de-données) |
 | OpenTripPlanner | Calcul des itinéraires multimodaux à partir des flux GTFS/GBFS | [3.3](#33-moteur-de-calcul-ditinéraires-multimodaux) |
+| Géocodeur (Nominatim) | Résolution des adresses saisies en coordonnées, sur les données OpenStreetMap de la métropole | — |
+
+La **réservation unifiée** et le **calculateur d'empreinte carbone**, évoqués dans la demande initiale ([partie 2.2](#22-analyse-de-la-demande-client)), ne font pas partie du périmètre implémenté : le cahier des charges n'impose qu'une fonctionnalité au choix ([partie 2.5](#25-recueil-et-hiérarchisation-des-besoins)), et celle retenue est le classement personnalisé ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)). Ces deux briques sont replacées comme évolutions en [partie 11.1](#111-perspectives-et-feuille-de-route-post-mvp).
 
 <a id="43-nomenclature-et-conventions"></a>
 ### 4.3 Nomenclature et conventions
