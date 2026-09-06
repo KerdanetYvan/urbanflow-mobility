@@ -1042,9 +1042,47 @@ flowchart LR
 
 C'est cette manière de raisonner, plus que la stack technique retenue, qui recoupe directement les compétences visées par le Titre 6 Concepteur Développeur de Solutions Digitales.
 
-Deux évolutions restent ouvertes pour la suite. L'ajout de nouveaux opérateurs ou l'extension à d'autres villes, qui ne demanderait qu'un flux GTFS/GBFS de plus à brancher sur un écosystème déjà pensé pour ça ([partie 4.5](#45-évolutivité-et-maintenabilité)). Et un service de scoring qui pourrait, une fois assez de données d'usage accumulées, évoluer vers un modèle prédictif ([partie 7.4](#74-limites-et-évolutions-possibles)).
+<a id="111-perspectives-et-feuille-de-route-post-mvp"></a>
+### 11.1 Perspectives et feuille de route post-MVP
 
-Deux évolutions différentes, une même logique : faire grandir l'écosystème sans jamais complexifier ce que l'usager, lui, continue de voir.
+Le périmètre livré est un socle : les fonctionnalités obligatoires (F1–F3) et une fonctionnalité au choix ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)). L'architecture a été pensée pour que les extensions suivantes se branchent sans réécriture (découplage [3.5](#35-architecture-applicative-full-stack-intégré-ou-frontendbackend-séparés), sources de données interchangeables [2.6](#26-anticiper-les-évolutions-futures) / [4.5](#45-évolutivité-et-maintenabilité)).
+
+| Évolution | Ce que ça demande | Dépendances |
+|---|---|---|
+| **Nouveaux opérateurs / autres villes** | Brancher un flux GTFS/GBFS conforme supplémentaire ; aucun code applicatif à modifier | — |
+| **Vélo/trottinette libre-service dans le calcul d'itinéraire** | Aujourd'hui affichés sur la carte (disponibilité temps réel) mais pas encore intégrés au routage multimodal ; nécessite de configurer OpenTripPlanner avec le volet GBFS | Données GBFS déjà consommées |
+| **Réservation unifiée** (vélos, trottinettes, places de covoiturage) | Nouveau module backend + tables dédiées ; s'appuie sur la même API et les comptes existants | API opérateurs (réservation) — dépend de conventions avec chaque opérateur |
+| **Calculateur d'empreinte carbone avec suivi personnel** | Facteurs d'émission par mode (barème ADEME) appliqués aux segments d'un itinéraire, puis agrégation dans un tableau de bord citoyen | Historique de trajets (déjà persisté) |
+| **Covoiturage dynamique** avec *matching* | Module de mise en relation + géomatching (PostGIS déjà en place) ; enjeu principal = masse critique d'usagers | — |
+| **Scoring prédictif** | Passer de la somme pondérée à un modèle entraîné sur l'historique d'usage réel ([partie 7.4](#74-limites-et-évolutions-possibles)) | Volume de données d'usage suffisant |
+| **Canal collectivité** (tableau de bord agrégé) | Exposer des statistiques agrégées et anonymisées à la métropole ([partie 10.2](#102-rgpd-et-données-de-géolocalisation)) | Cadre RGPD du traitement statistique à formaliser |
+| **Gamification / signalement collaboratif** | Modules d'engagement, moindre priorité produit | — |
+
+Une même logique traverse cette liste : faire grandir l'écosystème sans jamais complexifier ce que l'usager, lui, continue de voir.
+
+<a id="112-écarts-frictions-et-enseignements-post-mortem"></a>
+### 11.2 Écarts, frictions et enseignements (post-mortem)
+
+Ce dossier a d'abord été rédigé comme un document de conception amont (juillet), puis mis à jour en fin de projet : il fait aussi office de point de clôture. Ce bilan croise ce qui a bien fonctionné, les frictions rencontrées, les écarts entre la conception initiale et le produit livré, et ce qui serait fait autrement.
+
+**Ce qui a bien fonctionné**
+
+- Le **découplage frontend / backend** et le traitement des flux comme sources interchangeables ont tenu : aucune des fonctionnalités ajoutées en cours de route (scoring, suivi de perturbation, notifications) n'a demandé de revenir sur la structure en couches.
+- Le **cycle itératif** avec revue de code systématique et tests de non-régression a permis de livrer en continu sans accumuler de dette bloquante — 151 *pull requests*, chacune revue, sur 7 semaines.
+- Les **revues manuelles de bout en bout** en conditions réelles (mêmes données, mêmes contraintes réseau que la production) ont détecté des défauts qu'aucun test automatisé n'aurait vus — mauvais cadrage de carte, glyphes trop petits, messages d'erreur indifférenciés — et ont directement alimenté les sprints suivants.
+
+**Frictions et écarts**
+
+- **Configuration de production maintenue à la main.** Le fichier de configuration du serveur étant hors dépôt (pas de secrets versionnés), l'ajout d'une variable au code ne se propageait pas automatiquement : deux fonctionnalités (chiffrement de l'historique, notifications push) ont été cassées en silence en production avant d'être diagnostiquées ([partie 9.4](#94-cas-concrets-de-bogues-traités)). Corrigé par une validation au démarrage et une vérification de CI, mais le coût de diagnostic aurait été évité par une gestion de configuration plus rigoureuse dès le départ.
+- **Écarts dossier / code.** Certaines sections du dossier de juillet décrivaient des mécanismes comme acquis alors qu'ils étaient encore à l'état d'intention (rotation du refresh token, traitement statistique agrégé). Ces écarts ont été résorbés — soit en implémentant (rotation), soit en requalifiant explicitement en principe de conception (canal collectivité) — mais ils rappellent qu'un document de conception doit distinguer nettement « prévu » de « fait ».
+- **Portée initiale surdimensionnée.** La demande client listait une dizaine de fonctionnalités ; le cadrage a resserré à F1–F3 + une fonctionnalité au choix. Ce resserrement a été le bon choix, mais il aurait pu être posé plus tôt et plus explicitement dans le dossier de juillet.
+- **Estimation de la charge d'intégration.** Le déploiement d'OpenTripPlanner avec de vraies données GTFS/OSM et sa maintenance (fenêtre de validité glissante du flux) ont demandé plus de mise au point que prévu — d'où le rafraîchissement automatique hebdomadaire ajouté en cours de route.
+
+**Ce qui serait fait autrement**
+
+- Traiter la **configuration de production comme du code** dès le premier déploiement (fichier d'exemple versionné + vérification d'écart en CI en place *avant* la première mise en production, pas après un incident).
+- **Figer la portée dans le dossier** en distinguant systématiquement, pour chaque fonctionnalité, l'état « conçu / en cours / livré / hors périmètre ».
+- Mettre en place l'**audit d'accessibilité automatisé** dès le premier écran plutôt qu'à mi-parcours : plusieurs corrections auraient été prises en compte au fil de l'eau au lieu d'un rattrapage groupé.
 
 ---
 
