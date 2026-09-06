@@ -297,17 +297,64 @@ describe('ProfilPage', () => {
       });
     });
 
-    it('regroupe les modes de transport par categorie (Actif/Transport en commun/Partage)', async () => {
+    it('regroupe les modes de transport par categorie (Actif/Transport en commun)', async () => {
       renderPage();
 
       expect(await screen.findByText('Actif')).toBeInTheDocument();
       expect(screen.getByText('Transport en commun')).toBeInTheDocument();
-      expect(screen.getByText('Partagé')).toBeInTheDocument();
+      // Plus de groupe "Partagé" depuis le retrait de trottinette/covoiturage
+      // (issue #278) - la seule chip qu'il contenait a disparu.
+      expect(screen.queryByText('Partagé')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('checkbox', { name: 'Trottinette' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('checkbox', { name: 'Covoiturage' }),
+      ).not.toBeInTheDocument();
       // Regroupement programmatique (WCAG 1.3.1), pas seulement visuel :
       // chaque categorie est un vrai <fieldset>, pas juste une <div>.
       expect(
         screen.getByRole('group', { name: 'Actif' }),
       ).toBeInTheDocument();
+    });
+
+    it('lit sans planter un profil qui porte encore une valeur retiree (issue #278)', async () => {
+      // Profil enregistre avant le retrait : 'scooter' est toujours en base.
+      vi.mocked(profileLib.getMyProfile).mockResolvedValue({
+        id: 'profile-1',
+        userId: 'user-1',
+        preferredTransportModes: ['walking', 'scooter'],
+        accessibilityPreferences: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      const updateMock = vi
+        .mocked(profileLib.updateProfile)
+        .mockResolvedValue({
+          id: 'profile-1',
+          userId: 'user-1',
+          preferredTransportModes: ['walking'],
+          accessibilityPreferences: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      const user = userEvent.setup();
+      renderPage();
+
+      // La page s'affiche, 'walking' reste coche, 'scooter' est ignore
+      // (aucune chip pour lui).
+      const walking = await screen.findByRole('checkbox', { name: 'Marche' });
+      expect(walking).toBeChecked();
+      expect(
+        screen.queryByRole('checkbox', { name: 'Trottinette' }),
+      ).not.toBeInTheDocument();
+
+      // Un enregistrement ulterieur ne renvoie plus la valeur obsolete.
+      await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+      await waitFor(() => expect(updateMock).toHaveBeenCalled());
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ preferredTransportModes: ['walking'] }),
+      );
     });
 
     it('reste un vrai <input type="checkbox"> natif sous la chip (acceptance : semantique inchangee)', async () => {

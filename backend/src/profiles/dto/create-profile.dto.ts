@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
+  IsIn,
   IsLatitude,
   IsLongitude,
   IsOptional,
@@ -10,17 +11,24 @@ import {
   MaxLength,
 } from 'class-validator';
 import { AccessibilityPreference } from '../accessibility-preference.enum';
-import { TransportMode } from '../transport-mode.enum';
+import { PROFILE_TRANSPORT_MODES, TransportMode } from '../transport-mode.enum';
 
 /** Donnees attendues pour POST /profiles (creation du profil de mobilite). */
 export class CreateProfileDto {
+  /**
+   * Modes de transport preferes. Valides contre PROFILE_TRANSPORT_MODES
+   * (sous-ensemble de TransportMode), pas contre l'enum complet : trottinette
+   * et covoiturage ne sont plus proposables dans un profil (issue #278, voir
+   * le commentaire de PROFILE_TRANSPORT_MODES). Un client qui les enverrait
+   * quand meme recoit une 400, comme pour n'importe quelle valeur inconnue.
+   */
   @ApiProperty({
-    enum: TransportMode,
+    enum: PROFILE_TRANSPORT_MODES,
     isArray: true,
     example: [TransportMode.WALKING],
   })
   @IsArray()
-  @IsEnum(TransportMode, { each: true })
+  @IsIn(PROFILE_TRANSPORT_MODES, { each: true })
   preferredTransportModes: TransportMode[];
 
   @ApiProperty({
