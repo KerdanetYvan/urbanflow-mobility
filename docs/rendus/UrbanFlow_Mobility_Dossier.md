@@ -226,6 +226,7 @@ puppeteer:
    - [6.1 Indicateurs de qualité suivis](#61-indicateurs-de-qualité-suivis)
    - [6.2 Démarche d'amélioration continue](#62-démarche-damélioration-continue)
    - [6.3 Boucle de capitalisation](#63-boucle-de-capitalisation)
+   - [6.4 Bilan quantitatif de la démarche](#64-bilan-quantitatif-de-la-démarche)
 7. [Spécifications détaillées d'une fonctionnalité clé](#7-spécifications-détaillées-dune-fonctionnalité-clé)
    - [7.1 Présentation et objectifs de la fonctionnalité](#71-présentation-et-objectifs-de-la-fonctionnalité)
    - [7.2 Spécifications fonctionnelles](#72-spécifications-fonctionnelles)
@@ -239,6 +240,7 @@ puppeteer:
    - [9.1 Détection et priorisation des anomalies](#91-détection-et-priorisation-des-anomalies)
    - [9.2 Processus de correction](#92-processus-de-correction)
    - [9.3 Approche spécifique à la phase de préproduction](#93-approche-spécifique-à -la-phase-de-préproduction)
+   - [9.4 Cas concrets de bogues traités](#94-cas-concrets-de-bogues-traités)
 10. [Contraintes transverses (sécurité, RGPD, accessibilité, éco-conception, PWA, performance)](#10-contraintes-transverses)
     - [10.1 Sécurité des données](#101-sécurité-des-données)
     - [10.2 RGPD et données de géolocalisation](#102-rgpd-et-données-de-géolocalisation)
@@ -246,6 +248,8 @@ puppeteer:
     - [10.4 Éco-conception](#104-éco-conception)
     - [10.5 PWA et performance en mobilité](#105-pwa-et-performance-en-mobilité)
 11. [Conclusion et perspectives](#11-conclusion-et-perspectives)
+    - [11.1 Perspectives et feuille de route post-MVP](#111-perspectives-et-feuille-de-route-post-mvp)
+    - [11.2 Écarts, frictions et enseignements (post-mortem)](#112-écarts-frictions-et-enseignements-post-mortem)
 12. [Annexes](#12-annexes)
 
 ---
@@ -974,7 +978,7 @@ Ces contraintes s'appliquent à l'ensemble de la plateforme plutôt qu'à un mod
 <a id="101-sécurité-des-données"></a>
 ### 10.1 Sécurité des données
 
-La sécurité s'appuie sur les standards OWASP déjà mentionnés en partie 2.5, déclinés en pratiques concrètes : authentification par JWT avec refresh tokens et mots de passe hachés (bcrypt), déjà posée comme choix technique en [partie 3.10](#310-stack-technique-retenue--synthèse) *(fonctionnement détaillé en [annexe C](#annexe-c-authentification-jwt-et-refresh-tokens) et [annexe D](#annexe-d-hachage-des-mots-de-passe-avec-bcrypt))* ; validation systématique des données entrantes côté API pour se prémunir des injections ; communications chiffrées en HTTPS de bout en bout ; et une limitation du nombre de requêtes (rate limiting) sur les endpoints sensibles, notamment ceux liés à l'authentification.
+La sécurité s'appuie sur les standards OWASP déjà mentionnés en partie 2.5, déclinés en pratiques concrètes : authentification par JWT avec refresh tokens **à rotation et détection de rejeu** et mots de passe hachés (bcrypt), déjà posée comme choix technique en [partie 3.10](#310-stack-technique-retenue--synthèse) *(fonctionnement détaillé en [annexe C](#annexe-c-authentification-jwt-et-refresh-tokens) et [annexe D](#annexe-d-hachage-des-mots-de-passe-avec-bcrypt))* ; validation systématique des données entrantes côté API pour se prémunir des injections ; communications chiffrées en HTTPS de bout en bout ; en-têtes de sécurité HTTP standards ; et une limitation du nombre de requêtes (rate limiting) sur les endpoints sensibles, notamment ceux liés à l'authentification. Ces points ont fait l'objet d'un audit OWASP dédié en cours de projet, qui a donné lieu à plusieurs correctifs (rate limiting, en-têtes, restriction explicite de l'algorithme de signature des jetons).
 
 Les données de géolocalisation méritent une vigilance particulière : elles permettent de reconstituer des habitudes de déplacement (domicile, lieu de travail, horaires), ce qui en fait une catégorie de données particulièrement sensible si elle venait à fuiter. *(Cartographie détaillée des risques en [annexe E](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation).)*
 
@@ -1097,6 +1101,7 @@ Les annexes qui suivent n'ont pas vocation à être lues pour comprendre les par
 - [Annexe D — Hachage des mots de passe avec bcrypt](#annexe-d-hachage-des-mots-de-passe-avec-bcrypt)
 - [Annexe E — Cartographie des risques sur les données de géolocalisation](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation)
 - [Annexe F — Grille de conformité WCAG 2.1 AA](#annexe-f-grille-de-conformité-wcag-21-aa)
+- [Annexe G — Glossaire](#annexe-g-glossaire)
 
 <a id="annexe-a-standards-de-données-de-transport"></a>
 ### Annexe A — Standards de données de transport, origine et adoption
@@ -1200,8 +1205,31 @@ Le WCAG 2.1 (Web Content Accessibility Guidelines) est le référentiel de réf�
 | 3.3.1 / 3.3.2 Identification des erreurs et instructions | Les erreurs de saisie doivent être signalées clairement, et les champs doivent être accompagnés d'instructions | Le formulaire d'inscription et la recherche d'itinéraire indiquent explicitement le champ en erreur et la nature du problème, plutôt qu'un message générique |
 | 4.1.2 Nom, rôle, valeur | Les composants d'interface personnalisés (carte interactive, sélecteurs) doivent exposer correctement leur état aux technologies d'assistance | Les composants non standards (carte, sélecteur de préférences du profil de mobilité) sont construits avec les attributs ARIA nécessaires plutôt qu'en HTML non sémantique |
 
-Cette sélection n'a pas vocation à remplacer un audit d'accessibilité complet, mais à intégrer les critères les plus structurants dès la conception plutôt que de les traiter en correction a posteriori.
+Cette sélection n'a pas vocation à remplacer un audit d'accessibilité complet, mais à intégrer les critères les plus structurants dès la conception plutôt que de les traiter en correction a posteriori. En complément, une suite d'audit automatisée (Playwright + axe-core) rejoue ces vérifications sur les écrans clés à chaque push ([partie 5.2](#52-environnement-et-outils-de-travail)) et fait échouer la CI en cas de régression d'accessibilité.
 
 Sources :
 - [W3C — Web Content Accessibility Guidelines (WCAG) 2.1](https://www.w3.org/TR/WCAG21/)
 - [W3C — WCAG 2.1 Quick Reference (liste filtrable des critères de succès)](https://www.w3.org/WAI/WCAG21/quickref/)
+
+---
+
+<a id="annexe-g-glossaire"></a>
+### Annexe G — Glossaire
+
+| Terme | Définition |
+|---|---|
+| **GTFS** (*General Transit Feed Specification*) | Format ouvert décrivant l'offre de transport en commun *théorique* (lignes, arrêts, horaires planifiés). Standard de fait, alimenté par la plupart des autorités de transport. |
+| **GTFS-Realtime** (GTFS-RT) | Extension temps réel de GTFS : perturbations, retards, positions de véhicules. Utilisée ici pour détecter un incident sur une ligne suivie. |
+| **GBFS** (*General Bikeshare Feed Specification*) | Équivalent de GTFS pour les mobilités en libre-service : position et disponibilité en temps réel des vélos et trottinettes en station. |
+| **OpenTripPlanner** (OTP) | Moteur open source de calcul d'itinéraires multimodaux, à partir des flux GTFS/GBFS et des données OpenStreetMap ([annexe B](#annexe-b-comparatif-des-moteurs-de-routage)). |
+| **RAPTOR** (*Round-bAsed Public Transit Optimized Router*) | Algorithme de calcul d'itinéraires en transport en commun par « tours » successifs, optimisé pour les correspondances. Utilisé par OpenTripPlanner. |
+| **Dijkstra / A\*** | Algorithmes classiques de plus court chemin dans un graphe, utilisés pour le routage sur le réseau piéton/cyclable. |
+| **Somme pondérée multicritère** (*Weighted Sum Model*) | Méthode d'aide à la décision : chaque critère reçoit un poids explicite, le score global est leur combinaison linéaire. Base du service de scoring ([partie 7.3](#73-spécifications-techniques)). |
+| **PWA** (*Progressive Web App*) | Application web installable, dotée d'un *service worker* pour le fonctionnement hors ligne partiel, sans passer par un magasin d'applications. |
+| **Service worker** | Script exécuté par le navigateur en arrière-plan de la page : gère le cache hors ligne et la réception des notifications push. |
+| **JWT** (*JSON Web Token*) | Jeton d'authentification auto-porteur et signé, vérifiable sans consulter la base ([annexe C](#annexe-c-authentification-jwt-et-refresh-tokens)). |
+| **VAPID** (*Voluntary Application Server Identification*) | Paire de clés identifiant le serveur applicatif auprès du service de push du navigateur, requise pour l'envoi de notifications Web Push. |
+| **PostGIS** | Extension géospatiale de PostgreSQL : types géométriques, index et requêtes spatiales natives. |
+| **AES-256-GCM** | Algorithme de chiffrement symétrique *authentifié* (détecte toute altération du texte chiffré). Utilisé pour le chiffrement au repos des données de géolocalisation ([annexe E](#annexe-e-cartographie-des-risques-sur-les-données-de-géolocalisation)). |
+| **MaaS** (*Mobility as a Service*) | Modèle agrégeant l'ensemble des offres de mobilité d'un territoire dans une application unique ([partie 2.1](#21-présentation-du-commanditaire-et-du-contexte)). |
+| **RGESN** | Référentiel Général d'Écoconception de Services Numériques (référentiel public français). |
