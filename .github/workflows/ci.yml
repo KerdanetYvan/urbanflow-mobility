@@ -352,3 +352,27 @@ jobs:
             git reset --hard origin/main
             docker compose -f docker-compose.prod.yml up --build -d
           '
+
+      # Detecte une derive du .env prod maintenu a la main (issue #293) : une
+      # cle attendue par le code (.env.example) mais oubliee sur le VPS casse
+      # une fonctionnalite en silence - deja arrive avec
+      # GEOLOCATION_ENCRYPTION_KEY (#281) et les 3 VAPID_* (#277). Le
+      # `git reset --hard` ci-dessus garantit que scripts/ et .env.example
+      # sur le VPS sont a jour. Seuls les NOMS de cles sont lus, jamais les
+      # valeurs. Mode alerte pour l'instant (annotation ::warning::, le step
+      # ne bloque pas le deploiement) ; pour le rendre bloquant une fois la
+      # liste d'exceptions eprouvee, prefixer la commande distante de
+      # `STRICT_ENV_DRIFT=1`.
+      - name: Vérifier la dérive du .env de production (#293)
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" '
+            cd /home/ubuntu/app
+            bash scripts/check-env-drift.sh \
+              --env .env \
+              --example .env.example \
+              --allowlist scripts/env-drift-allowlist.txt
+          ' | tee env-drift-report.txt
+          if grep -q "^RESULT: DRIFT" env-drift-report.txt; then
+            echo "::warning title=Dérive du .env de production (#293)::$(grep '^RESULT: DRIFT' env-drift-report.txt) — voir le log de ce step et scripts/env-drift-allowlist.txt"
+          fi

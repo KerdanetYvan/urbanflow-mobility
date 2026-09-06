@@ -1,0 +1,32 @@
+# Allowlist de la detection de derive du .env prod (scripts/check-env-drift.sh,
+# job "Deploiement production" de .github/workflows/ci.yml, issue #293).
+#
+# Une cle par ligne. Ces cles figurent dans .env.example mais leur absence du
+# .env du VPS est NORMALE : le code retombe sur une valeur par defaut, ou la
+# variable est fournie autrement qu'via le .env runtime. Verifie a la main,
+# reference du code a l'appui.
+#
+# Attention : ne PAS y ajouter une cle juste pour faire taire l'alerte -
+# chaque entree doit renvoyer a un defaut explicite cote code.
+
+# SMTP : le backend n'authentifie pas la connexion si MAIL_USER est vide
+# (relai postfix interne en prod, MailHog en dev) - voir
+# backend/src/mail/mail.service.ts L26-38.
+MAIL_USER
+MAIL_PASSWORD
+
+# Import GTFS statique : GTFS_LOCAL_PATH a un defaut vide (prime seulement s'il
+# est renseigne, dev/CI), GTFS_SOURCE_URL a un DEFAULT_GTFS_SOURCE_URL,
+# GTFS_OTP_OUTPUT_PATH a un defaut - voir backend/src/gtfs/gtfs-import.service.ts.
+GTFS_LOCAL_PATH
+GTFS_SOURCE_URL
+GTFS_OTP_OUTPUT_PATH
+
+# Fuseau passe a OpenTripPlanner : defaut cote code - voir
+# backend/src/otp/otp-client.service.ts L149.
+OTP_TIMEZONE
+
+# Config multi-operateurs (JSON) : absente => repli sur l'operateur par defaut,
+# comportement assume pour un deploiement simple - voir
+# backend/src/operators/operators.service.ts.
+MOBILITY_OPERATORS
