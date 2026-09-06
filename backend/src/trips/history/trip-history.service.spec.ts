@@ -1,5 +1,13 @@
+import { createEncryptedColumnTransformer } from '../../common/encryption/encrypted-column.transformer';
 import { TripHistoryService } from './trip-history.service';
 import type { TripHistoryEntry } from './trip-history-entry.entity';
+
+/**
+ * Cle de test valide (32 octets, base64). Calculee a la volee plutot
+ * qu'ecrite en dur : aucune chaine ressemblant a un secret dans la source
+ * (evite un faux positif du scan gitleaks de la CI).
+ */
+const TEST_KEY = Buffer.from('0'.repeat(32)).toString('base64');
 
 describe('TripHistoryService', () => {
   let service: TripHistoryService;
@@ -7,6 +15,7 @@ describe('TripHistoryService', () => {
     create: jest.Mock;
     save: jest.Mock;
     find: jest.Mock;
+    query: jest.Mock;
     delete: jest.Mock;
   };
 
@@ -15,6 +24,7 @@ describe('TripHistoryService', () => {
       create: jest.fn((data: Partial<TripHistoryEntry>) => data),
       save: jest.fn().mockResolvedValue(undefined),
       find: jest.fn().mockResolvedValue([]),
+      query: jest.fn().mockResolvedValue([]),
       delete: jest.fn().mockResolvedValue({ affected: 0 }),
     };
     service = new TripHistoryService(repository as never);
@@ -145,6 +155,99 @@ describe('TripHistoryService', () => {
       const result = await service.findRecent('user-1');
 
       expect(result).toHaveLength(10);
+    });
+  });
+
+  describe('findRecent - resilience a une entree indechiffrable (issue #281)', () => {
+    const originalKey = process.env.GEOLOCATION_ENCRYPTION_KEY;
+
+    beforeEach(() => {
+      process.env.GEOLOCATION_ENCRYPTION_KEY = TEST_KEY;
+    });
+
+    afterEach(() => {
+      process.env.GEOLOCATION_ENCRYPTION_KEY = originalKey;
+    });
+
+    /**
+     * Construit une ligne SQL brute (colonnes snake_case, coordonnees/libelles
+     * chiffres avec TEST_KEY) telle que la renverrait historyRepository.query
+     * dans le repli tolerant.
+     */
+    function rawRow(overrides: {
+      id: string;
+      searchedAt: Date;
+      destinationLat?: number;
+      destinationLon?: number;
+    }): Record<string, string | null> {
+      const num = createEncryptedColumnTransformer<number>();
+      const text = createEncryptedColumnTransformer<string>();
+      return {
+        id: overrides.id,
+        user_id: 'user-1',
+        origin_lat: num.to(48.85) as string,
+        origin_lon: num.to(2.35) as string,
+        destination_lat: num.to(overrides.destinationLat ?? 48.86) as string,
+        destination_lon: num.to(overrides.destinationLon ?? 2.36) as string,
+        origin_label: text.to('Part-Dieu') as string,
+        destination_label: null,
+        searched_at: overrides.searchedAt.toISOString(),
+      };
+    }
+
+    it('bascule sur une lecture brute quand find() echoue, et renvoie les entrees dechiffrables', async () => {
+      repository.find.mockRejectedValue(
+        new Error('Unsupported state or unable to authenticate data'),
+      );
+      repository.query.mockResolvedValue([
+        rawRow({ id: 'ok', searchedAt: new Date() }),
+      ]);
+
+      const result = await service.findRecent('user-1');
+
+      expect(repository.query).toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('ok');
+      expect(result[0].originLabel).toBe('Part-Dieu');
+    });
+
+    it('ignore la (ou les) ligne(s) indechiffrable(s) sans faire tomber tout l historique', async () => {
+      repository.find.mockRejectedValue(new Error('cle rotee'));
+      repository.query.mockResolvedValue([
+        rawRow({
+          id: 'lisible',
+          searchedAt: new Date(),
+          destinationLat: 48.86,
+          destinationLon: 2.36,
+        }),
+        // Valeur qui n'est pas un texte chiffre valide -> from() leve, la
+        // ligne doit etre ecartee, pas propagee.
+        {
+          id: 'corrompue',
+          user_id: 'user-1',
+          origin_lat: 'pas-un-chiffre-valide',
+          origin_lon: 'xxx',
+          destination_lat: 'xxx',
+          destination_lon: 'xxx',
+          origin_label: null,
+          destination_label: null,
+          searched_at: new Date().toISOString(),
+        },
+      ]);
+
+      const result = await service.findRecent('user-1');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('lisible');
+    });
+
+    it('n echoue pas si find() aboutit normalement (le chemin nominal ne touche pas a query)', async () => {
+      repository.find.mockResolvedValue([]);
+
+      const result = await service.findRecent('user-1');
+
+      expect(result).toEqual([]);
+      expect(repository.query).not.toHaveBeenCalled();
     });
   });
 
