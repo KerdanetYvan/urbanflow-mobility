@@ -27,3 +27,13 @@ a8f688445a2ca5f5e7c29a91fc51221ab33af6a6:backend/src/common/encryption/encrypted
 # fichier), mais cette ancienne version reste visible dans l'historique git
 # et doit donc rester ignoree elle aussi.
 8fec16062345ab29cd1ea787ca44af12f3366ee8:.gitleaksignore:generic-api-key:6
+
+# Commit 746469d (PR #290, #281) : les deux nouveaux .spec utilisaient la
+# meme constante de cle de test que encrypted-column.transformer.spec.ts
+# (voir plus haut) - meme faux positif, meme valeur sans rapport avec une
+# cle de production. Le commit suivant de la meme PR (944459e) l'a remplacee
+# par un calcul a la volee, il n'y a donc plus rien a la HEAD - mais gitleaks
+# scanne tout l'historique (fetch-depth: 0) et retrouve la valeur dans le
+# diff de 746469d. Historique deja pousse et mergE, non reecrit.
+746469de0076c009917d54744703a252f1199ad5:backend/src/config/env.validation.spec.ts:generic-api-key:4
+746469de0076c009917d54744703a252f1199ad5:backend/src/trips/history/trip-history.service.spec.ts:generic-api-key:6

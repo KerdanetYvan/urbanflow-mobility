@@ -74,6 +74,33 @@ Le bouton "Suivre ce trajet" reste **visible** pour un visiteur non connecté
 flux d'abonnement — même traitement que les autres actions du produit qui
 nécessitent un compte (raccourcis domicile/travail, historique).
 
+### 3.1 Réexamen après retour testeur ([#276](https://github.com/KerdanetYvan/urbanflow-mobility/issues/276))
+
+La revue testeur qui a clôturé le Sprint 4 a reposé la question : « pour
+suivre un trajet il faut obligatoirement être connecté — est-ce vraiment
+nécessaire ? » Décision PO en session (Sprint 5) : **la contrainte reste**,
+et ce paragraphe la fige pour ne plus la rouvrir sans élément nouveau.
+
+Deux portées réduites ont été pesées et écartées :
+
+- **Suivi anonyme purement local** (la PWA poll GTFS-Realtime elle-même, sans
+  `FollowedTrip` serveur ni push ni anti-spam) : ne fonctionne que l'onglet
+  ouvert. Un « suivi » qui s'arrête dès qu'on ferme l'app livre l'inverse de
+  ce que l'utilisateur attend (être prévenu **pendant** son trajet, écran
+  éteint) — demi-fonctionnalité plus trompeuse qu'absente.
+- **Suivi anonyme complet** (`FollowedTrip` keyé par un jeton d'appareil au
+  lieu de `userId`) : rapproche de la parité mais rouvre tout le flux
+  (persistance, cycle de vie, anti-spam par signature) sur une identité non
+  authentifiée, donc une nouvelle surface d'écriture publique à cadrer
+  (abus/rate-limiting, OWASP API4/API6). Coût sans rapport avec le gain pour
+  une fonctionnalité déjà post-MVP.
+
+Le cœur du raisonnement de la section 3 tient toujours : un suivi utile =
+notification en arrière-plan = état serveur durable (abonnement push ↔
+trajet suivi ↔ déduplication des perturbations), et cet état a besoin d'un
+propriétaire pour son cycle de vie et sa suppression RGPD. Le compte n'est
+pas une barrière arbitraire, c'est ce propriétaire.
+
 ## 4. Anti-spam sans delta chiffré
 
 Remplace la règle "delta > 5 min" (section 3.5 du spec, inapplicable —
