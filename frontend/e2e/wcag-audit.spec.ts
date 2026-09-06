@@ -125,30 +125,56 @@ test.describe('Recherche avec résultats', () => {
 });
 
 test.describe('Navigation clavier', () => {
-  // fixme (audit securite/CI OWASP #262, decouvert au premier run reel de
-  // cette suite en CI) : le bouton popover "Modes de transport" cible ici a
-  // ete remplace par des chips icone+libelle (voir le commentaire "remplace
-  // l'ancien bouton dedie 'Modes de transport'" dans RecherchePage.tsx,
-  // issues #108/#109, #255) - ce test n'a jamais ete mis a jour en
-  // consequence et echoue systematiquement (bouton introuvable). A
-  // reecrire contre le nouveau pattern d'interaction clavier des chips
-  // avant de reactiver (retirer `.fixme`).
-  test.fixme('Popover "Modes de transport" : ouverture/fermeture au clavier', async ({ page }) => {
+  // Reecrit pour #264 : l'ancien popover dedie "Modes de transport"
+  // (#108/#109) a ete fusionne dans la modale unique "Filtres" (#233) - un
+  // <button aria-label="Filtres" aria-haspopup="dialog"> qui ouvre un
+  // <div role="dialog" aria-modal="true"> contenant le <fieldset> "Modes de
+  // transport pour cette recherche" (cases a cocher) + l'heure de depart.
+  // Ce test verifie le contrat clavier de cette modale en vrai navigateur :
+  // ouverture au clavier, focus deplace dans la modale, piege de focus,
+  // fermeture a Echap avec retour du focus au declencheur.
+  test('Modale "Filtres" (modes de transport) : ouverture, piège de focus et fermeture au clavier', async ({
+    page,
+  }) => {
     await page.goto('/recherche');
 
-    const trigger = page.getByRole('button', { name: /Modes de transport/ });
+    const trigger = page.getByRole('button', { name: 'Filtres' });
     await trigger.focus();
     await expect(trigger).toBeFocused();
 
+    // Ouverture au clavier (Entree sur le declencheur focalise).
     await page.keyboard.press('Enter');
-    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('#recherche-modes-panel')).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: 'Filtres de recherche' });
+    await expect(dialog).toBeVisible();
 
+    // Le focus est deplace dans la modale a l'ouverture (WAI-ARIA APG,
+    // pattern "Dialog (Modal)") - sur le premier element focusable, ici la
+    // premiere case a cocher.
+    const firstCheckbox = page.getByRole('checkbox', { name: 'Marche' });
+    const closeButton = page.getByRole('button', { name: 'Fermer' });
+    await expect(firstCheckbox).toBeFocused();
+
+    // Piege de focus : depuis le dernier element focusable ("Fermer"), Tab
+    // revient au premier ; depuis le premier, Shift+Tab va au dernier.
+    await closeButton.focus();
+    await page.keyboard.press('Tab');
+    await expect(firstCheckbox).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(closeButton).toBeFocused();
+
+    // Activation clavier d'une case (Espace) : l'etat suit.
+    const bikeCheckbox = page.getByRole('checkbox', { name: 'Vélo' });
+    await bikeCheckbox.focus();
+    await expect(bikeCheckbox).not.toBeChecked();
+    await page.keyboard.press('Space');
+    await expect(bikeCheckbox).toBeChecked();
+
+    // Fermeture a Echap : la modale disparait et le focus revient
+    // explicitement au declencheur (le libelle porte alors le compteur de
+    // filtres actifs, une case ayant ete cochee).
     await page.keyboard.press('Escape');
-    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    // Le focus doit revenir explicitement au declencheur a la fermeture
-    // (spec docs/specs/filtre-modes-transport.md section 3).
-    await expect(trigger).toBeFocused();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('button', { name: /^Filtres/ })).toBeFocused();
   });
 
   test('Formulaire de recherche : parcours complet au clavier sans piège', async ({ page }) => {
