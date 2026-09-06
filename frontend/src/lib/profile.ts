@@ -1,20 +1,25 @@
 import { authDelete, authGet, authPatch, authPost } from './api';
 
 /**
- * Memes valeurs que l'enum TransportMode cote backend (voir
+ * Modes de transport proposables a l'utilisateur (selecteur du profil de
+ * mobilite ET filtre de modes de /recherche, qui partagent cette liste).
+ * Correspond au sous-ensemble PROFILE_TRANSPORT_MODES cote backend (voir
  * backend/src/profiles/transport-mode.enum.ts) - pas de code partage entre
- * les deux projets, donc dupliquees ici volontairement, avec un libelle
- * lisible pour l'affichage du formulaire.
+ * les deux projets, donc duplique ici volontairement, avec un libelle
+ * lisible.
+ *
+ * Trottinette et covoiturage ont ete retires (issue #278) : aucune source
+ * de donnees ne permet de produire un trajet de ce type, les cocher
+ * n'avait aucun effet. Un profil deja enregistre avec l'une de ces valeurs
+ * reste lu sans erreur (voir ProfilPage, filtrage au chargement).
  */
 export const TRANSPORT_MODES = [
   { value: 'walking', label: 'Marche' },
   { value: 'cycling', label: 'Vélo' },
-  { value: 'scooter', label: 'Trottinette' },
   { value: 'bus', label: 'Bus' },
   { value: 'tram', label: 'Tram' },
   { value: 'metro', label: 'Métro' },
   { value: 'train_ter', label: 'Train / TER' },
-  { value: 'carpooling', label: 'Covoiturage' },
 ] as const;
 
 /**

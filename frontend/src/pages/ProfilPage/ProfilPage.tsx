@@ -14,13 +14,11 @@ import FormField from '../../components/FormField/FormField';
 import {
   BikeIcon,
   BusIcon,
-  CarIcon,
   LockIcon,
   MinusIcon,
   MoonIcon,
   PlusIcon,
   RulerIcon,
-  ScooterIcon,
   SunIcon,
   SwapIcon,
   WalkIcon,
@@ -77,26 +75,24 @@ type Feedback = { variant: 'success' | 'error'; message: string };
 const TRANSPORT_MODE_ICON: Record<string, ReactNode> = {
   walking: <WalkIcon />,
   cycling: <BikeIcon />,
-  scooter: <ScooterIcon />,
   bus: <BusIcon />,
   tram: <BusIcon />,
   metro: <BusIcon />,
   train_ter: <BusIcon />,
-  carpooling: <CarIcon />,
 };
 
 /**
  * Regroupement par categorie des modes de transport (issue #255, acceptance
  * "regroupement visuel par categorie") - corrige 2 des 3 echecs de charge
  * cognitive du rapport de critique concentres sur cet ecran (chunking,
- * ≤4 choix visibles par decision) : 8 items d'un coup deviennent 3 groupes
- * de 3/4/1. Values = valeurs de TRANSPORT_MODES (lib/profile.ts) qui
- * appartiennent a ce groupe.
+ * ≤4 choix visibles par decision) : la liste devient 2 groupes de 2 et 4.
+ * L'ancien groupe "Partagé" (covoiturage) a disparu avec le retrait de
+ * trottinette/covoiturage (issue #278). Values = valeurs de TRANSPORT_MODES
+ * (lib/profile.ts) qui appartiennent a ce groupe.
  */
 const TRANSPORT_MODE_CATEGORIES: { label: string; values: string[] }[] = [
-  { label: 'Actif', values: ['walking', 'cycling', 'scooter'] },
+  { label: 'Actif', values: ['walking', 'cycling'] },
   { label: 'Transport en commun', values: ['bus', 'tram', 'metro', 'train_ter'] },
-  { label: 'Partagé', values: ['carpooling'] },
 ];
 
 /**
@@ -817,7 +813,18 @@ function ProfilPage() {
         const profile = await getMyProfile();
         if (cancelled) return;
         setProfileExists(true);
-        setSelectedModes(profile.preferredTransportModes);
+        // Lecture tolerante (issue #278) : un profil enregistre avant le
+        // retrait de trottinette/covoiturage peut encore porter ces valeurs
+        // en base. On les ecarte des cases cochees plutot que de planter
+        // l'affichage - il n'existe plus de chip pour elles, et un
+        // "Enregistrer" ulterieur les renverrait au backend qui les rejette
+        // desormais (voir CreateProfileDto). Elles sont donc silencieusement
+        // nettoyees au prochain enregistrement volontaire de l'utilisateur.
+        setSelectedModes(
+          profile.preferredTransportModes.filter((mode) =>
+            TRANSPORT_MODES.some((known) => known.value === mode),
+          ),
+        );
         setSelectedAccessibilityPreferences(profile.accessibilityPreferences);
         // Preremplissage domicile/travail (issue #113/#114) : traite comme
         // une suggestion deja resolue (pas juste un texte tape), pour

@@ -529,7 +529,16 @@ function RecherchePage() {
       .then((profile) => {
         if (!cancelled) {
           if (!initialSession) {
-            setSelectedModes(profile.preferredTransportModes);
+            // Filtrage tolerant (issue #278) : un profil enregistre avant le
+            // retrait de trottinette/covoiturage peut encore porter ces
+            // valeurs. Les garder ici ferait apparaitre un filtre "actif"
+            // invisible (aucune case dans le popover, mais compte dans
+            // activeCount) - on ne prend que les modes encore proposables.
+            setSelectedModes(
+              profile.preferredTransportModes.filter((mode) =>
+                TRANSPORT_MODES.some((known) => known.value === mode),
+              ),
+            );
           }
           setAccessibilityPreferences(profile.accessibilityPreferences);
           // Domicile/travail (issue #93) : PlaceSuggestion derive du profil,

@@ -25,3 +25,32 @@ export enum TransportMode {
   TRAIN_TER = 'train_ter',
   CARPOOLING = 'carpooling',
 }
+
+/**
+ * Sous-ensemble de TransportMode reellement proposable dans les preferences
+ * d'un profil de mobilite (issue #278).
+ *
+ * SCOOTER (trottinette) et CARPOOLING (covoiturage) sont volontairement
+ * exclus : aucune source de donnees ne permet aujourd'hui de produire un
+ * trajet de ce type (constat de la revue testeur du Sprint 4, confirme par
+ * le commentaire de otp-modes.ts - acceptes par OTP mais silencieusement
+ * ignores au routage) et aucune integration n'est prevue a court terme.
+ * Les laisser dans le selecteur revenait a cocher une preference qui ne
+ * serait jamais honoree. CYCLING reste : la source GBFS existe deja
+ * (issue #13), seul son cablage au routage est encore un backlog.
+ *
+ * TransportMode ci-dessus garde en revanche les deux valeurs : elles
+ * restent des chaines connues du catalogue pour la recherche d'itineraire
+ * (SearchTripsDto) et le suivi de trajet (FollowedTrip), et on veut
+ * tolerer en lecture un profil existant qui les aurait deja en base
+ * (colonne Postgres text[], aucune contrainte d'enum au niveau SQL) plutot
+ * que de planter l'affichage de ces comptes.
+ */
+export const PROFILE_TRANSPORT_MODES: readonly TransportMode[] = [
+  TransportMode.WALKING,
+  TransportMode.CYCLING,
+  TransportMode.BUS,
+  TransportMode.TRAM,
+  TransportMode.METRO,
+  TransportMode.TRAIN_TER,
+];
