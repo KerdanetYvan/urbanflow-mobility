@@ -2,8 +2,12 @@ import { createEncryptedColumnTransformer } from '../../common/encryption/encryp
 import { TripHistoryService } from './trip-history.service';
 import type { TripHistoryEntry } from './trip-history-entry.entity';
 
-/** Cle de test valide (32 octets, base64) - identique a celle du .spec du transformer. */
-const TEST_KEY = 'ZmFrZWtleWZha2VrZXlmYWtla2V5ZmFrZWtleTEyMzQ=';
+/**
+ * Cle de test valide (32 octets, base64). Calculee a la volee plutot
+ * qu'ecrite en dur : aucune chaine ressemblant a un secret dans la source
+ * (evite un faux positif du scan gitleaks de la CI).
+ */
+const TEST_KEY = Buffer.from('0'.repeat(32)).toString('base64');
 
 describe('TripHistoryService', () => {
   let service: TripHistoryService;

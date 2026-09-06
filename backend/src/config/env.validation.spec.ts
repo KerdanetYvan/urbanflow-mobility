@@ -1,14 +1,18 @@
 import { validateEnv } from './env.validation';
 
-/** Cle valide (32 octets une fois decodee depuis le base64). */
-const VALID_KEY = 'ZmFrZWtleWZha2VrZXlmYWtla2V5ZmFrZWtleTEyMzQ=';
+/**
+ * Cle valide (32 octets une fois decodee depuis le base64). Calculee a la
+ * volee plutot qu'ecrite en dur : aucune chaine ressemblant a un secret dans
+ * la source (evite un faux positif du scan gitleaks de la CI).
+ */
+const VALID_KEY = Buffer.from('0'.repeat(32)).toString('base64');
 
 /** Jeu de variables minimal qui doit passer la validation sans erreur. */
 function validConfig(): Record<string, unknown> {
   return {
     DATABASE_URL: 'postgresql://u:p@postgres:5432/db',
-    JWT_SECRET: 'secret-access',
-    JWT_REFRESH_SECRET: 'secret-refresh',
+    JWT_SECRET: 'jwt-access-test',
+    JWT_REFRESH_SECRET: 'jwt-refresh-test',
     GEOLOCATION_ENCRYPTION_KEY: VALID_KEY,
   };
 }
