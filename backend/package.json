@@ -48,7 +48,7 @@
     "gtfs-realtime-bindings": "^2.2.0",
     "helmet": "^8.3.0",
     "long": "^5.3.2",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^9.0.6",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.0",
