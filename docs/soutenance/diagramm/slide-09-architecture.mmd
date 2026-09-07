@@ -1,0 +1,39 @@
+%% Slide 9 - Architecture en couches (voir docs/soutenance/trame-slides.md)
+%% Couleurs : charte graphique du projet (frontend/src/styles/tokens.css, issue #52)
+%%   epine dorsale  : ambre  #f5a623 / #8a5209
+%%   modules ajoutes : bleu   #2f6fed / #1a3f8f
+flowchart TB
+    PWA["PWA React<br/>(navigateur)"]
+    CADDY["Caddy<br/>reverse proxy + HTTPS"]
+    API["API REST NestJS"]
+    DB[("PostgreSQL<br/>+ PostGIS")]
+
+    PWA -->|HTTPS| CADDY --> API --> DB
+
+    subgraph ITER["Ajoutes au fil des sprints - structure inchangee"]
+        SCORE["Scoring<br/>d'itineraires"]
+        RT["Caches temps reel<br/>GBFS / GTFS-RT"]
+        PUSH["Notifications push"]
+    end
+
+    subgraph EXT["Services externes interchangeables"]
+        OTP["OpenTripPlanner"]
+        GEO["Geocodeur"]
+        METEO["API meteo"]
+        FLUX["Flux operateurs<br/>GTFS / GBFS"]
+    end
+
+    API --> SCORE
+    API -->|itineraires| OTP
+    API -->|adresses| GEO
+    SCORE --> METEO
+    SCORE --> RT
+    RT --> FLUX
+    OTP --> FLUX
+    RT -.perturbation.-> PUSH
+    PUSH -.-> PWA
+
+    classDef spine fill:#f5a623,stroke:#8a5209,color:#241a00,font-weight:bold
+    classDef added fill:#ffffff,stroke:#2f6fed,stroke-dasharray:5 3,color:#1a3f8f
+    class PWA,CADDY,API,DB spine
+    class SCORE,RT,PUSH added

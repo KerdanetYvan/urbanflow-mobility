@@ -1,0 +1,37 @@
+<svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <!-- Cible principale : grand cercle bleu -->
+  <circle cx="280" cy="260" r="200" fill="#2F6FED" fill-opacity="0.12" stroke="#2F6FED" stroke-width="2"/>
+
+  <!-- Coeur de cible : petit cercle rouge, dans le bleu, bas-droite -->
+  <circle cx="330" cy="320" r="85" fill="#E23D3D" fill-opacity="0.24" stroke="#E23D3D" stroke-width="2"/>
+
+  <!-- Cible secondaire : cercle vert, à côté -->
+  <circle cx="650" cy="260" r="140" fill="#2FA84F" fill-opacity="0.12" stroke="#2FA84F" stroke-width="2"/>
+
+  <!-- Titre cible principale : centré en haut du cercle bleu -->
+  <text x="280" y="90" text-anchor="middle" font-size="16" font-weight="700" fill="#1a3f8f">Cible principale</text>
+  <!-- Details cible principale : centrés en-dessous du titre -->
+  <text x="280" y="130" text-anchor="middle" font-size="12" fill="#1a3f8f">
+    <tspan x="280" dy="0">22–30 ans</tspan>
+    <tspan x="280" dy="20">Diplômé(e) depuis moins de 2 ans</tspan>
+    <tspan x="280" dy="20">Sans véhicule personnel</tspan>
+    <tspan x="280" dy="20">Récemment installé(e) en ville</tspan>
+  </text>
+
+  <!-- Titre + details coeur de cible : centrés dans le cercle rouge -->
+  <text x="330" y="298" text-anchor="middle" font-size="12" font-weight="700" fill="#7a1414">Cœur de cible</text>
+  <text x="330" y="316" text-anchor="middle" font-size="10" fill="#7a1414">
+    <tspan x="330" dy="0">Vit seul(e), 1er logement</tspan>
+    <tspan x="330" dy="14">Emménagé(e) depuis</tspan>
+    <tspan x="330" dy="14">moins de 12 mois</tspan>
+  </text>
+
+  <!-- Titre + details cible secondaire -->
+  <text x="650" y="195" text-anchor="middle" font-size="15" font-weight="700" fill="#1c5c2e">Cible secondaire</text>
+  <text x="650" y="245" text-anchor="middle" font-size="12" fill="#1c5c2e">
+    <tspan x="650" dy="0">65 ans et plus</tspan>
+    <tspan x="650" dy="19">Permis non détenu ou non renouvelé</tspan>
+    <tspan x="650" dy="19">Déplacement seul(e) difficile</tspan>
+    <tspan x="650" dy="19">Aide à la marche ou fauteuil roulant</tspan>
+  </text>
+</svg>

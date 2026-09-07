@@ -1,0 +1,28 @@
+%% Slide 10 - Fonctionnalite au choix : le service de scoring (voir docs/soutenance/trame-slides.md)
+%% Schema du dossier §7.3, aux couleurs de la charte (frontend/src/styles/tokens.css, issue #52)
+%%   epine dorsale : ambre #f5a623 / #8a5209  (structure fixe : OTP, PWA)
+%%   module ajoute : bleu  #2f6fed / #1a3f8f  (le scoring, ajoute au fil des sprints)
+flowchart LR
+    OTP["OpenTripPlanner<br/>itineraires possibles"]
+
+    subgraph IN["Entrees du scoring"]
+        METEO["API meteo"]
+        RT["GTFS-Realtime<br/>perturbations en cours"]
+        PROFIL["Profil de mobilite<br/>preferences usager"]
+    end
+
+    SCORE["Service de scoring<br/>somme ponderee, poids explicites<br/><br/>duree · correspondances<br/>meteo · perturbations · profil"]
+
+    RESULT["Itineraires<br/>classes"]
+    PWA["PWA React"]
+
+    OTP --> SCORE
+    METEO --> SCORE
+    RT --> SCORE
+    PROFIL --> SCORE
+    SCORE --> RESULT --> PWA
+
+    classDef spine fill:#f5a623,stroke:#8a5209,color:#241a00,font-weight:bold
+    classDef added fill:#ffffff,stroke:#2f6fed,stroke-dasharray:5 3,color:#1a3f8f,font-weight:bold
+    class OTP,PWA spine
+    class SCORE added
