@@ -239,7 +239,7 @@ puppeteer:
 9. [Gestion des bogues et qualité de code](#9-gestion-des-bogues-et-qualité-de-code)
    - [9.1 Détection et priorisation des anomalies](#91-détection-et-priorisation-des-anomalies)
    - [9.2 Processus de correction](#92-processus-de-correction)
-   - [9.3 Approche spécifique à la phase de préproduction](#93-approche-spécifique-à -la-phase-de-préproduction)
+   - [9.3 Approche spécifique à la phase de préproduction](#93-approche-spécifique-à-la-phase-de-préproduction)
    - [9.4 Cas concrets de bogues traités](#94-cas-concrets-de-bogues-traités)
 10. [Contraintes transverses (sécurité, RGPD, accessibilité, éco-conception, PWA, performance)](#10-contraintes-transverses)
     - [10.1 Sécurité des données](#101-sécurité-des-données)
@@ -948,7 +948,7 @@ Une régression désigne un bogue déjà corrigé qui réapparaît plus tard, à
 
 La fusion sur la branche principale reste enfin soumise à la même revue de code que n'importe quelle autre évolution.
 
-<a id="93-approche-spécifique-à -la-phase-de-préproduction"></a>
+<a id="93-approche-spécifique-à-la-phase-de-préproduction"></a>
 ### 9.3 Approche spécifique à la phase de préproduction
 
 La phase de préproduction concentre une vigilance particulière, car c'est le dernier point de contrôle avant qu'un usager réel comme [Antoine](#23-cibles-et-personas) ou [Muriel](#23-cibles-et-personas) ne soit exposé à une régression. Trois pratiques structurent cette phase : un parcours de test manuel, où l'on utilise soi-même l'application comme le ferait un usager réel, sur un environnement proche de la production (mêmes flux GTFS/GBFS, mêmes contraintes réseau), un jeu de données réaliste plutôt que des données de test simplifiées, et un passage prioritaire sur les parcours critiques — inscription et profil de mobilité (F1), recherche d'itinéraire (F2), intégration transport (F3), et classement personnalisé par IA ([partie 7](#7-spécifications-détaillées-dune-fonctionnalité-clé)).

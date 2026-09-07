@@ -9,6 +9,7 @@
 |---|---|
 | [`plan-presentation.md`](plan-presentation.md) | Plan minuté des 20 min, chaque segment relié aux critères de la grille. Checklist avant d'entrer. |
 | [`trame-slides.md`](trame-slides.md) | 18 slides (+ 1 repli), pour mise en forme dans Canva : contenu à l'écran + texte de speaker + durée par slide. |
+| [`diagramm/`](diagramm/) | Sources Mermaid `.mmd` des schémas de slides (slide 9 : architecture en couches ; slide 10 : service de scoring), aux couleurs de la charte. Export PNG : `mmdc -i slide-09-architecture.mmd -o slide-09-architecture.png -b transparent -s 3 -w 1600` (ou coller dans [mermaid.live](https://mermaid.live)). |
 | [`scenario-demo.md`](scenario-demo.md) | Parcours de démo continu (F1 → F2 → F3 → scoring → alerte de perturbation), chaque étape reliée à une partie du dossier. Liste des captures de secours. |
 | [`questions-jury.md`](questions-jury.md) | Questions probables et réponses cadrées : « IA » vs somme pondérée, architecture, post-mortem, sécurité/RGPD, simulation du scénario de crise (C2.3), pièges terminologie. |
 | `captures/` | Captures d'écran de secours (à produire, liste dans `scenario-demo.md`). |
